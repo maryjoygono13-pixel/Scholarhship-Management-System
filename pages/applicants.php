@@ -6,7 +6,7 @@
 </div>
 <div class="main-content">
 <div class="field">
-  <label class="label">Name</label>
+  <label class="label">Something to change</label>
   <div class="control">
     <input class="input" type="text" placeholder="Text input">
   </div>
