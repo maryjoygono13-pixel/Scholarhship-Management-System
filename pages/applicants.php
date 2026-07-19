@@ -1,93 +1,122 @@
 <?php include __DIR__ . '/../includes/header.php'; ?>
-
 <div class="top-nav">
     <h2>Applicants</h2>
-    <?php include __DIR__ . '/../includes/navbar.php'; ?>
+<?php include __DIR__ . '/../includes/navbar.php'; ?>
 </div>
-<div class="main-content">
-<div class="field">
-  <label class="label">Something to change</label>
-  <div class="control">
-    <input class="input" type="text" placeholder="Text input">
-  </div>
-</div>
+<body>
+    <div class="page">
 
-<div class="field">
-  <label class="label">Username</label>
-  <div class="control has-icons-left has-icons-right">
-    <input class="input is-success" type="text" placeholder="Text input" value="bulma">
-    <span class="icon is-small is-left">
-      <i class="fas fa-user"></i>
-    </span>
-    <span class="icon is-small is-right">
-      <i class="fas fa-check"></i>
-    </span>
-  </div>
-  <p class="help is-success">This username is available</p>
-</div>
+        <div class="toolbar">
+        <div class="toolbar-buttons">
+        <button id="btnAdd" class="btn btn-primary">Add Applicant</button>
+        <button id="btnImport" class="btn">Import (Excel)</button>
+        <div class="dropdown">
+        <button id="btnExport" class="btn">Export</button>
+        <div id="exportMenu" class="dropdown-menu hidden">
+        <a href="#" id="exportExcel">Export as Excel</a>
+        <a href="#" id="exportPdf">Export as PDF</a>
+        </div>
+        </div>
+        </div>
+       </div>
 
-<div class="field">
-  <label class="label">Email</label>
-  <div class="control has-icons-left has-icons-right">
-    <input class="input is-danger" type="email" placeholder="Email input" value="hello@">
-    <span class="icon is-small is-left">
-      <i class="fas fa-envelope"></i>
-    </span>
-    <span class="icon is-small is-right">
-      <i class="fas fa-exclamation-triangle"></i>
-    </span>
-  </div>
-  <p class="help is-danger">This email is invalid</p>
-</div>
+    <div id="searchFilterBar" class="search-filter-bar">
+        <input type="text" id="searchName" placeholder="Search by name" />
+       <input type="number"id="searchId"placeholder="Search by Student ID"/>
 
-<div class="field">
-  <label class="label">Subject</label>
-  <div class="control">
-    <div class="select">
-      <select>
-        <option>Select dropdown</option>
-        <option>With options</option>
-      </select>
+        <select id="filterScholarship">
+        <option value="">All scholarships</option>
+        <option value="Merit">Merit</option>
+        <option value="Endorsement">Endorsement</option>
+        <option value="Dean's Lister">Dean's Lister</option>
+        </select>
+
+        <select id="filterStatus">
+        <option value="">All statuses</option>
+        <option value="Approved">Approved</option>
+        <option value="Under Evaluation">Under Evaluation</option>
+        <option value="Pending Requirements">Pending Requirements</option>
+        <option value="Rejected">Rejected</option>
+        </select>
+        <input type="date" id="filterDate" />
+        <button id="btnClearFilters" class="btn btn-ghost">Clear</button>
+       </div>
+
+    <div class="table-wrapper">
+        <table id="applicantTable">
+        <thead>
+        <tr>
+        <th>Name</th>
+        <th>Student ID</th>
+        <th>Scholarship</th>
+        <th>Status</th>
+        <th>Date Applied</th>
+        <th class="actions-col">Actions</th>
+        </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+        </table>
+        <p id="emptyState" class="empty-state hidden">No applicants match your search or filters.</p>
     </div>
-  </div>
-</div>
 
-<div class="field">
-  <label class="label">Message</label>
-  <div class="control">
-    <textarea class="textarea" placeholder="Textarea"></textarea>
-  </div>
-</div>
+    <<div id="addModalOverlay" class="applicant-modal-overlay hidden">
+    <div class="applicant-modal">
+        <div class="modal-header">
+        <h2>Add Applicant</h2>
+        <button id="btnCloseModal" class="modal-close">&times;</button>
+        </div>
 
-<div class="field">
-  <div class="control">
-    <label class="checkbox">
-      <input type="checkbox">
-      I agree to the <a href="#">terms and conditions</a>
-    </label>
-  </div>
-</div>
+        <form id="addApplicantForm" class="modal-body">
+        <label>
+        Full name
+        <input type="text" id="fieldName" required />
+        </label>
 
-<div class="field">
-  <div class="control">
-    <label class="radio">
-      <input type="radio" name="question">
-      Yes
-    </label>
-    <label class="radio">
-      <input type="radio" name="question">
-      No
-    </label>
-  </div>
-</div>
+        <label>
+    Student ID
+    <input
+        type="text"
+        id="fieldId"
+        name="student_id"
+        oninput="this.value = this.value.replace(/[^0-9]/g, '')"
+        required
+    />
+</label>
 
-<div class="field is-grouped">
-  <div class="control">
-    <button class="button is-link">Submit</button>
-  </div>
-  <div class="control">
-    <button class="button is-link is-light">Cancel</button>
-  </div>
-</div>
-</div>
-<?php include __DIR__ . '/../includes/footer.php'; ?>
+        <label>
+        Scholarship type
+        <select id="fieldScholarship" required>
+        <option value="" disabled selected>Select scholarship</option>
+        <option value="Merit">Merit</option>
+        <option value="Endorsement">Endorsement</option>
+        <option value="Dean's Lister">Dean's Lister</option>
+        </select>
+        </label>
+
+        <label>
+        Status
+        <select id="fieldStatus" required>
+        <option value="Pending Requirements" selected>Pending Requirements</option>
+        <option value="Under Evaluation">Under Evaluation</option>
+        <option value="Approved">Approved</option>
+        <option value="Rejected">Rejected</option>
+        </select>
+        </label>
+
+        <label>
+        Date applied
+        <input type="date" id="fieldDate" required />
+        </label>
+
+        <p id="formError" class="form-error hidden"></p>
+
+        <div class="modal-actions">
+        <button type="button" id="btnCancelAdd" class="btn btn-ghost">Cancel</button>
+        <button type="submit" class="btn btn-primary">Add Applicant</button>
+        </div>
+        </form>
+    </div>
+    </div>
+    </div>
+</body>
+    <script src="assets/js/applicants.js"></script>

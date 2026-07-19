@@ -1,1 +1,1 @@
-<?php include __DIR__ . '/pages/dashboard.php'; ?>
+<?php include __DIR__ . '/../includes/dashboard.php'; ?>

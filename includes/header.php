@@ -9,7 +9,10 @@
         <link href="assets/css/style.css" rel="stylesheet">
         <link href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet">
         <link href="assets/lib/bulma.min.css" rel="stylesheet">
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
         <title>Dashboard Menu</title>
+            <link rel="icon" href="assets/img/cmlogoremove.png">
     </head>
 
 
