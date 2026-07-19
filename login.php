@@ -2,12 +2,11 @@
 <html>
     <head>
         <meta charset="UTF-8">
+       
         <title>Login Form   </title>
-
-
 </head>
 <style>
-   
+
 @import url('https://fonts.googleapis.com/css2?family=Black+Ops+One&family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap');
 
     body{
@@ -20,10 +19,10 @@
         justify-content: center;
         align-items: center;
         font-family: "DM sans",sans-serif ;
-        
+
     }
-    
-          
+
+
     .box {
         width: 300px;
         height: 400px;
@@ -34,28 +33,28 @@
         text-align:center;
         box-shadow: 0 0 10px rgba(0,0,0,0.2);
         color:gray;
-        
+
     }
     .logo-image {
         width:100px;
-       
+
     }
-        
+
     .form-box h1{
         font-size:32px;
         color:black;
-        
+
     }
     .input-group{
         position:relative;
         display:flex;
-       
+
     }
     .form-box{
         display: flex;
         flex-direction:column;
         gap:10px;
-     
+
     }
     .input-field{
     width:100%;
@@ -115,7 +114,7 @@
     background:none;
     border-radius:6px;
     cursor:pointer;
-    padding-inline:8px;  
+    padding-inline:8px;
 }
 .form-btn--submit{
     background-color: rgb(76, 129, 104);
@@ -132,22 +131,22 @@
 }
 
 
-      
 
-        
+
+
 </style>
 <body>
-    
+
    <div class="box">
     <div class="form-box">
       <div class="logo">
-        <img src="IMAGE/cmlogo.jpg" alt="logo" class="logo-image"> 
+        <img src="IMAGE/cmlogo.jpg" alt="logo" class="logo-image">
       </div>
     <div class="form-header">
         <h1>SCHOLAR PORTAL</H1>
             <p> Sign in to continue</p>
     </div>
-    
+
      <form class="form-box">
         <div class="input-group">
             <input type="email" id="email" class="input-field" placeholder=""required>
@@ -166,8 +165,8 @@
 
     </div>
    </div>
-  
-    
+
+
     <script>
 function togglePassword() {
     const passwordInput = document.getElementById("password");
@@ -200,12 +199,12 @@ function togglePassword() {
     }
 }
 </script>
-    </script>   
+    </script>
 
-    
 
-    
-   
+
+
+
 </body>
 
 
