@@ -2,15 +2,16 @@
 <html>
     <head>
         <meta charset="UTF-8">
-       
         <title>Login Form   </title>
+        <link rel="icon" href="assets/img/cmlogoremove.png">
+
 </head>
 <style>
 
 @import url('https://fonts.googleapis.com/css2?family=Black+Ops+One&family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap');
 
     body{
-        background-image:   linear-gradient(rgba(255,255,255,0.5), rgba(255,255,255,0.5)),url('IMAGE/cm2.jpg');
+        background-image:  linear-gradient(rgba(255,255,255,0.5), rgba(255,255,255,0.5)),url("assets/img/cm2.jpg");
         background-repeat: no-repeat;
         background-size: cover;
         margin:0;
@@ -140,7 +141,7 @@
    <div class="box">
     <div class="form-box">
       <div class="logo">
-        <img src="IMAGE/cmlogo.jpg" alt="logo" class="logo-image">
+        <img src="assets/img/cmlogo.jpg" alt="logo" class="logo-image">
       </div>
     <div class="form-header">
         <h1>SCHOLAR PORTAL</H1>
@@ -149,11 +150,11 @@
 
      <form class="form-box">
         <div class="input-group">
-            <input type="email" id="email" class="input-field" placeholder=""required>
+        <input type="email" id="email" class="input-field" placeholder=""required>
        <label for="email" class="floating-label">Email address</label>
        </div>
         <div class="input-group">
-            <input type="password" id="password" class="input-field" placeholder=""required>
+        <input type="password" id="password" class="input-field" placeholder=""required>
        <label for="password" class="floating-label">Password</label>
        <div class="eye-icon" onclick="togglePassword()">
         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-eye-icon lucide-eye"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg>
