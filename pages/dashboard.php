@@ -1,4 +1,7 @@
-<?php include __DIR__ . '/../includes/header.php'; ?>
+<?php
+$page_css = 'dashboard.css';
+include __DIR__ . '/../includes/header.php';
+?>
 
 <div class="top-nav">
     <h2>Dashboard</h2>
@@ -11,15 +14,15 @@
         <div class="cards">
 
         <div class="card blue">
-         <i class="bx bx-user"></i>
-        <span class="text card-text">Total Applicants</span>
-        <h1>250</h1>
-         </div>
+            <i class="bx bx-user"></i>
+            <span class="text card-text">Total Applicants</span>
+            <h1>250</h1>
+        </div>
 
         <div class="card orange">
-        <i class="bx bx-task"></i>
-        <span class="text card-text">Under Evaluation</span>
-        <h1>180</h1>
+            <i class="bx bx-task"></i>
+            <span class="text card-text">Under Evaluation</span>
+            <h1>180</h1>
         </div>
 
         <div class="card green">
@@ -88,7 +91,6 @@
 
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
-<script src="assets/js/chart.js"></script>
-
-<?php include __DIR__ . '/../includes/footer.php'; ?>
+<?php
+$useChart = true;
+include __DIR__ . '/../includes/footer.php';

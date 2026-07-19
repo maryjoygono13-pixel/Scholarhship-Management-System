@@ -7,6 +7,9 @@
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <link href="assets/css/style.css" rel="stylesheet">
+        <?php if (isset($page_css)): ?>
+            <link rel="stylesheet" href="<?= SITE_URL ?>/assets/css/<?= $page_css ?>">
+        <?php endif; ?>
         <link href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet">
         <link href="assets/lib/bulma.min.css" rel="stylesheet">
         <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
