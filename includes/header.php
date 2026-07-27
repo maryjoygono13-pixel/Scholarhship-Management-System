@@ -1,5 +1,5 @@
-<?php require_once __DIR__ . '/../config.php'; ?>
-
+<?php require_once __DIR__ . '/../config/config.php';
+?>
 
 <!DOCTYPE html>
 <html>
@@ -15,7 +15,7 @@
         <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
         <title>Dashboard Menu</title>
             <link rel="icon" href="assets/img/cmlogoremove.png">
-    </head>
+    </head>  
 
 
 <body>

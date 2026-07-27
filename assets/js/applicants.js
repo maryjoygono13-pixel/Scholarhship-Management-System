@@ -76,12 +76,21 @@ function render() {
   if (activePanel) activePanel.classList.add("active");
 
   renderProgress();
-  stepCounter.textContent = `Step ${currentIndex + 1} of ${STEPS.length}`;
-  backBtn.disabled = currentIndex === 0;
-  nextBtn.innerHTML = currentIndex === STEPS.length - 1
-    ? "Submit Application"
-    : `Next <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>`;
-  modalFooter.style.display = "flex";
+stepCounter.textContent = `Step ${currentIndex + 1} of ${STEPS.length}`;
+
+// Hide Back button on Step 1
+if (currentIndex === 0) {
+    backBtn.style.display = "none";
+    modalFooter.style.justifyContent = "flex-end";
+} else {
+    backBtn.style.display = "inline-flex";
+    modalFooter.style.justifyContent = "space-between";
+}
+nextBtn.innerHTML = currentIndex === STEPS.length - 1
+  ? "Submit Application"
+  : `Next <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>`;
+
+modalFooter.style.display = "flex";
 }
 
 function showSuccess() {
@@ -147,17 +156,99 @@ backBtn.addEventListener("click", () => {
 });
 
 nextBtn.addEventListener("click", () => {
-  if (currentIndex === STEPS.length - 1) {
-    showSuccess();
-    return;
-  }
-  currentIndex++;
-  furthestIndex = Math.max(furthestIndex, currentIndex);
-  render();
-});
 
+    // Remove previous error highlights
+    document.querySelectorAll(".error").forEach(el => {
+        el.classList.remove("error");
+    });
+
+    // Get required fields in the current step
+    const currentPanel = document.querySelector(`.step-panel[data-step="${currentIndex}"]`);
+    const requiredFields = currentPanel.querySelectorAll("[required]");
+
+    let hasError = false;
+
+    requiredFields.forEach(field => {
+
+        if (field.type === "file") {
+
+            if (field.files.length === 0) {
+                field.classList.add("error");
+
+                if (!hasError) {
+                    field.focus();
+                }
+
+                hasError = true;
+            }
+
+        } else {
+
+            if (field.value.trim() === "") {
+                field.classList.add("error");
+
+                if (!hasError) {
+                    field.focus();
+                }
+
+                hasError = true;
+            }
+
+        }
+
+    });
+
+    if (hasError) return;
+
+    if (currentIndex === STEPS.length - 1) {
+       const form = document.getElementById("applicantForm");
+
+    // Add saveApplicant so PHP can detect the submission
+    const hidden = document.createElement("input");
+    hidden.type = "hidden";
+    hidden.name = "saveApplicant";
+    hidden.value = "1";
+    form.appendChild(hidden);
+
+    form.submit();
+    return;
+
+    }
+
+    currentIndex++;
+    furthestIndex = Math.max(furthestIndex, currentIndex);
+    render();
+
+});
 overlay.addEventListener("click", (e) => {
   if (e.target === overlay) closeModal();
 });
+document.querySelectorAll("[required]").forEach(field => {
 
+    field.addEventListener("input", () => {
+        if (field.value.trim() !== "") {
+            field.classList.remove("error");
+        }
+    });
+
+    field.addEventListener("change", () => {
+        if (
+            (field.type === "file" && field.files.length > 0) ||
+            (field.type !== "file" && field.value.trim() !== "")
+        ) {
+            field.classList.remove("error");
+        }
+    });
+
+});
+const studentId = document.querySelector('[data-field="studentId"]');
+const phoneNumber = document.querySelector('[data-field="phone"]');
+
+studentId.addEventListener("input", function () {
+    this.value = this.value.replace(/\D/g, "");
+});
+
+phoneNumber.addEventListener("input", function () {
+    this.value = this.value.replace(/\D/g, "");
+});
 render();

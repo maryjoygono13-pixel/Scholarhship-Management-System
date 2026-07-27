@@ -1,24 +1,71 @@
-
 <?php
+require_once __DIR__ . '/../config/database.php';
+if(isset($_POST['saveApplicant'])){
+$first_name=$_POST['first_name'];
+$last_name=$_POST['last_name'];
+$student_id=$_POST['student_id'];
+$email = $_POST['email'];
+$phone=$_POST['phone'];
+$birthdate=$_POST['birthdate'];
+$address=$_POST['address'];
+$school=$_POST['school'];
+$program=$_POST['program'];
+$gpa=$_POST['gpa'];
+$scholarship_type=$_POST['scholarship_type'];
+$essay=$_POST['essay'];
+$transcript=$_FILES['transcript'];
+$recommendation=$_FILES['recommendation'];
+$valid_id=$_FILES['valid_id'];
+$sql="INSERT INTO applicants
+(
+first_name,
+last_name,
+student_id,
+email
+)
+VALUES
+(
+?,
+?,
+?,
+?
+)";
+ $stmt = $conn->prepare($sql);
+
+    $stmt->bind_param(
+        "ssss",
+        $first_name,
+        $last_name,
+        $student_id,
+        $email
+    );
+
+    $stmt->execute();
+    header("Location: applicants.php");
+exit();
+}
 $page_css = "applicants.css";
 $page_js = "applicants.js";
+
 include __DIR__ . '/../includes/header.php';
 ?>
-<div class="page">
-    <div class="table-card">
-      <div class="table-header">
-        <div>
-          <h2>Applications</h2>
-          <p>All submitted scholarship applications.</p>
-        </div>
-        <button class="btn-primary" id="openBtn">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 11v6M19 14h6"/></svg>
-          Add Applicant
-        </button>
-      </div>
 
-      <div class="table-wrap">
-        <table class="applicants-table">
+<div class="top-nav">
+    <h2>Applicants</h2>
+    <?php include __DIR__ . '/../includes/navbar.php'; ?>
+</div>
+
+
+    <div class="page">
+      <div class="table-card">
+        <div class="table-header">
+            <button class="btn-primary" id="openBtn">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 11v6M19 14h6"/></svg>
+              Add Applicant
+            </button>
+        </div>
+       <div class="table-wrap">
+          <table class="applicants-table">
           <thead>
             <tr>
               <th>Name</th>
@@ -29,54 +76,86 @@ include __DIR__ . '/../includes/header.php';
               <th class="actions-head">Actions</th>
             </tr>
           </thead>
-          <tbody id="tableBody"></tbody>
+          <tbody id="tableBody">
+            <?php
+            $result = $conn->query("SELECT * FROM applicants");
+            while ($row = $result->fetch_assoc()) {
+            ?>
+            <tr>
+              <td><?= htmlspecialchars($row['first_name'] . " " . $row['last_name']) ?></td>
+              <td><?= htmlspecialchars($row['student_id']) ?></td>
+              <td><?= htmlspecialchars($row['scholarship_type']) ?></td>
+              <td><?= htmlspecialchars($row['status']) ?></td>
+              <td><?= htmlspecialchars($row['created_at']) ?></td>
+              <td>
+              <!-- Add Edit/Delete buttons here later -->
+              </td>
+            </tr>
+            <?php
+            }
+            ?>
+          </tbody>
         </table>
       </div>
-
       <div class="empty-state" id="emptyState">
         <p>No applications yet.</p>
         <span>Click "Add Applicant" to create the first one.</span>
       </div>
     </div>
-  </div>
 
-  <div class="overlay" id="overlay">
-    <div class="modal">
+    <div class="applicant-overlay" id="overlay">
+      <div class="applicant-modal">
+        <form id="applicantForm" method="POST" enctype="multipart/form-data">
 
-      <!-- Header -->
-      <div class="modal-header">
-        <div>
-          <h2>Add Applicant</h2>
-          <p id="stepCounter">Step 1 of 4</p>
+        <!-- Header -->
+        <div class="applicant-modal-header">
+          <div>
+            <h2>Add Applicant</h2>
+            <p id="stepCounter">Step 1 of 4</p>
+          </div>
+          <button class="close-btn" id="closeBtn" aria-label="Close">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+          </button>
         </div>
-        <button class="close-btn" id="closeBtn" aria-label="Close">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
-        </button>
-      </div>
-
-      <!-- Progress -->
-      <div class="progress" id="progressBar"></div>
-
-      <!-- Body -->
-      <div class="modal-body">
-
-        <!-- Step 1: Personal -->
-        <div class="step-panel active" data-step="0">
+          <!-- Progress -->
+        <div class="applicant-progress" id="progressBar"></div>
+        <!-- Body -->
+        <div class="applicant-modal-body">
+          <!-- Step 1: Personal -->
+          <div class="step-panel active" data-step="0">
           <div class="step-title">
             <h3>Personal information</h3>
             <p>Basic contact details for the applicant.</p>
           </div>
+          <br>
           <div class="grid-2">
-            <div class="field"><label>First name <span class="req">*</span></label><input type="text" placeholder="Juan" data-field="firstName"></div>
-            <div class="field"><label>Last name <span class="req">*</span></label><input type="text" placeholder="Dela Cruz" data-field="lastName"></div>
-            <div class="field"><label>Student ID <span class="req">*</span></label><input type="text" placeholder="2023-00123" data-field="studentId"></div>
-            <div class="field"><label>Email address <span class="req">*</span></label><input type="email" placeholder="juan@email.com" data-field="email"></div>
-            <div class="field"><label>Phone number <span class="req">*</span></label><input type="text" placeholder="09XX XXX XXXX" data-field="phone"></div>
-            <div class="field"><label>Date of birth <span class="req">*</span></label><input type="date" data-field="birthdate"></div>
-            <div class="field"><label>Home address <span class="req">*</span></label><input type="text" placeholder="City, Province" data-field="address"></div>
+            <div class="field">
+              <label>First name <span class="req">*</span></label>
+              <input type="text" name="first_name" placeholder="Juan" data-field="firstName" required>
+            </div>
+            <div class="field">
+              <label>Last name <span class="req">*</span></label>
+              <input type="text" name="last_name" placeholder="Dela Cruz" data-field="lastName" required>
+            </div>
+            <div class="field">
+              <label>Student ID <span class="req">*</span></label>
+              <input type="text" name="student_id" placeholder="2023-00123" data-field="studentId" inputmode="numeric" required>
+            </div>
+            <div class="field">
+              <label>Email address <span class="req">*</span></label>
+              <input type="email" name="email" placeholder="juan@email.com" data-field="email" required>
+            </div>
+            <div class="field">
+              <label>Phone number <span class="req">*</span></label>
+              <input type="text" name="phone" placeholder="09XX XXX XXXX" data-field="phone" inputmode="numeric" maxlength="11" required></div>
+            <div class="field">
+              <label>Date of birth <span class="req">*</span></label>
+              <input type="date" name="birthdate" data-field="birthdate" required></div>
+            <div class="field">
+              <label>Home address <span class="req">*</span></label>
+              <input type="text" name="address" placeholder="City,Province" data-field="address" required></div>
           </div>
         </div>
-
         <!-- Step 2: Academic -->
         <div class="step-panel" data-step="1">
           <div class="step-title">
@@ -84,11 +163,15 @@ include __DIR__ . '/../includes/header.php';
             <p>Where the applicant currently studies.</p>
           </div>
           <div class="grid-2">
-            <div class="field"><label>School / University <span class="req">*</span></label><input type="text" placeholder="University name" data-field="school"></div>
-            <div class="field"><label>Program / Course <span class="req">*</span></label><input type="text" placeholder="BS Computer Science" data-field="program"></div>
+            <div class="field">
+              <label>School / University <span class="req">*</span></label>
+              <input type="text" name="school" placeholder="University name" data-field="school" required></div>
+            <div class="field">
+              <label>Program / Course <span class="req">*</span></label>
+              <input type="text" name="program" placeholder="BS Computer Science" data-field="program" required></div>
             <div class="field">
               <label>Year level <span class="req">*</span></label>
-              <select data-field="yearLevel">
+              <select data-field="yearLevel"required name="year_level">
                 <option value="">Select year level</option>
                 <option>1st Year</option>
                 <option>2nd Year</option>
@@ -97,7 +180,7 @@ include __DIR__ . '/../includes/header.php';
 
               </select>
             </div>
-            <div class="field"><label>GPA / General average <span class="req">*</span></label><input type="text" placeholder="e.g. 1.75 or 92%" data-field="gpa"></div>
+            <div class="field"><label>GPA / General average <span class="req">*</span></label><input type="text" name="gpa" placeholder="e.g. 1.75 or 92%" data-field="gpa" required></div>
           </div>
         </div>
 
@@ -110,7 +193,7 @@ include __DIR__ . '/../includes/header.php';
           <div class="grid-2">
             <div class="field">
               <label>Scholarship type <span class="req">*</span></label>
-              <select data-field="scholarshipType">
+              <select data-field="scholarshipType" name="scholarship_type"required >
                 <option value="">Select type</option>
                 <option>Academic Merit</option>
                 <option>Financial Need-Based</option>
@@ -118,10 +201,10 @@ include __DIR__ . '/../includes/header.php';
                 <option>Community Service</option>
               </select>
             </div>
-            <div class="field"><label>Amount requested (₱) <span class="req">*</span></label><input type="text" placeholder="15,000" data-field="amountRequested"></div>
+
             <div class="field full-width">
               <label>Motivation essay</label>
-              <textarea placeholder="Briefly explain why the applicant is applying for this scholarship..." data-field="essay"></textarea>
+              <textarea placeholder="Briefly explain why the applicant is applying for this scholarship..."name="essay" data-field="essay"></textarea>
             </div>
           </div>
         </div>
@@ -144,7 +227,7 @@ include __DIR__ . '/../includes/header.php';
               </div>
             </div>
             <span class="upload-action" data-action="transcript">Upload</span>
-            <input type="file" data-field="transcript">
+            <input type="file" name="transcript" data-field="transcript">
           </label>
 
           <label class="upload-row">
@@ -158,7 +241,7 @@ include __DIR__ . '/../includes/header.php';
               </div>
             </div>
             <span class="upload-action" data-action="recommendation">Upload</span>
-            <input type="file" data-field="recommendation">
+            <input type="file" name="recommendation" data-field="recommendation">
           </label>
 
           <label class="upload-row">
@@ -172,7 +255,7 @@ include __DIR__ . '/../includes/header.php';
               </div>
             </div>
             <span class="upload-action" data-action="validId">Upload</span>
-            <input type="file" data-field="validId">
+            <input type="file" name="valid_id" data-field="validId">
           </label>
         </div>
 
@@ -191,24 +274,31 @@ include __DIR__ . '/../includes/header.php';
       </div>
 
       <!-- Footer -->
-      <div class="modal-footer" id="modalFooter">
+      <div class="applicant-modal-footer" id="modalFooter">
         <button class="btn-back" id="backBtn">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
           Back
         </button>
-        <button class="btn-next" id="nextBtn">
-          Next
+        <button
+    type="submit"
+    name="saveApplicant"
+    class="btn-next"
+    id="nextBtn">
+    Submit Application
+
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
         </button>
+</form>
       </div>
 
     </div>
+
   </div>
 
   <!-- View info modal -->
-  <div class="overlay" id="viewOverlay">
-    <div class="modal modal-sm">
-      <div class="modal-header">
+  <div class="applicant-overlay" id="viewOverlay">
+    <div class="applicant-modal applicant-modal-sm">
+      <div class="applicant-modal-header">
         <div>
           <h2>Applicant information</h2>
           <p>Read-only summary of the application.</p>
@@ -225,9 +315,9 @@ include __DIR__ . '/../includes/header.php';
   </div>
 
   <!-- Documents modal -->
-  <div class="overlay" id="docsOverlay">
-    <div class="modal modal-sm">
-      <div class="modal-header">
+  <div class="applicant-overlay" id="docsOverlay">
+    <div class="applicant-modal applicant-modal-sm">
+      <div class="applicant-modal-header">
         <div>
           <h2>Submitted documents</h2>
           <p>Files uploaded with this application.</p>
@@ -236,8 +326,8 @@ include __DIR__ . '/../includes/header.php';
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
         </button>
       </div>
-      <div class="modal-body" id="docsBody"></div>
-      <div class="modal-footer modal-footer-end">
+      <div class="applicant-modal-body" id="docsBody"></div>
+      <div class="applicant-modal-footer applicant-modal-footer-end">
         <button class="btn-next" id="docsCloseBtn2">Close</button>
       </div>
     </div>
