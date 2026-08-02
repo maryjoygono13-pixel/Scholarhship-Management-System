@@ -15,92 +15,85 @@
 
     <div class="menu-bar">
         <div class="menu">
-        <ul class="menu-links">
-        <li class="nav-link">
-        <a href="<?= SITE_URL?>/dashboard">
-        <i class="bx bx-home"></i>
-        <span class="text nav-text">Dashboard</span>
-        </a>
-        </li>
+                <ul class="menu-links">
+                    <li class="nav-link">
+                        <a href="<?= SITE_URL?>/dashboard">
+                            <i class="bx bx-home"></i>
+                            <span class="text nav-text">Dashboard</span>
+                        </a>
+                    </li>
 
-        <li class="nav-link">
-        <a href="<?= SITE_URL?>/applicants">
-        <i class="bx bx-user"></i>
-        <span class="text nav-text">Applicants</span>
-        </a>
-        </li>
+                    <li class="nav-link">
+                        <a href="<?= SITE_URL?>/applicants">
+                            <i class="bx bx-user"></i>
+                            <span class="text nav-text">Applicants</span>
+                        </a>
+                    </li>
 
-         <li class="nav-link">
-        <a href="<?= SITE_URL?>/data-management">
-        <i class="bx bx-data"></i>
-        <span class="text nav-text">Data Management</span>
-        </a>
-        </li>
+                    <li class="nav-link">
+                        <a href="<?= SITE_URL?>/data-management">
+                            <i class="bx bx-data"></i>
+                            <span class="text nav-text">Data Management</span>
+                        </a>
+                    </li>
 
 
-        <li class="nav-link">
-        <a href="<?= SITE_URL?>/evaluation">
-        <i class="bx bx-task"></i>
-        <span class="text nav-text">Evaluation</span>
-        </a>
-        </li>
+                    <li class="nav-link">
+                        <a href="<?= SITE_URL?>/evaluation">
+                            <i class="bx bx-task"></i>
+                            <span class="text nav-text">Evaluation</span>
+                        </a>
+                    </li>
 
-        <li class="nav-link">
-        <a href="<?= SITE_URL?>/records">
-        <i class="bx bx-folder"></i>
-        <span class="text nav-text">Records</span>
-        </a>
-        </li>
+                <li class="nav-link">
+                    <a href="<?= SITE_URL?>/records">
+                        <i class="bx bx-folder"></i>
+                        <span class="text nav-text">Records</span>
+                        </a>
+                </li>
 
-        <li class="nav-link">
-        <a href="#">
-        <i class="bx bxs-graduation"></i>
-        <span class="text nav-text">Scholarships</span>
-        </a>
-        </li>
+                <li class="nav-link">
+                    <a href="<?= SITE_URL?>/scholarships">
+                        <i class="bx bxs-graduation"></i>
+                        <span class="text nav-text">Scholarships</span>
+                    </a>
+                </li>
 
-        <li class="nav-link">
-        <a href="#">
-        <i class="bx bx-group"></i>
-        <span class="text nav-text">Students</span>
-        </a>
-        </li>
+                <li class="nav-link">
+                    <a href="#">
+                        <i class="bx bx-bar-chart-alt-2"></i>
+                        <span class="text nav-text">Renewal &amp; Retention</span>
+                    </a>
+                </li>
 
-        <li class="nav-link">
-        <a href="#">
-        <i class="bx bx-bar-chart-alt-2"></i>
-        <span class="text nav-text">Renewal &amp; Retention</span>
-        </a>
-        </li>
+                <li class="nav-link">
+                    <a href="#">
+                        <i class="bx bx-bell"></i>
+                        <span class="text nav-text">Reports</span>
+                    </a>
+                </li>
 
-        <li class="nav-link">
-        <a href="#">
-        <i class="bx bx-bell"></i>
-        <span class="text nav-text">Reports</span>
-        </a>
-        </li>
+                <li class="nav-link">
+                    <a href="#">
+                        <i class="bx bx-task"></i>
+                        <span class="text nav-text">Notifications</span>
+                    </a>
+                </li>
 
-        <li class="nav-link">
-        <a href="#">
-        <i class="bx bx-task"></i>
-        <span class="text nav-text">Notifications</span>
-        </a>
-        </li>
+                <li class="nav-cog">
+                    <a href="#">
+                        <i class="bx bx-cog"></i>
+                        <span class="text nav-text">Settings</span>
+                    </a>
+                </li>
 
-        <li class="nav-cog">
-        <a href="#">
-        <i class="bx bx-cog"></i>
-        <span class="text nav-text">Settings</span>
-        </a>
-        </li>
-
-        <li class="nav-link">
-        <a href="#">
-        <i class="bx bx-log-out"></i>
-        <span class="text nav-text">Log Out</span>
-        </a>
-        </li>
-        </ul>
+                <li class="nav-link">
+                    <a href="#">
+                        <i class="bx bx-log-out"></i>
+                        <span class="text nav-text">Log Out</span>
+                    </a>
+                </li>
+            </ul>
         </div>
     </div>
 </nav>
