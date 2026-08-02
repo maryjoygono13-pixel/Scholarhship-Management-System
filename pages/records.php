@@ -113,69 +113,6 @@ include __DIR__ . '/../includes/header.php';
                                 View
                             </button>
                         </td>
-
-                    </tr>
-
-                    <tr>
-
-                        <td><input type="checkbox"></td>
-
-                        <td>20230002</td>
-
-                        <td>Maria Santos</td>
-
-                        <td>Financial Need-Based</td>
-
-                        <td>
-                            <span class="badge approved">
-                                Approved
-                            </span>
-                        </td>
-
-                        <td>1st Semester</td>
-
-                        <td>2026-2027</td>
-
-                        <td>Jul 26, 2026</td>
-
-                        <td>
-                            <button class="view-btn">
-                                <i class='bx bx-show'></i>
-                                View
-                            </button>
-                        </td>
-
-                    </tr>
-
-                    <tr>
-
-                        <td><input type="checkbox"></td>
-
-                        <td>20230003</td>
-
-                        <td>Mark Reyes</td>
-
-                        <td>Academic Merit</td>
-
-                        <td>
-                            <span class="badge rejected">
-                                Rejected
-                            </span>
-                        </td>
-
-                        <td>1st Semester</td>
-
-                        <td>2026-2027</td>
-
-                        <td>Jul 26, 2026</td>
-
-                        <td>
-                            <button class="view-btn">
-                                <i class='bx bx-show'></i>
-                                View
-                            </button>
-                        </td>
-
                     </tr>
 
                 </tbody>

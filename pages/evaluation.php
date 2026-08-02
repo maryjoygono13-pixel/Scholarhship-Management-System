@@ -9,19 +9,10 @@ $page_js = "evaluation.js";
 
     <?php include __DIR__ . '/../includes/navbar.php'; ?>
 </div>
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Applicant Evaluation</title>
-<link rel="stylesheet" href="applicant-evaluation.css">
-</head>
-<body>
-
-<div class="app">
-  <div class="card left">
-    <div class="left-head">
+<div class="evaluation-page">
+<div class="evaluation-main-content">
+  <div class="evaluation-card left">
+    <div class="evaluatioon-left-head">
 
       <div class="toolbar">
         <select id="filterType"><option value="all">All Scholarship Types</option></select>
@@ -47,6 +38,5 @@ $page_js = "evaluation.js";
 <div class="toast" id="toast"></div>
 
 <script src="applicant-evaluation.js"></script>
-</body>
-</html>
+
 <?php include __DIR__ . '/../includes/footer.php'; ?>

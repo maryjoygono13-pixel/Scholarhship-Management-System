@@ -31,7 +31,7 @@
         </li>
 
          <li class="nav-link">
-        <a href="#">
+        <a href="<?= SITE_URL?>/data-management">
         <i class="bx bx-data"></i>
         <span class="text nav-text">Data Management</span>
         </a>

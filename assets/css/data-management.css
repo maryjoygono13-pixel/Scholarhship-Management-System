@@ -1,0 +1,238 @@
+/* ===========================
+   DATA MANAGEMENT
+=========================== */
+
+.data-management-container {
+    width: 100%;
+    padding: 25px;
+}
+
+/* ===========================
+   TWO COLUMNS
+=========================== */
+
+.management-container {
+    display: flex;
+    gap: 25px;
+    align-items: flex-start;
+}
+
+.management-column {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+/* ===========================
+   IMPORT CARD
+=========================== */
+
+.import-card {
+    background: #fff;
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 4px 12px rgba(0,0,0,.08);
+}
+
+.import-card h2 {
+    margin: 0 0 20px;
+    color: #1f2937;
+    font-size: 22px;
+    font-weight: 600;
+}
+
+/* ===========================
+   BUTTON GROUP
+=========================== */
+
+.button-group {
+    display: flex;
+    gap: 12px;
+}
+
+.button-group button {
+    flex: 1;
+    border: none;
+    padding: 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 15px;
+    font-weight: 600;
+    transition: .3s;
+}
+
+/* Choose File */
+
+#gradeBtn,
+#enrollmentBtn {
+    background: #2563eb;
+    color: white;
+}
+
+#gradeBtn:hover,
+#enrollmentBtn:hover {
+    background: #1d4ed8;
+}
+
+/* Import */
+
+.import-btn {
+    background: #16a34a;
+    color: white;
+}
+
+.import-btn:hover {
+    background: #15803d;
+}
+
+/* File Name */
+
+.file-name {
+    margin-top: 15px;
+    font-size: 14px;
+    color: #6b7280;
+}
+.selected-file{
+    margin-top:15px;
+    padding:10px 15px;
+    border:1px solid #d1d5db;
+    border-radius:8px;
+
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+
+    background:#f9fafb;
+}
+
+.selected-file span{
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+}
+
+.selected-file button{
+    display:none;
+    border:none;
+    background:transparent;
+    color:#ef4444;
+    cursor:pointer;
+    font-size:20px;
+}
+
+.selected-file button:hover{
+    color:#dc2626;
+}
+
+/* ===========================
+   TABLE CARD
+=========================== */
+
+.table-card {
+    background: #fff;
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 4px 12px rgba(0,0,0,.08);
+}
+
+.table-card h3 {
+    margin-bottom: 18px;
+    color: #1f2937;
+    font-size: 18px;
+}
+
+/* ===========================
+   TABLE
+=========================== */
+
+.table-card table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.table-card thead {
+    background: #2563eb;
+    color: white;
+}
+
+.table-card th,
+.table-card td {
+    padding: 14px;
+    text-align: left;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.table-card tbody tr:hover {
+    background: #f8fafc;
+}
+
+.table-card th:last-child,
+.table-card td:last-child {
+    width: 120px;
+    text-align: center;
+}
+
+/* ===========================
+   ACTION BUTTONS
+=========================== */
+
+.action-buttons {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+}
+
+.view-btn,
+.delete-btn {
+    border: none;
+    padding: 7px 12px;
+    border-radius: 6px;
+    color: white;
+    cursor: pointer;
+    font-size: 13px;
+    transition: .3s;
+}
+
+.view-btn {
+    background: #2563eb;
+}
+
+.view-btn:hover {
+    background: #1d4ed8;
+}
+
+.delete-btn {
+    background: #dc2626;
+}
+
+.delete-btn:hover {
+    background: #b91c1c;
+}
+
+/* ===========================
+   EMPTY TABLE
+=========================== */
+
+.empty-state {
+    text-align: center;
+    padding: 20px;
+    color: #6b7280;
+    font-style: italic;
+}
+
+/* ===========================
+   RESPONSIVE
+=========================== */
+
+@media (max-width: 992px) {
+
+    .management-container {
+        flex-direction: column;
+    }
+
+    .button-group {
+        flex-direction: column;
+    }
+
+}

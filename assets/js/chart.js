@@ -6,9 +6,10 @@ const scholarshipData = {
 };
 
 const monthlyData = {
-  Merit: 0,
-  Endorsement: 0,
-  "Dean's Lister": 0
+  January: 0,
+  February: 0,
+  March: 0,
+  April: 0
 };
 // ---------------------------------------------------------
 

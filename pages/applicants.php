@@ -1,49 +1,5 @@
 <?php
-require_once __DIR__ . '/../config/database.php';
-if(isset($_POST['saveApplicant'])){
-$first_name=$_POST['first_name'];
-$last_name=$_POST['last_name'];
-$student_id=$_POST['student_id'];
-$email = $_POST['email'];
-$phone=$_POST['phone'];
-$birthdate=$_POST['birthdate'];
-$address=$_POST['address'];
-$school=$_POST['school'];
-$program=$_POST['program'];
-$gpa=$_POST['gpa'];
-$scholarship_type=$_POST['scholarship_type'];
-$essay=$_POST['essay'];
-$transcript=$_FILES['transcript'];
-$recommendation=$_FILES['recommendation'];
-$valid_id=$_FILES['valid_id'];
-$sql="INSERT INTO applicants
-(
-first_name,
-last_name,
-student_id,
-email
-)
-VALUES
-(
-?,
-?,
-?,
-?
-)";
- $stmt = $conn->prepare($sql);
 
-    $stmt->bind_param(
-        "ssss",
-        $first_name,
-        $last_name,
-        $student_id,
-        $email
-    );
-
-    $stmt->execute();
-    header("Location: applicants.php");
-exit();
-}
 $page_css = "applicants.css";
 $page_js = "applicants.js";
 
@@ -77,23 +33,7 @@ include __DIR__ . '/../includes/header.php';
             </tr>
           </thead>
           <tbody id="tableBody">
-            <?php
-            $result = $conn->query("SELECT * FROM applicants");
-            while ($row = $result->fetch_assoc()) {
-            ?>
-            <tr>
-              <td><?= htmlspecialchars($row['first_name'] . " " . $row['last_name']) ?></td>
-              <td><?= htmlspecialchars($row['student_id']) ?></td>
-              <td><?= htmlspecialchars($row['scholarship_type']) ?></td>
-              <td><?= htmlspecialchars($row['status']) ?></td>
-              <td><?= htmlspecialchars($row['created_at']) ?></td>
-              <td>
-              <!-- Add Edit/Delete buttons here later -->
-              </td>
-            </tr>
-            <?php
-            }
-            ?>
+
           </tbody>
         </table>
       </div>
@@ -105,7 +45,7 @@ include __DIR__ . '/../includes/header.php';
 
     <div class="applicant-overlay" id="overlay">
       <div class="applicant-modal">
-        <form id="applicantForm" method="POST" enctype="multipart/form-data">
+        <form id="applicantForm">
 
         <!-- Header -->
         <div class="applicant-modal-header">
@@ -281,7 +221,6 @@ include __DIR__ . '/../includes/header.php';
         </button>
         <button
     type="submit"
-    name="saveApplicant"
     class="btn-next"
     id="nextBtn">
     Submit Application

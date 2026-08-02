@@ -15,25 +15,25 @@ include __DIR__ . '/../includes/header.php';
         <div class="card blue">
             <i class="bx bx-user"></i>
             <span class="text card-text">Total Applicants</span>
-            <h1>250</h1>
+
         </div>
 
         <div class="card orange">
             <i class="bx bx-task"></i>
             <span class="text card-text">Under Evaluation</span>
-            <h1>180</h1>
+
         </div>
 
         <div class="card green">
             <i class="bx bxs-graduation"></i>
             <span class="text card-text">Active Scholars</span>
-            <h1>35</h1>
+
         </div>
 
         <div class="card red">
             <i class="bx bxs-calendar"></i>
             <span class="text card-text">Renewal Due</span>
-            <h1>20</h1>
+
         </div>
     </div>
 
@@ -50,7 +50,7 @@ include __DIR__ . '/../includes/header.php';
         <div class="chart-block">
             <div class="text chart-title">Monthly Applications</div>
                 <canvas id="monthlyChart" role="img"
-                aria-label="Bar chart of monthly applications by scholarship type.">
+                aria-label="Bar chart of monthly applications by scholarship .">
                 </canvas>
             </div>
         </div>
@@ -62,14 +62,14 @@ include __DIR__ . '/../includes/header.php';
             <i class="bx bx-bell"></i>
             <div>
                 <h4>Renewal Deadline</h4>
-                <p>July 31, 2026</p>
+
             </div>
         </div>
         <div class="notification-item">
             <i class="bx bx-user-plus"></i>
             <div>
                 <h4>New Applicant</h4>
-                <p>5 new applications submitted.</p>
+
             </div>
         </div>
 
@@ -77,7 +77,7 @@ include __DIR__ . '/../includes/header.php';
             <i class="bx bx-calendar"></i>
             <div>
                 <h4>Evaluation Meeting</h4>
-                <p>Tomorrow • 9:00 AM</p>
+
         </div>
         </div>
 

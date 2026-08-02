@@ -14,14 +14,14 @@ Applicants
   overflow: hidden;
 }
 .table-header {
-    display: flex;
-    justify-content: flex-end;
-    align-items: center;
-    padding: 20px 24px;
-    border-bottom: 1px solid var(--slate-200);
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--slate-200);
 }
 .table-header .btn-primary {
-    margin-left: auto;
+  margin-left: auto;
 }
 
 
@@ -174,7 +174,7 @@ Applicants
  padding:40px 20px;
   z-index: 50;
 }
-.applicant-overlay.open { display: flex; }
+.applicant-overlay.open { display: flex;   }
 
 .applicant-modal {
   width: 95%;

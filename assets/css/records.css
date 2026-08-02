@@ -6,8 +6,8 @@
     display:flex;
     gap:24px;
     padding:25px;
-    height:calc(100vh - 100px);
-    box-sizing:border-box;
+    min-height:calc(100vh - 100px);
+    align-items:flex-start;
 }
 
 .records-content{
@@ -220,13 +220,25 @@
 =================================*/
 
 .record-details{
+
     width:360px;
+    min-width:360px;
+    flex-shrink:0;
+
     background:#fff;
-    border-radius:16px;
     border:1px solid #e2e8f0;
+    border-radius:16px;
+
+    height:calc(100vh - 100px);
+    overflow:hidden;
+
     display:flex;
     flex-direction:column;
-    overflow:hidden;
+}
+
+.records-content {
+    flex: 1;
+    min-width: 0;
 }
 
 .details-header{
@@ -259,6 +271,10 @@
     padding:20px;
     border-bottom:1px solid #f1f5f9;
 }
+.student-details-content{
+    flex:1;
+    overflow-y:auto;
+}
 
 .profile-image{
     width:70px;
@@ -283,8 +299,7 @@
 =================================*/
 
 .tabs{
-    display:flex;
-    border-bottom:1px solid #e2e8f0;
+    overflow-x: auto;
 }
 
 .tab{
