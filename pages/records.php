@@ -2,7 +2,6 @@
 
 $page_css = "records.css";
 $page_js = "records.js";
-
 include __DIR__ . '/../includes/header.php';
 
 ?>
