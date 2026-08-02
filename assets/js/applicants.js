@@ -1,203 +1,254 @@
- // ---- Sample data — replace with your real applicants ----
-let applicants = [
-  { id: "2023-0001", name: "Ana Cruz", scholarship: "Merit", status: "Approved", dateApplied: "2026-06-02" },
-  { id: "2023-0002", name: "Liam Reyes", scholarship: "Endorsement", status: "Under Evaluation", dateApplied: "2026-06-10" },
-  { id: "2023-0003", name: "Sofia Tan", scholarship: "Dean's Lister", status: "Pending Requirements", dateApplied: "2026-06-15" },
-  { id: "2023-0004", name: "Marco Diaz", scholarship: "Merit", status: "Rejected", dateApplied: "2026-06-18" }
+
+const STEPS = [
+  { key: "personal", label: "Personal" },
+  { key: "academic", label: "Academic" },
+  { key: "scholarship", label: "Scholarship" },
+  { key: "documents", label: "Documents" },
 ];
-// ------------------------------------------------------------
 
-const tableBody = document.getElementById("tableBody");
-const emptyState = document.getElementById("emptyState");
+const overlay = document.getElementById("overlay");
+const openBtn = document.getElementById("openBtn");
+const closeBtn = document.getElementById("closeBtn");
+const doneBtn = document.getElementById("doneBtn");
+const backBtn = document.getElementById("backBtn");
+const nextBtn = document.getElementById("nextBtn");
+const progressBar = document.getElementById("progressBar");
+const stepCounter = document.getElementById("stepCounter");
+const modalFooter = document.getElementById("modalFooter");
+const successMsg = document.getElementById("successMsg");
 
-const searchName = document.getElementById("searchName");
-const searchId = document.getElementById("searchId");
-const filterScholarship = document.getElementById("filterScholarship");
-const filterStatus = document.getElementById("filterStatus");
-const filterDate = document.getElementById("filterDate");
-const btnClearFilters = document.getElementById("btnClearFilters");
+let currentIndex = 0;
+let furthestIndex = 0;
+const formData = {};
 
-function statusClass(status) {
-  return "status-" + status.toLowerCase().replace(/\s+/g, "-");
-}
+const checkIcon = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>`;
 
-function renderTable() {
-  const nameQuery = searchName.value.trim().toLowerCase();
-  const idQuery = searchId.value.trim().toLowerCase();
-  const scholarshipFilter = filterScholarship.value;
-  const statusFilter = filterStatus.value;
-  const dateFilter = filterDate.value;
+const ICONS = {
+  personal: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>`,
+  academic: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10 12 5 2 10l10 5 10-5Z"/><path d="M6 12v5c0 1.5 2.5 3 6 3s6-1.5 6-3v-5"/></svg>`,
+  scholarship: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="6"/><path d="M15.5 13.5 17 22l-5-3-5 3 1.5-8.5"/></svg>`,
+  documents: `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/></svg>`,
+};
 
-  const filtered = applicants.filter(a => {
-    const matchesName = a.name.toLowerCase().includes(nameQuery);
-    const matchesId = a.id.toLowerCase().includes(idQuery);
-    const matchesScholarship = !scholarshipFilter || a.scholarship === scholarshipFilter;
-    const matchesStatus = !statusFilter || a.status === statusFilter;
-    const matchesDate = !dateFilter || a.dateApplied === dateFilter;
-    return matchesName && matchesId && matchesScholarship && matchesStatus && matchesDate;
-  });
+function renderProgress() {
+  progressBar.innerHTML = "";
+  STEPS.forEach((step, i) => {
+    const wrap = document.createElement("div");
+    wrap.className = "progress-step";
 
-  tableBody.innerHTML = "";
+    const isCompleted = i < currentIndex;
+    const isCurrent = i === currentIndex;
+    const isReachable = i <= furthestIndex;
 
-  if (filtered.length === 0) {
-    emptyState.classList.remove("hidden");
-    return;
-  }
-  emptyState.classList.add("hidden");
-
-  filtered.forEach(a => {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${a.name}</td>
-      <td>${a.id}</td>
-      <td>${a.scholarship}</td>
-      <td><span class="status-badge ${statusClass(a.status)}">${a.status}</span></td>
-      <td>${a.dateApplied}</td>
-      <td class="actions-col">
-        <div class="actions">
-          <button title="View" data-action="view" data-id="${a.id}">👁</button>
-          <button title="Edit" data-action="edit" data-id="${a.id}">✏</button>
-          <button title="Delete" data-action="delete" data-id="${a.id}">🗑</button>
-          <button title="Evaluate" data-action="evaluate" data-id="${a.id}">✔</button>
-          <button title="View submitted requirements" data-action="requirements" data-id="${a.id}">📄</button>
-        </div>
-      </td>
+    const btn = document.createElement("button");
+    btn.className = "step-btn";
+    btn.disabled = !isReachable;
+    btn.innerHTML = `
+      <span class="step-circle ${isCompleted ? "completed" : isCurrent ? "current" : ""}">
+        ${isCompleted ? checkIcon : ICONS[step.key]}
+      </span>
+      <span class="step-label ${isCompleted ? "completed" : isCurrent ? "current" : ""}">${step.label}</span>
     `;
-    tableBody.appendChild(tr);
+    btn.addEventListener("click", () => {
+      if (isReachable) {
+        currentIndex = i;
+        render();
+      }
+    });
+    wrap.appendChild(btn);
+
+    if (i < STEPS.length - 1) {
+      const line = document.createElement("div");
+      line.className = "step-line" + (i < currentIndex ? " completed" : "");
+      wrap.appendChild(line);
+    }
+
+    progressBar.appendChild(wrap);
   });
 }
 
-// ---- Row actions — wire these up to your real view/edit/evaluate screens ----
-tableBody.addEventListener("click", (e) => {
-  const btn = e.target.closest("button[data-action]");
-  if (!btn) return;
-  const id = btn.dataset.id;
-  const applicant = applicants.find(a => a.id === id);
+function render() {
+  // panels
+  document.querySelectorAll(".step-panel").forEach(panel => {
+    panel.classList.remove("active");
+  });
+  const activePanel = document.querySelector(`.step-panel[data-step="${currentIndex}"]`);
+  if (activePanel) activePanel.classList.add("active");
 
-  switch (btn.dataset.action) {
-    case "view":
-      console.log("View applicant:", applicant);
-      // e.g. openApplicantDetail(applicant)
-      break;
-    case "edit":
-      console.log("Edit applicant:", applicant);
-      // e.g. openEditForm(applicant)
-      break;
-    case "delete":
-      if (confirm(`Delete ${applicant.name}? This cannot be undone.`)) {
-        applicants = applicants.filter(a => a.id !== id);
-        renderTable();
+  renderProgress();
+stepCounter.textContent = `Step ${currentIndex + 1} of ${STEPS.length}`;
+
+// Hide Back button on Step 1
+if (currentIndex === 0) {
+    backBtn.style.display = "none";
+    modalFooter.style.justifyContent = "flex-end";
+} else {
+    backBtn.style.display = "inline-flex";
+    modalFooter.style.justifyContent = "space-between";
+}
+nextBtn.innerHTML = currentIndex === STEPS.length - 1
+  ? "Submit Application"
+  : `Next <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>`;
+
+modalFooter.style.display = "flex";
+}
+
+function showSuccess() {
+  document.querySelectorAll(".step-panel").forEach(panel => panel.classList.remove("active"));
+  document.querySelector('.step-panel[data-step="success"]').classList.add("active");
+  modalFooter.style.display = "none";
+  const name = `${formData.firstName || "The applicant"} ${formData.lastName || ""}`.trim();
+  successMsg.textContent = `${name} has been successfully added to the system.`;
+}
+
+function openModal() {
+  overlay.classList.add("open");
+}
+
+function closeModal() {
+  overlay.classList.remove("open");
+  currentIndex = 0;
+  furthestIndex = 0;
+  document.querySelectorAll("[data-field]").forEach(el => {
+    el.value = "";
+  });
+  document.querySelectorAll(".hint").forEach(el => {
+    el.textContent = "PDF, JPG, or PNG · max 5MB";
+  });
+  document.querySelectorAll(".upload-action").forEach(el => {
+    el.textContent = "Upload";
+  });
+  Object.keys(formData).forEach(k => delete formData[k]);
+  render();
+}
+
+// collect field values as user types
+document.querySelectorAll("input[data-field], select[data-field], textarea[data-field]").forEach(el => {
+  el.addEventListener("change", () => {
+    const key = el.dataset.field;
+    if (el.type === "file") {
+      const file = el.files[0];
+      formData[key] = file || null;
+      const hint = document.querySelector(`.hint[data-hint="${key}"]`);
+      const action = document.querySelector(`.upload-action[data-action="${key}"]`);
+      if (file) {
+        hint.textContent = file.name;
+        action.textContent = "Replace";
+      } else {
+        hint.textContent = "PDF, JPG, or PNG · max 5MB";
+        action.textContent = "Upload";
       }
-      break;
-    case "evaluate":
-      console.log("Evaluate applicant:", applicant);
-      // e.g. openEvaluationPanel(applicant)
-      break;
-    case "requirements":
-      console.log("View requirements for:", applicant);
-      // e.g. openRequirementsViewer(applicant)
-      break;
+    } else {
+      formData[key] = el.value;
+    }
+  });
+});
+
+openBtn.addEventListener("click", openModal);
+closeBtn.addEventListener("click", closeModal);
+doneBtn.addEventListener("click", closeModal);
+
+backBtn.addEventListener("click", () => {
+  if (currentIndex > 0) {
+    currentIndex--;
+    render();
   }
 });
 
-// ---- Search & filter events ----
-[searchName, searchId, filterScholarship, filterStatus, filterDate].forEach(el => {
-  el.addEventListener("input", renderTable);
-});
+nextBtn.addEventListener("click", () => {
 
-btnClearFilters.addEventListener("click", () => {
-  searchName.value = "";
-  searchId.value = "";
-  filterScholarship.value = "";
-  filterStatus.value = "";
-  filterDate.value = "";
-  renderTable();
-});
+    // Remove previous error highlights
+    document.querySelectorAll(".error").forEach(el => {
+        el.classList.remove("error");
+    });
 
-// ---- Add Applicant modal ----
-const addModalOverlay = document.getElementById("addModalOverlay");
-const addApplicantForm = document.getElementById("addApplicantForm");
-const formError = document.getElementById("formError");
+    // Get required fields in the current step
+    const currentPanel = document.querySelector(`.step-panel[data-step="${currentIndex}"]`);
+    const requiredFields = currentPanel.querySelectorAll("[required]");
 
-const fieldName = document.getElementById("fieldName");
-const fieldId = document.getElementById("fieldId");
-const fieldScholarship = document.getElementById("fieldScholarship");
-const fieldStatus = document.getElementById("fieldStatus");
-const fieldDate = document.getElementById("fieldDate");
+    let hasError = false;
 
-function openAddModal() {
-  addApplicantForm.reset();
-  formError.classList.add("hidden");
-  addModalOverlay.classList.remove("hidden");
-  fieldName.focus();
-}
+    requiredFields.forEach(field => {
 
-function closeAddModal() {
-  addModalOverlay.classList.add("hidden");
-}
+        if (field.type === "file") {
 
-document.getElementById("btnAdd").addEventListener("click", openAddModal);
-document.getElementById("btnCloseModal").addEventListener("click", closeAddModal);
-document.getElementById("btnCancelAdd").addEventListener("click", closeAddModal);
+            if (field.files.length === 0) {
+                field.classList.add("error");
 
-// close when clicking outside the modal box
-addModalOverlay.addEventListener("click", (e) => {
-  if (e.target === addModalOverlay) closeAddModal();
-});
+                if (!hasError) {
+                    field.focus();
+                }
 
-addApplicantForm.addEventListener("submit", (e) => {
-  e.preventDefault();
+                hasError = true;
+            }
 
-  const newApplicant = {
-    id: fieldId.value.trim(),
-    name: fieldName.value.trim(),
-    scholarship: fieldScholarship.value,
-    status: fieldStatus.value,
-    dateApplied: fieldDate.value
-  };
+        } else {
 
-  // basic validation: no duplicate student IDs
-  if (applicants.some(a => a.id === newApplicant.id)) {
-    formError.textContent = "An applicant with this Student ID already exists.";
-    formError.classList.remove("hidden");
+            if (field.value.trim() === "") {
+                field.classList.add("error");
+
+                if (!hasError) {
+                    field.focus();
+                }
+
+                hasError = true;
+            }
+
+        }
+
+    });
+
+    if (hasError) return;
+
+    if (currentIndex === STEPS.length - 1) {
+       const form = document.getElementById("applicantForm");
+
+    // Add saveApplicant so PHP can detect the submission
+    const hidden = document.createElement("input");
+    hidden.type = "hidden";
+    hidden.name = "saveApplicant";
+    hidden.value = "1";
+    form.appendChild(hidden);
+
+    form.submit();
     return;
-  }
 
-  applicants.push(newApplicant);
-  renderTable();
-  closeAddModal();
+    }
+
+    currentIndex++;
+    furthestIndex = Math.max(furthestIndex, currentIndex);
+    render();
+
+});
+overlay.addEventListener("click", (e) => {
+  if (e.target === overlay) closeModal();
+});
+document.querySelectorAll("[required]").forEach(field => {
+
+    field.addEventListener("input", () => {
+        if (field.value.trim() !== "") {
+            field.classList.remove("error");
+        }
+    });
+
+    field.addEventListener("change", () => {
+        if (
+            (field.type === "file" && field.files.length > 0) ||
+            (field.type !== "file" && field.value.trim() !== "")
+        ) {
+            field.classList.remove("error");
+        }
+    });
+
+});
+const studentId = document.querySelector('[data-field="studentId"]');
+const phoneNumber = document.querySelector('[data-field="phone"]');
+
+studentId.addEventListener("input", function () {
+    this.value = this.value.replace(/\D/g, "");
 });
 
-
-document.getElementById("btnImport").addEventListener("click", () => {
-  console.log("Trigger Excel import");
-  // e.g. use SheetJS (xlsx) to parse an uploaded .xlsx file into `applicants`
+phoneNumber.addEventListener("input", function () {
+    this.value = this.value.replace(/\D/g, "");
 });
-
-// Export dropdown toggle
-const btnExport = document.getElementById("btnExport");
-const exportMenu = document.getElementById("exportMenu");
-
-btnExport.addEventListener("click", (e) => {
-  e.stopPropagation();
-  exportMenu.classList.toggle("hidden");
-});
-
-document.addEventListener("click", () => {
-  exportMenu.classList.add("hidden");
-});
-
-document.getElementById("exportExcel").addEventListener("click", (e) => {
-  e.preventDefault();
-  console.log("Export applicants as Excel");
-  // e.g. use SheetJS (xlsx) to build a workbook from `applicants`
-});
-
-document.getElementById("exportPdf").addEventListener("click", (e) => {
-  e.preventDefault();
-  console.log("Export applicants as PDF");
-  // e.g. use a library like jsPDF to generate a PDF from `applicants`
-});
-
-// ---- Initial render ----
-renderTable();
+render();

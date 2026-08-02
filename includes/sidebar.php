@@ -30,6 +30,14 @@
         </a>
         </li>
 
+         <li class="nav-link">
+        <a href="<?= SITE_URL?>/data-management">
+        <i class="bx bx-data"></i>
+        <span class="text nav-text">Data Management</span>
+        </a>
+        </li>
+
+
         <li class="nav-link">
         <a href="<?= SITE_URL?>/evaluation">
         <i class="bx bx-task"></i>
@@ -38,7 +46,7 @@
         </li>
 
         <li class="nav-link">
-        <a href="#">
+        <a href="<?= SITE_URL?>/records">
         <i class="bx bx-folder"></i>
         <span class="text nav-text">Records</span>
         </a>
@@ -76,13 +84,6 @@
         <a href="#">
         <i class="bx bx-task"></i>
         <span class="text nav-text">Notifications</span>
-        </a>
-        </li>
-
-        <li class="nav-link">
-        <a href="#">
-        <i class="bx bx-history"></i>
-        <span class="text nav-text">Audit Trail</span>
         </a>
         </li>
 
