@@ -145,23 +145,40 @@ Applicants
 .applicant-modal-footer-end { justify-content: flex-end; }
 
 /* ---------- Trigger button ---------- */
+/* Add Applicant Button */
 .btn-primary {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  background: var(--teal-600);
-  color: #0c0b0b;
-  border: none;
-  border-radius: 8px;
-  padding: 11px 18px;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.30);
-  transition: background 0.15s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: #22c55e;      /* Green */
+    color: #fff;              /* White text */
+    border: none;
+    border-radius: 8px;
+    padding: 11px 18px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(34, 197, 94, 0.3);
+    transition: background 0.2s ease, transform 0.2s ease;
 }
-.btn-primary:hover { background: var(--teal-700); }
 
+.btn-primary:hover {
+    background: #16a34a;      /* Darker green */
+    transform: translateY(-1px);
+}
+
+.btn-primary:active {
+    background: #15803d;
+    transform: translateY(0);
+}
+.btn-add-applicant {
+    background: #22c55e;
+    color: #fff;
+}
+
+.btn-add-applicant:hover {
+    background: #16a34a;
+}
 /* ---------- Overlay & modal ---------- */
 .applicant-overlay {
   position: fixed;
@@ -276,8 +293,7 @@ Applicants
   flex: 1;
 
 }
-.applicant-modal h3 { margin: 0; font-size: 16px; font-weight: 600; color: var(--slate-900); }
-.applicant-modal p { margin: 3px 0 20px 0; font-size: 13px; color: var(--slate-500); }
+
 .grid-2 {
   display: grid;
   grid-template-columns: 1fr 1fr;

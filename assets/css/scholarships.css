@@ -1,5 +1,5 @@
 /* ===============================
-   RECORDS PAGE
+   SCHOLARSHIP PAGE
 =================================*/
 .table-wrap { overflow-x: auto; }
 
@@ -47,7 +47,8 @@ select {
     border: 1px solid var(--slate-200);
     border-radius: 12px;
     overflow: hidden
-}.records-toolbar{
+
+}.scholarships-toolbar{
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -57,12 +58,12 @@ select {
 
 .table-wrap { overflow-x: auto; }
 
-.records-table {
+.scholarships-table {
   width: 100%;
   border-collapse: collapse;
   font-size: 13.5px;
 }
-.records-table th {
+.scholarships-table th {
   text-align: left;
   font-size: 11px;
   font-weight: 600;
@@ -73,21 +74,21 @@ select {
   border-bottom: 1px solid var(--slate-200);
   white-space: nowrap;
 }
-.records-table th.actions-head { text-align: right; }
-.records-table td {
+.scholarships-table th.actions-head { text-align: right; }
+.scholarships-table td {
   padding: 14px 16px;
   border-bottom: 1px solid var(--slate-100);
   color: var(--slate-700);
   vertical-align: middle;
 }
-.records-table tbody tr:last-child td { border-bottom: none; }
-.records-table tbody tr:hover { background: var(--slate-50); }
+.scholarships-table tbody tr:last-child td { border-bottom: none; }
+.scholarships-table tbody tr:hover { background: var(--slate-50); }
 
 .name-cell { display: flex; flex-direction: column; }
 .name-cell .name { font-weight: 600; color: var(--slate-900); }
 .name-cell .email { font-size: 12px; color: var(--slate-400); margin-top: 1px; }
 
-.records-toolbar{
+.scholarships-toolbar{
     display:flex;
     justify-content:space-between;
     align-items:center;

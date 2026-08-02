@@ -1,12 +1,12 @@
 <?php
-$page_css = "records.css";
-$page_js = "records.js";
+$page_css = "scholarships.css";
+$page_js = "scholarships.js";
 
 include __DIR__ . '/../includes/header.php';
 ?>
 
 <div class="top-nav">
-    <h2>Records</h2>
+    <h2>Scholarships</h2>
     <?php include __DIR__ . '/../includes/navbar.php'; ?>
 </div>
 
@@ -15,7 +15,7 @@ include __DIR__ . '/../includes/header.php';
 
 
         <!-- Toolbar -->
-        <div class="records-toolbar">
+        <div class="scholarships-toolbar">
 
             <div class="toolbar">
 
@@ -28,7 +28,7 @@ include __DIR__ . '/../includes/header.php';
                 </select>
 
                 <div class="search-wrap">
-                    <input type="text" placeholder="Search applicant...">
+                    <input type="text" placeholder="Search scholarship...">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
                         stroke="currentColor" stroke-width="2">
                         <circle cx="11" cy="11" r="8"/>
@@ -49,18 +49,15 @@ include __DIR__ . '/../includes/header.php';
         <!-- Table -->
         <div class="table-wrap">
 
-            <table class="records-table">
+            <table class="scholarships-table">
 
                 <thead>
                     <tr>
-                        <th>Name</th>
-                        <th>Student ID</th>
-                        <th>Scholarship Type</th>
+                        <th>Scholarship Name</th>
+                        <th>Type</th>
+                        <th>Slots</th>
                         <th>Status</th>
-                        <th>Semester</th>
-                        <th>SY</th>
-                        <th>Date Evaluated</th>
-                        <th>Action</th>
+                        <th>Actions</th>
                     </tr>
                 </thead>
 

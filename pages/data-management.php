@@ -1,7 +1,7 @@
-<<?php
+<?php
 
 $page_css = "data-management.css";
-$page_js = "data-management.js";    
+$page_js = "data-management.js";
 
 include __DIR__ . '/../includes/header.php';
 
