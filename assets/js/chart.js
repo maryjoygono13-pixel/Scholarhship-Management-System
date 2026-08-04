@@ -2,7 +2,7 @@
 const scholarshipData = {
   Merit: 0,
   Endorsement: 0,
-  "Dean's Lister": 0
+  Academic: 0
 };
 
 const monthlyData = {

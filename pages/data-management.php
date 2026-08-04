@@ -13,14 +13,12 @@ include __DIR__ . '/../includes/header.php';
 </div>
 
 
-<div class="management-container">
+<div class="page-container">
 
     <!-- LEFT COLUMN -->
     <div class="management-column">
-
         <div class="import-card">
             <h2>Import Academic Records</h2>
-
             <input type="file" id="gradeFile" hidden>
 
             <div class="button-group">
@@ -37,17 +35,15 @@ include __DIR__ . '/../includes/header.php';
                 <span id="gradeFileName">
                     No file selected
                 </span>
-
                 <button type="button" id="gradeDeleteBtn">
                     <i class='bx bx-x'></i>
                 </button>
             </div>
         </div>
 
-
         <div class="table-card">
             <h3>Imported Grade Files</h3>
-
+            
             <table>
                 <thead>
                     <tr>

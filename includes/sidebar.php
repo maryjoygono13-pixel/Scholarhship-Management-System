@@ -60,21 +60,14 @@
                 </li>
 
                 <li class="nav-link">
-                    <a href="#">
+                    <a href="<?=SITE_URL?>/renewal-retention">
                         <i class="bx bx-bar-chart-alt-2"></i>
                         <span class="text nav-text">Renewal &amp; Retention</span>
                     </a>
                 </li>
 
                 <li class="nav-link">
-                    <a href="#">
-                        <i class="bx bx-bell"></i>
-                        <span class="text nav-text">Reports</span>
-                    </a>
-                </li>
-
-                <li class="nav-link">
-                    <a href="#">
+                    <a href="<?= SITE_URL?>/notification">
                         <i class="bx bx-task"></i>
                         <span class="text nav-text">Notifications</span>
                     </a>
