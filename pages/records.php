@@ -12,13 +12,9 @@ include __DIR__ . '/../includes/header.php';
 
 <div class="page">
 
-
-
         <!-- Toolbar -->
         <div class="records-toolbar">
-
             <div class="toolbar">
-
                 <select id="filterType">
                     <option>All Scholarship Types</option>
                 </select>
@@ -35,26 +31,22 @@ include __DIR__ . '/../includes/header.php';
                         <line x1="21" y1="21" x2="16.65" y2="16.65"/>
                     </svg>
                 </div>
-
             </div>
 
             <button class="btn-export">
                 <i class='bx bx-export'></i>
-                Export to Excel
+                Export Records
             </button>
-
         </div>
 
         <div class="table-card">
         <!-- Table -->
         <div class="table-wrap">
-
             <table class="records-table">
-
                 <thead>
                     <tr>
-                        <th>Name</th>
                         <th>Student ID</th>
+                        <th>Name</th>
                         <th>Scholarship Type</th>
                         <th>Status</th>
                         <th>Semester</th>
@@ -63,17 +55,12 @@ include __DIR__ . '/../includes/header.php';
                         <th>Action</th>
                     </tr>
                 </thead>
-
                 <tbody id="tableBody">
                     <!-- Database -->
                 </tbody>
-
             </table>
-
         </div>
-
     </div>
-
 </div>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>

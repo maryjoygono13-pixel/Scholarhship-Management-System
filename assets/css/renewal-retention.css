@@ -1,0 +1,251 @@
+* { box-sizing: border-box; }
+
+
+
+.page {
+   max-width: 1000px;
+    margin: 0 auto;
+  }
+
+
+/* ---------------- Summary cards ---------------- */
+.summary-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
+.summary-card {
+  background:#ffff;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  border-radius: 15px;
+
+}
+
+.summary-card .label {
+  color: #6B7280;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.summary-card .value {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--slate-900);
+  margin-top: 4px;
+}
+
+.summary-card.eligible .value { color:rgb(102, 224, 91); }
+.summary-card.at-risk .value { color:#d3a033; }
+.summary-card.terminated .value { color:#c02424; }
+
+/* ---------------- Toolbar ---------------- */
+.toolbar { display: flex; gap: 12px; margin-bottom: 18px; align-items: center; }
+
+.toolbar input[type="search"],
+.toolbar select {
+  font-size: 14px;
+  font-weight: 400;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #ffff;
+  color: var(--ink-900);
+}
+
+.toolbar input[type="search"] { flex: 1; max-width: 320px;   }
+
+/* ---------------- Table ---------------- */
+.ledger {
+  width: 100%;
+  border-collapse: collapse;
+  background:#ffff;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.ledger th {
+  text-align: left;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--ink-600);
+  background: var(--paper-100);
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.ledger td {
+  padding: 13px 16px;
+  border-bottom: 1px solid var(--line);
+  font-size: 0.92rem;
+  vertical-align: middle;
+}
+
+.ledger tr:last-child td { border-bottom: none; }
+.ledger tbody tr { cursor: pointer; }
+.ledger tbody tr:hover { background: rgba(184,145,46,0.06); }
+
+.student-name { font-weight: 600; }
+.student-id { font-family: var(--font-mono); font-size: 0.78rem; color: var(--ink-600); }
+
+.metric { font-family: var(--font-mono); font-size: 0.85rem; }
+.metric.fail { color: var(--status-terminated); font-weight: 600; }
+.metric.pass { color: var(--status-eligible); }
+
+/* ---------------- Seal badges ---------------- */
+.seal {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px 5px 9px;
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border: 1px solid transparent;
+}
+
+.seal::before { content: ''; width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+
+.seal.eligible { background: var(--status-eligible-bg); color: var(--status-eligible); border-color: rgba(47,107,79,0.25); }
+.seal.eligible::before { background: var(--status-eligible); }
+
+.seal.at-risk { background: var(--status-atrisk-bg); color: var(--status-atrisk); border-color: rgba(169,112,27,0.25); }
+.seal.at-risk::before { background: var(--status-atrisk); }
+
+.seal.terminated { background: var(--status-terminated-bg); color: var(--status-terminated); border-color: rgba(161,58,50,0.25); }
+.seal.terminated::before { background: var(--status-terminated); }
+
+/* ---------------- Modal ---------------- */
+.modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(22,33,62,0.45);
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 100;
+}
+
+.modal-overlay.open { display: flex; }
+
+.modal {
+  position: relative;
+  background: var(--paper-050);
+  border-radius: 10px;
+  padding: 28px;
+  max-width: 460px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.modal-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: none;
+  border: none;
+  font-size: 1.4rem;
+  line-height: 1;
+  color: var(--ink-600);
+  cursor: pointer;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 18px;
+  padding-right: 24px;
+}
+
+.modal-name {
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--ink-900);
+}
+
+.modal-id { font-family: var(--font-mono); font-size: 0.78rem; color: var(--ink-600); margin-top: 2px; }
+
+.criteria-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 18px; }
+
+.criteria-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--paper-100);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+}
+
+.criteria-row .name { font-weight: 600; font-size: 0.9rem; }
+.criteria-row .sub { font-family: var(--font-mono); font-size: 0.72rem; color: var(--ink-600); margin-top: 2px; }
+
+.check-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.check-icon.pass { background: var(--status-eligible-bg); color: var(--status-eligible); }
+.check-icon.fail { background: var(--status-terminated-bg); color: var(--status-terminated); }
+
+.remarks-box {
+  border-left: 3px solid var(--brass-500);
+  background: var(--paper-100);
+  padding: 14px 16px;
+  margin-bottom: 20px;
+}
+
+.remarks-label {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  color: var(--ink-600);
+  margin-bottom: 8px;
+}
+
+.remarks-text { font-size: 0.85rem; color: var(--ink-800); margin-top: 10px; }
+
+.modal-actions { display: flex; gap: 10px; }
+
+.btn {
+  flex: 1;
+  padding: 10px;
+  border-radius: var(--radius);
+  font-family: var(--font-body);
+  font-size: 0.88rem;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid var(--line);
+  background: var(--paper-050);
+}
+
+.btn-primary { background: var(--ink-900); color: var(--paper-050); border-color: var(--ink-900); }
+.btn-primary:disabled { background: var(--line); border-color: var(--line); color: var(--ink-600); cursor: not-allowed; }
+.btn-ghost { color: var(--ink-900); }
+.btn-ghost:hover { background: var(--paper-100); }
+
+@media (max-width: 900px) {
+  .app-shell { grid-template-columns: 1fr; }
+  .sidebar { display: none; }
+  .summary-row { grid-template-columns: repeat(2, 1fr); }
+}

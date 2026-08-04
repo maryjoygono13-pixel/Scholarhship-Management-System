@@ -24,8 +24,8 @@ include __DIR__ . '/../includes/header.php';
           <table class="applicants-table">
           <thead>
             <tr>
-              <th>Name</th>
               <th>Student ID</th>
+              <th>Name</th>
               <th>Scholarship type</th>
               <th>Status</th>
               <th>Date applied</th>
@@ -271,5 +271,6 @@ include __DIR__ . '/../includes/header.php';
       </div>
     </div>
   </div>
+
 
  <?php include __DIR__ . '/../includes/footer.php'; ?>

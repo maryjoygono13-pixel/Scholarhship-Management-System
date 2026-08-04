@@ -21,34 +21,41 @@ select, .search-wrap input {
     color: var(--slate-500);
     padding: 12px 16px;
 }
+
 select {
     padding:6px 26px 6px 10px;
     appearance:none;
     background:#fff url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%236B7280' stroke-width='2'><polyline points='6 9 12 15 18 9'/></svg>") no-repeat right 8px center;
 }
+
 .search-wrap {
     position:relative;
     flex:1;
     max-width:260px;
 }
+
 .search-wrap input {
     width:100%;
     padding:6px 30px 6px 10px;
     outline:none;
 }
+
 .search-wrap svg {
     position:absolute;
     right:9px;top:50%;
     transform:translateY(-50%);
     color:var(--ink-soft);
 }
+
 .table-card {
    background: #fff;
     border: 1px solid var(--slate-200);
     border-radius: 12px;
     overflow: hidden
 
-}.scholarships-toolbar{
+}
+
+.scholarships-toolbar{
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -59,28 +66,29 @@ select {
 .table-wrap { overflow-x: auto; }
 
 .scholarships-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13.5px;
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13.5px;
 }
 .scholarships-table th {
-  text-align: left;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--slate-500);
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--slate-200);
-  white-space: nowrap;
+    text-align: left;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--slate-500);
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--slate-200);
+    white-space: nowrap;
 }
 .scholarships-table th.actions-head { text-align: right; }
 .scholarships-table td {
-  padding: 14px 16px;
-  border-bottom: 1px solid var(--slate-100);
-  color: var(--slate-700);
-  vertical-align: middle;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--slate-100);
+    color: var(--slate-700);
+    vertical-align: middle;
 }
+
 .scholarships-table tbody tr:last-child td { border-bottom: none; }
 .scholarships-table tbody tr:hover { background: var(--slate-50); }
 
@@ -102,7 +110,7 @@ select {
     gap:12px;
 }
 
-.btn-export {
+.btn-plus {
     display: flex;
     align-items: center;
     gap: 8px;
@@ -118,7 +126,7 @@ select {
     margin-left:auto;
 }
 
-.btn-export:hover {
+.btn-plus:hover {
     background: #15803d;
 }
 .page{

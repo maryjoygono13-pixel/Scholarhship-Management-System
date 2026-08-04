@@ -1,17 +1,9 @@
-/* ===========================
-   DATA MANAGEMENT
-=========================== */
-
-.data-management-container {
-    width: 100%;
-    padding: 25px;
-}
 
 /* ===========================
    TWO COLUMNS
 =========================== */
 
-.management-container {
+.page-container {
     display: flex;
     gap: 25px;
     align-items: flex-start;
@@ -227,12 +219,12 @@
 
 @media (max-width: 992px) {
 
-    .management-container {
-        flex-direction: column;
-    }
+.management-container {
+    flex-direction: column;
+}
 
-    .button-group {
-        flex-direction: column;
-    }
+.button-group {
+    flex-direction: column;
+}
 
 }

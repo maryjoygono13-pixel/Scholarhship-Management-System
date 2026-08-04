@@ -9,7 +9,7 @@ $page_js = "evaluation.js";
 
     <?php include __DIR__ . '/../includes/navbar.php'; ?>
 </div>
-<div class="evaluation-page">
+<div class="page">
 <div class="evaluation-main-content">
   <div class="evaluation-card left">
     <div class="evaluatioon-left-head">
@@ -29,13 +29,28 @@ $page_js = "evaluation.js";
         </div>
       </div>
     </div>
-    <div class="table-wrap" id="tableWrap"></div>
-  </div>
 
-  <div class="card right" id="rightPanel" style="display:none;"></div>
-</div>
+    <div class="table-wrap">
+        <div class="table-card">
+          <table class="applicants-table">
+          <thead>
+            <tr>
+              <th>Student ID</th>
+              <th>Name</th>
+              <th>Scholarship type</th>
+              <th>Status</th>
+              <th>Date applied</th>
+              <th class="actions-head">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody">
 
+          </tbody>
+        </table>
+      </div>
 <div class="toast" id="toast"></div>
+
+
 
 <script src="applicant-evaluation.js"></script>
 

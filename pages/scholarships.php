@@ -11,9 +11,6 @@ include __DIR__ . '/../includes/header.php';
 </div>
 
 <div class="page">
-
-
-
         <!-- Toolbar -->
         <div class="scholarships-toolbar">
 
@@ -38,35 +35,35 @@ include __DIR__ . '/../includes/header.php';
 
             </div>
 
-            <button class="btn-export">
-                <i class='bx bx-export'></i>
-                Export to Excel
+            <button class="btn-plus">
+                <i class='bx bx-plus-circle'></i>
+                Add Scholarship
             </button>
 
         </div>
 
         <div class="table-card">
-        <!-- Table -->
-        <div class="table-wrap">
+            <!-- Table -->
+            <div class="table-wrap">
 
-            <table class="scholarships-table">
+                <table class="scholarships-table">
 
-                <thead>
-                    <tr>
-                        <th>Scholarship Name</th>
-                        <th>Type</th>
-                        <th>Slots</th>
-                        <th>Status</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
+                    <thead>
+                        <tr>
+                            <th>Scholarship Name</th>
+                            <th>Type</th>
+                            <th>Slots</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
 
-                <tbody id="tableBody">
-                    <!-- Database -->
-                </tbody>
+                    <tbody id="tableBody">
+                        <!-- Database -->
+                    </tbody>
 
-            </table>
-
+                </table>
+            </div>
         </div>
 
     </div>

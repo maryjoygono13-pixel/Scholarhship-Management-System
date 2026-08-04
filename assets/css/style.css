@@ -15,10 +15,10 @@ body {
 }
 
 .home {
-    margin-left:250px;
-    min-height:100vh;
-    background:#f5f7fa;
-    padding:25px;
+  margin-left:250px;
+  min-height:100vh;
+  background:#f5f7fa;
+  padding:25px;
 
 }
 
@@ -83,8 +83,8 @@ header .image-text .header-text {
 
 .sidebar li i,
 .sidebar li .text {
-    transition:2s;
-    color: rgb(255, 247, 247);
+  transition:2s;
+  color: rgb(255, 247, 247);
 }
 .sidebar li a {
   display: flex;
@@ -97,7 +97,7 @@ header .image-text .header-text {
 
 }
 .sidebar li a:hover {
-    background:darkolivegreen
+  background:darkolivegreen
 }
 .sidebar li a:hover i,
 .sidebar li a:hover .text {
@@ -132,7 +132,7 @@ header .image-text .header-text {
 /*Footer */
 .footer {
   padding:20px;
-  
+
 
 }
 

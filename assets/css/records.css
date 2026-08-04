@@ -58,27 +58,27 @@ select {
 .table-wrap { overflow-x: auto; }
 
 .records-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13.5px;
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13.5px;
 }
 .records-table th {
-  text-align: left;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--slate-500);
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--slate-200);
-  white-space: nowrap;
+    text-align: left;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--slate-500);
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--slate-200);
+    white-space: nowrap;
 }
 .records-table th.actions-head { text-align: right; }
 .records-table td {
-  padding: 14px 16px;
-  border-bottom: 1px solid var(--slate-100);
-  color: var(--slate-700);
-  vertical-align: middle;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--slate-100);
+    color: var(--slate-700);
+    vertical-align: middle;
 }
 .records-table tbody tr:last-child td { border-bottom: none; }
 .records-table tbody tr:hover { background: var(--slate-50); }
