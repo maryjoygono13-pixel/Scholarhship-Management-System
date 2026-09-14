@@ -4,12 +4,38 @@
 
 const EVAL_API_BASE = "api/applicants.php";
 
+/*
+ * Some older seeded records stored the year level baked into the
+ * program string itself (e.g. "BS Criminology · 4th Year"). Strip
+ * that off so combining it with the real yearLevel field below never
+ * shows the year level twice, then always show it as one line —
+ * "<program> · <year level>" — right next to the course/department,
+ * never as a separate standalone line.
+ */
+function formatDeptLine(program: string, major: string, yearLevel: string): string {
+  let base = (program || "").trim();
+  const yl = (yearLevel || "").trim();
+  if (yl) {
+    const suffix = "· " + yl;
+    if (base.endsWith(suffix)) {
+      base = base.slice(0, base.length - suffix.length).trim();
+    }
+  }
+  if (major) {
+    base = base ? base + " — " + major : major;
+  }
+  if (!base) return yl || "Not on file";
+  return yl ? base + " · " + yl : base;
+}
+
 function normalizeEval(record: any): EvaluationApplicant {
   return {
     id: String(record.id ?? record._id ?? String(record.studentId ?? record.student_id ?? Math.random())),
     name: String(record.name ?? record.full_name ?? ""),
     studentId: String(record.studentId ?? record.student_id ?? ""),
     program: String(record.program ?? record.program_year ?? ""),
+    major: String(record.major ?? ""),
+    yearLevel: String(record.yearLevel ?? record.year_level ?? ""),
     type: String(record.type ?? record.scholarship_type ?? ""),
     gwa: Number(record.gwa ?? record.current_gwa ?? 0),
     gwaReq: Number(record.gwaReq ?? record.gwa_requirement ?? 0),
@@ -234,17 +260,31 @@ function normalizeEval(record: any): EvaluationApplicant {
     }
 
     if (activeTab === "grades") {
+      const subjects = (window as any).getCurriculumSubjects
+        ? (window as any).getCurriculumSubjects(a.program, a.major, a.yearLevel)
+        : [];
+
+      const tableRows = subjects
+        .map(
+          (s: { code: string; name: string }) =>
+            '<tr><td><b class="font-mono">' + esc(s.code) + '</b></td><td>' + esc(s.name) + '</td><td><span class="badge badge-pending">Not yet graded</span></td></tr>'
+        )
+        .join("");
+
+      const breakdownHtml = subjects.length
+        ? '<div style="border:1px solid #e2e8f0; border-radius:10px; overflow:hidden; margin-bottom:14px;">' +
+          '<table class="applicants-table" style="font-size:13px; margin:0;">' +
+          '<thead><tr><th>Code</th><th>Subject Description</th><th>Status</th></tr></thead>' +
+          '<tbody>' + tableRows + '</tbody></table></div>'
+        : '<p style="font-size:12.5px; color:#6b7280; margin-bottom:14px;">' +
+          (a.yearLevel
+            ? 'No curriculum reference is available for this program/major yet.'
+            : "Set the applicant's year level to view the subject breakdown.") +
+          '</p>';
+
       return (
         '<div class="section"><h3>Academic Subject Breakdown</h3>' +
-        '<div style="border:1px solid #e2e8f0; border-radius:10px; overflow:hidden; margin-bottom:14px;">' +
-        '<table class="applicants-table" style="font-size:13px; margin:0;">' +
-        '<thead><tr><th>Code</th><th>Subject Description</th><th>Units</th><th>Grade</th><th>Status</th></tr></thead>' +
-        '<tbody>' +
-        '<tr><td><b class="font-mono">CS 201</b></td><td>Data Structures & Algorithms</td><td class="font-mono">3.0</td><td class="font-mono" style="font-weight:700;color:var(--green)">1.25</td><td><span class="badge badge-approved">Passed</span></td></tr>' +
-        '<tr><td><b class="font-mono">CS 202</b></td><td>Object Oriented Programming</td><td class="font-mono">3.0</td><td class="font-mono" style="font-weight:700;color:var(--green)">1.50</td><td><span class="badge badge-approved">Passed</span></td></tr>' +
-        '<tr><td><b class="font-mono">MATH 101</b></td><td>Discrete Mathematics</td><td class="font-mono">3.0</td><td class="font-mono" style="font-weight:700;color:var(--green)">1.75</td><td><span class="badge badge-approved">Passed</span></td></tr>' +
-        '<tr><td><b class="font-mono">ENG 102</b></td><td>Technical Writing & Comms</td><td class="font-mono">3.0</td><td class="font-mono" style="font-weight:700;color:var(--green)">1.50</td><td><span class="badge badge-approved">Passed</span></td></tr>' +
-        '</tbody></table></div>' +
+        breakdownHtml +
         '<div style="padding:14px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; display:flex; justify-content:space-between; align-items:center;">' +
         '<span style="font-size:13px; font-weight:600; color:#334155;">Cumulative GWA Target</span>' +
         '<span class="font-mono" style="font-size:16px; font-weight:700; color:var(--green);">' + Number(a.gwa).toFixed(2) + '</span>' +
@@ -260,7 +300,7 @@ function normalizeEval(record: any): EvaluationApplicant {
         '<div class="detail-item"><span class="detail-label">Academic Year</span><span class="detail-value font-mono">2025 - 2026</span></div>' +
         '<div class="detail-item"><span class="detail-label">Semester</span><span class="detail-value">2nd Semester</span></div>' +
         '<div class="detail-item"><span class="detail-label">Registrar Verified</span><span class="detail-value">Office of the Registrar</span></div>' +
-        '<div class="detail-item full-width"><span class="detail-label">Degree Program</span><span class="detail-value">' + esc(a.program) + '</span></div>' +
+        '<div class="detail-item full-width"><span class="detail-label">Degree Program</span><span class="detail-value">' + esc(formatDeptLine(a.program, a.major, a.yearLevel)) + '</span></div>' +
         '</div></div>'
       );
     }
@@ -320,7 +360,7 @@ function normalizeEval(record: any): EvaluationApplicant {
       '<div class="profile-top"><div class="avatar">' + initials(a.name) + "</div>" +
       '<div><div class="eval-profile-name">' + esc(a.name) + " " + statusBadge(a.status) + '</div><div class="profile-id font-mono">' + esc(a.studentId) + "</div></div></div>" +
       '<div class="profile-meta">' +
-      "<span>" + esc(a.program) + "</span>" +
+      "<span>" + esc(formatDeptLine(a.program, a.major, a.yearLevel)) + "</span>" +
       "<span>" + esc(a.type) + " Scholarship</span>" +
       "</div>" +
       "</div>" +

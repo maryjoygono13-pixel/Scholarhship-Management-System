@@ -287,39 +287,39 @@
                                 Select program
                             </option>
 
-                            <option value="Bachelor of Science in Accountancy (BSA)">
+                            <option value="BS Accountancy">
                                 Bachelor of Science in Accountancy (BSA)
                             </option>
 
-                            <option value="Bachelor of Science in Business Administration (BSBA)">
+                            <option value="BS Business Administration">
                                 Bachelor of Science in Business Administration (BSBA)
                             </option>
 
-                            <option value="Bachelor of Science in Information Technology (BSIT)">
+                            <option value="BS Information Technology">
                                 Bachelor of Science in Information Technology (BSIT)
                             </option>
 
-                            <option value="Bachelor of Science in Nursing (BSN)">
+                            <option value="BS Nursing">
                                 Bachelor of Science in Nursing (BSN)
                             </option>
 
-                            <option value="Bachelor of Arts in Political Science (BAPolSci)">
+                            <option value="BA Political Science">
                                 Bachelor of Arts in Political Science (BAPolSci)
                             </option>
 
-                            <option value="Bachelor of Elementary Education (BEEd)">
+                            <option value="Bachelor of Elementary Education">
                                 Bachelor of Elementary Education (BEEd)
                             </option>
 
-                            <option value="Bachelor of Secondary Education (BSEd)">
+                            <option value="Bachelor of Secondary Education">
                                 Bachelor of Secondary Education (BSEd)
                             </option>
 
-                            <option value="Master in Public Administration (MPA)">
+                            <option value="Master in Public Administration">
                                 Master in Public Administration (MPA)
                             </option>
 
-                            <option value="Juris Doctor (JD)">
+                            <option value="Juris Doctor">
                                 Juris Doctor (JD)
                             </option>
 
@@ -432,14 +432,10 @@
                   <label>Scholarship type <span class="req">*</span></label>
                   <select data-field="scholarshipType" name="scholarship_type" required>
                     <option value="">Select type</option>
-                    <option>CMSP (CHED Merit Scholarship Program)</option>
-                    <option>TDP (Tulong Dunong Program)</option>
-                    <option>TES (Tertiary Education Subsidy)</option>
-                    <option>COSCHO (Scholarship for Coconut Farmers and Their Families)</option>
-                    <option>Academic Merit</option>
-                    <option>Financial Need-Based</option>
-                    <option>Athletic</option>
-                    <option>Community Service</option>
+                    <option value="CMSP">CMSP (CHED Merit Scholarship Program)</option>
+                    <option value="TDP">TDP (Tulong Dunong Program)</option>
+                    <option value="TES">TES (Tertiary Education Subsidy)</option>
+                    <option value="COSCHO">COSCHO (Scholarship for Coconut Farmers and Their Families)</option>
                   </select>
                 </div>
 

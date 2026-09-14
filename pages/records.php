@@ -3,6 +3,7 @@ $current_page = 'records';
 $page_title = "Records";
 $page_css = "records.css";
 $page_js = "records.js";
+$extra_js = ["curriculum-data.js"];
 
 include __DIR__ . '/../includes/header.php';
 ?>
@@ -89,10 +90,10 @@ include __DIR__ . '/../includes/header.php';
                 <div class="field">
                     <label style="font-size:13px; font-weight:600; color:#374151;">Scholarship Type</label>
                     <select id="recType" name="scholarship_type" style="width:100%; height:40px; padding:0 12px; border:1px solid #d1d5db; border-radius:8px; outline:none;">
-                        <option>Academic Merit</option>
-                        <option>Financial Need-Based</option>
-                        <option>Athletic</option>
-                        <option>Community Service</option>
+                        <option value="CMSP">CMSP (CHED Merit Scholarship Program)</option>
+                        <option value="TDP">TDP (Tulong Dunong Program)</option>
+                        <option value="TES">TES (Tertiary Education Subsidy)</option>
+                        <option value="COSCHO">COSCHO (Scholarship for Coconut Farmers and Their Families)</option>
                     </select>
                 </div>
                 <div class="field">

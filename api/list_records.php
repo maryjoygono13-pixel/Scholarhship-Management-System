@@ -58,7 +58,7 @@ try {
 
     // Look up the applicant behind each record (if any) for richer academic details.
     $appStmt = $pdo->prepare("
-        SELECT program, gwa, gwa_req, failing_grades, units, enrolled, docs_complete
+        SELECT program, major, year_level, gwa, gwa_req, failing_grades, units, enrolled, docs_complete
         FROM applicants
         WHERE id = ? OR student_id = ?
         ORDER BY id DESC
@@ -83,6 +83,8 @@ try {
             'date_evaluated' => $r['date_evaluated'],
             'remarks' => $r['remarks'],
             'program' => $app['program'] ?? null,
+            'major' => $app['major'] ?? '',
+            'yearLevel' => $app['year_level'] ?? '',
             'gwa' => $app ? (float)$app['gwa'] : null,
             'gwaReq' => $app ? (float)$app['gwa_req'] : null,
             'failingGrades' => $app ? (int)$app['failing_grades'] : null,

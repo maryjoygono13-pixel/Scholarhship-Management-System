@@ -41,6 +41,8 @@ interface EvaluationApplicant {
   name: string;
   studentId: string;
   program: string;
+  major: string;
+  yearLevel: string;
   type: string;
   gwa: number;
   gwaReq: number;
@@ -72,6 +74,8 @@ interface Window {
   confirmDeleteRenewal?: (event: MouseEvent, id: number) => void;
   editScholarship?: (event: MouseEvent, id: number) => void;
   confirmDeleteScholarship?: (event: MouseEvent, id: number) => void;
+  CURRICULUM_DATA?: Record<string, Record<string, { code: string; name: string }[]>>;
+  getCurriculumSubjects?: (program: string, major: string, yearLevel: string) => { code: string; name: string }[];
 }
 
 declare const lucide: { createIcons: () => void } | undefined;

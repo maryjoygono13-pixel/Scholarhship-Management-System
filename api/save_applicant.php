@@ -100,39 +100,18 @@ function createSystemNotification(
         }
 
         /*
-        * Nominatim fallback
+        * No known-town match. We used to fall back to a live call to
+        * the Nominatim geocoding API here, but that's a synchronous
+        * network request on the critical save path — it routinely
+        * took 1.7-3.8+ seconds (sometimes longer, since PHP's stream
+        * "timeout" option doesn't bound DNS/connect time), and
+        * Nominatim's usage policy throttles rapid repeated calls, so
+        * adding several applicants in a row made each save slower
+        * than the last. That's what made the whole site feel like it
+        * froze. Default to the town-hall coordinate instead; precise
+        * geocoding for unmatched addresses should happen out-of-band,
+        * not while the user is waiting on a save.
         */
-        try {
-            $url = 'https://nominatim.openstreetmap.org/search?' . http_build_query([
-                'q' => $address,
-                'format' => 'json',
-                'limit' => 1
-            ]);
-
-            $context = stream_context_create([
-                'http' => [
-                    'method' => 'GET',
-                    'timeout' => 2,
-                    'header' => "User-Agent: ScholarshipManagementSystem/1.0\r\n"
-                ]
-            ]);
-
-            $response = @file_get_contents($url, false, $context);
-
-            if ($response !== false) {
-                $results = json_decode($response, true);
-
-                if (!empty($results[0]['lat']) && !empty($results[0]['lon'])) {
-                    return [
-                        (float) $results[0]['lat'],
-                        (float) $results[0]['lon']
-                    ];
-                }
-            }
-        } catch (Throwable $e) {
-            // Use default coordinates if geocoding fails.
-        }
-
         return [10.1333, 124.8333];
     }
 

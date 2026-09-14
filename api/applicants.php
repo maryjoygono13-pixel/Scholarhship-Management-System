@@ -51,6 +51,8 @@ try {
 
                 'studentId' => $r['student_id'],
                 'program' => $r['program'],
+                'major' => $r['major'] ?? '',
+                'yearLevel' => $r['year_level'],
                 'type' => $r['scholarship_type'],
 
                 'gwa' => (float)$r['gwa'],

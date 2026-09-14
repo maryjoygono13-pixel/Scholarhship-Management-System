@@ -10,6 +10,10 @@
                <script src="<?= SITE_BASE ?>/assets/js/chart.js"></script>
           <?php endif; ?>
 
+          <?php if (isset($extra_js) && is_array($extra_js)): foreach ($extra_js as $extraJsFile): ?>
+               <script src="<?= SITE_BASE ?>/assets/js/<?= $extraJsFile ?>?v=<?= time() ?>"></script>
+          <?php endforeach; endif; ?>
+
           <?php if (isset($page_js)): ?>
                <script src="<?= SITE_BASE ?>/assets/js/<?= $page_js ?>?v=<?= time() ?>"></script>
           <?php endif; ?>

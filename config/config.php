@@ -1,6 +1,21 @@
 <?php
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
+
+    /*
+     * PHP's default session handler holds an exclusive lock on the
+     * session file for as long as the request is running. Since
+     * almost every page/API call here only READS $_SESSION (for the
+     * login check), we release that lock immediately instead of
+     * holding it for the request's full duration. Otherwise, one
+     * slow request (e.g. an applicant save that waits on the
+     * external geocoding API) blocks every other request from the
+     * same browser session — including unrelated pages — until it
+     * finishes, which is what made the whole site feel like it froze.
+     * pages/login.php reacquires the session right before it needs
+     * to write to it.
+     */
+    session_write_close();
 }
 
 $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';

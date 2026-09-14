@@ -5,6 +5,7 @@
     $page_title = "Evaluation";
     $page_css = "evaluation.css";
     $page_js = "evaluation.js";
+    $extra_js = ["curriculum-data.js"];
     include __DIR__ . '/../includes/header.php';
     ?>
 

@@ -132,6 +132,30 @@ document.addEventListener("DOMContentLoaded", () => {
     return (name || "").split(" ").map(n => n[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
   }
 
+  /*
+   * Some older seeded records stored the year level baked into the
+   * program string itself (e.g. "BS Criminology · 4th Year"). Strip
+   * that off so combining it with the real yearLevel field below
+   * never shows the year level twice, then always show it as one
+   * line — "<program> · <year level>" — right next to the
+   * course/department, never as a separate standalone line.
+   */
+  function formatDeptLine(program: string, major: string, yearLevel: string): string {
+    let base = (program || "").trim();
+    const yl = (yearLevel || "").trim();
+    if (yl) {
+      const suffix = "· " + yl;
+      if (base.endsWith(suffix)) {
+        base = base.slice(0, base.length - suffix.length).trim();
+      }
+    }
+    if (major) {
+      base = base ? base + " — " + major : major;
+    }
+    if (!base) return yl || "Not on file";
+    return yl ? base + " · " + yl : base;
+  }
+
   function getRecordTabHtml(r: any, tab: string): string {
     const hasAcademic = r.gwa !== null && r.gwa !== undefined;
     const passColor = "#15803d", failColor = "#be123c";
@@ -181,9 +205,25 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     if (tab === "grades") {
-      return '<div class="section"><h3>Academic Subject Breakdown</h3>' +
-        '<p class="empty-note">No detailed subject-by-subject grade breakdown is recorded for this record.</p>' +
-        '</div>';
+      const subjects = (window as any).getCurriculumSubjects
+        ? (window as any).getCurriculumSubjects(r.program || "", r.major || "", r.yearLevel || "")
+        : [];
+
+      const tableRows = subjects
+        .map(
+          (s: { code: string; name: string }) =>
+            '<tr><td><b class="font-mono">' + esc(s.code) + '</b></td><td>' + esc(s.name) + '</td><td><span class="badge badge-pending">Not yet graded</span></td></tr>'
+        )
+        .join("");
+
+      const breakdownHtml = subjects.length
+        ? '<div style="border:1px solid #e2e8f0; border-radius:10px; overflow:hidden;">' +
+          '<table class="applicants-table" style="font-size:13px; margin:0;">' +
+          '<thead><tr><th>Code</th><th>Subject Description</th><th>Status</th></tr></thead>' +
+          '<tbody>' + tableRows + '</tbody></table></div>'
+        : '<p class="empty-note">No detailed subject-by-subject grade breakdown is recorded for this record.</p>';
+
+      return '<div class="section"><h3>Academic Subject Breakdown</h3>' + breakdownHtml + '</div>';
     }
 
     if (tab === "enrollment") {
@@ -192,7 +232,7 @@ document.addEventListener("DOMContentLoaded", () => {
         '<div class="detail-item"><span class="detail-label">Enrollment Status</span><span class="detail-value highlight">' + (hasAcademic ? (r.enrolled ? "Validated & Official" : "Unconfirmed") : "Not available") + '</span></div>' +
         '<div class="detail-item"><span class="detail-label">School Year</span><span class="detail-value font-mono">' + esc(r.sy) + '</span></div>' +
         '<div class="detail-item"><span class="detail-label">Semester</span><span class="detail-value">' + esc(r.semester) + '</span></div>' +
-        '<div class="detail-item full-width"><span class="detail-label">Degree Program</span><span class="detail-value">' + (r.program ? esc(r.program) : 'Not on file') + '</span></div>' +
+        '<div class="detail-item full-width"><span class="detail-label">Degree Program</span><span class="detail-value">' + esc(formatDeptLine(r.program, r.major, r.yearLevel)) + '</span></div>' +
         '</div></div>';
     }
 
@@ -229,6 +269,7 @@ document.addEventListener("DOMContentLoaded", () => {
       '<div class="profile-meta">' +
       '<span>' + esc(typeAcronym(r.scholarshipType)) + ' Scholarship</span>' +
       '<span>' + esc(r.semester) + ' &middot; <span class="font-mono">' + esc(r.sy) + '</span></span>' +
+      '<span>' + esc(formatDeptLine(r.program, r.major, r.yearLevel)) + '</span>' +
       '</div>' +
       '</div>' +
       '<div class="tabs">' + tabsHtml + '</div>' +

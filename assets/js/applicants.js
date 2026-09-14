@@ -317,7 +317,7 @@ function updateMajorOptions() {
      */
     if (
         program ===
-        "Bachelor of Science in Business Administration (BSBA)"
+        "BS Business Administration"
     ) {
 
         majors = [
@@ -332,7 +332,7 @@ function updateMajorOptions() {
      */
     else if (
         program ===
-        "Bachelor of Secondary Education (BSEd)"
+        "Bachelor of Secondary Education"
     ) {
 
         majors = [
@@ -1587,12 +1587,9 @@ function showSuccess() {
 
     if (successMsg) {
 
-        successMsg.textContent =
-            `${name} has been successfully ${
-                editingApplicantId
-                    ? "updated"
-                    : "added"
-            } in the system.`;
+        successMsg.textContent = editingApplicantId
+            ? `${name} has been successfully updated in the system.`
+            : `${name} has been successfully added and sent to Evaluation.`;
     }
 }
 

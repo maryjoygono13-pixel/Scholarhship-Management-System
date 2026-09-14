@@ -36,8 +36,13 @@
 
             <div id="scholarMap"></div>
 
-            <div class="map-legend">
-                <h4>Academic Program</h4>
+            <div class="map-legend" id="mapLegend">
+                <button type="button" class="map-legend-toggle" id="mapLegendToggle" aria-expanded="true" aria-controls="mapLegendBody">
+                    <h4>Academic Program</h4>
+                    <i data-lucide="chevron-down" class="map-legend-chevron"></i>
+                </button>
+
+                <div class="map-legend-body" id="mapLegendBody">
 
                 <div class="legend-item">
                     <span class="legend-dot" style="background:#ec4899;"></span>
@@ -102,6 +107,8 @@
                 <div class="legend-item">
                     <span class="legend-dot" style="background:#be185d;"></span>
                     <span>Bread & Pastry Production NC II</span>
+                </div>
+
                 </div>
 
             </div>

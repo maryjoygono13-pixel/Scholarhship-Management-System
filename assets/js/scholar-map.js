@@ -16,7 +16,43 @@ document.addEventListener("DOMContentLoaded", () => {
 
     loadStudentLocations(map);
     setupDepartmentFilter();
+    setupLegendToggle();
 });
+
+/* =========================================================
+   LEGEND OPEN / CLOSE TOGGLE
+========================================================= */
+
+function setupLegendToggle() {
+    const legend = document.getElementById("mapLegend");
+    const toggleBtn = document.getElementById("mapLegendToggle");
+    if (!legend || !toggleBtn) return;
+
+    const STORAGE_KEY = "scholarMapLegendCollapsed";
+    let collapsed = false;
+    try {
+        collapsed = localStorage.getItem(STORAGE_KEY) === "1";
+    } catch (e) {
+        collapsed = false;
+    }
+
+    const applyState = (isCollapsed) => {
+        legend.classList.toggle("collapsed", isCollapsed);
+        toggleBtn.setAttribute("aria-expanded", String(!isCollapsed));
+    };
+
+    applyState(collapsed);
+
+    toggleBtn.addEventListener("click", () => {
+        collapsed = !legend.classList.contains("collapsed");
+        applyState(collapsed);
+        try {
+            localStorage.setItem(STORAGE_KEY, collapsed ? "1" : "0");
+        } catch (e) {
+            // Ignore storage errors (e.g. private browsing).
+        }
+    });
+}
 
 // Program & Department Color Palette
 const departmentColors = {

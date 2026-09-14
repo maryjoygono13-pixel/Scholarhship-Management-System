@@ -13,6 +13,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $password = trim($_POST['password'] ?? '');
 
     if (!empty($identifier) && !empty($password)) {
+        // Reacquire the session for writing — config.php closes it
+        // immediately after reading it to avoid blocking other requests.
+        session_start();
         $_SESSION['user_logged_in'] = true;
         $_SESSION['user_role'] = 'registrar';
         $_SESSION['user_identifier'] = $identifier;     
