@@ -27,6 +27,8 @@ try {
 
         $stmt = $pdo->prepare("DELETE FROM scholars WHERE id = ?");
         $stmt->execute([$id]);
+
+        logActivity($pdo, 'Scholar Deleted', 'Scholars', $title . ' was moved to Trash Bin.', $id);
     }
 
     sendJson(['success' => true, 'message' => 'Scholar entry moved to Trash Bin.']);

@@ -1,5 +1,12 @@
 <?php
 require_once __DIR__ . '/../config/config.php';
+require_once __DIR__ . '/../config/db_helper.php';
+require_once __DIR__ . '/../includes/activity_logger.php';
+
+if (!empty($_SESSION['user_logged_in'])) {
+    $identifier = trim((string)($_SESSION['user_identifier'] ?? '')) ?: 'Registrar Staff';
+    logActivity(getDB(), 'User Logout', 'Authentication', $identifier . ' logged out.');
+}
 
 $_SESSION = array();
 

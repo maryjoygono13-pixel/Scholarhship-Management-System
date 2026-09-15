@@ -28,15 +28,17 @@ try {
     }
 
     if ($id > 0) {
-        $stmt = $pdo->prepare("UPDATE scholars SET 
+        $stmt = $pdo->prepare("UPDATE scholars SET
             student_id = ?, name = ?, department = ?, year_level = ?, gwa = ?, status = ?, school_year = ?, remarks = ?, updated_at = CURRENT_TIMESTAMP
             WHERE id = ?");
         $stmt->execute([$studentId, $name, $department, $yearLevel, $gwa, $status, $schoolYear, $remarks, $id]);
+        logActivity($pdo, 'Scholar Updated', 'Scholars', $name . ' (Student ID: ' . $studentId . ') was updated.', $id);
         sendJson(['success' => true, 'id' => $id, 'message' => 'Scholar record updated successfully.']);
     } else {
         $stmt = $pdo->prepare("INSERT INTO scholars (student_id, name, department, year_level, gwa, status, school_year, remarks) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
         $stmt->execute([$studentId, $name, $department, $yearLevel, $gwa, $status, $schoolYear, $remarks]);
         $newId = (int)$pdo->lastInsertId();
+        logActivity($pdo, 'Scholar Added', 'Scholars', $name . ' (Student ID: ' . $studentId . ') was added as a scholar.', $newId);
         sendJson(['success' => true, 'id' => $newId, 'message' => 'Scholar record added successfully.']);
     }
 } catch (Exception $e) {

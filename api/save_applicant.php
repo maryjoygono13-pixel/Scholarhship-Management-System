@@ -390,7 +390,9 @@ function createSystemNotification(
                 SELECT
                     id,
                     student_id,
-                    scholarship_type
+                    scholarship_type,
+                    latitude,
+                    longitude
                 FROM applicants
                 WHERE id = ?
                 LIMIT 1
@@ -510,6 +512,26 @@ function createSystemNotification(
                 $studentId .
                 ') was updated in the scholarship system.'
             );
+
+            logActivity(
+                $pdo,
+                'Applicant Updated',
+                'Applicants',
+                $fullName . ' (Student ID: ' . $studentId . ') was updated.',
+                $id
+            );
+
+            $oldLat = $existingApplicant['latitude'] ?? null;
+            $oldLng = $existingApplicant['longitude'] ?? null;
+            if ((float)$oldLat !== (float)$latitude || (float)$oldLng !== (float)$longitude) {
+                logActivity(
+                    $pdo,
+                    'Map Location Updated',
+                    'Scholar Map',
+                    $fullName . ' (Student ID: ' . $studentId . ') location was updated to ' . $address . '.',
+                    $id
+                );
+            }
 
             sendJson([
                 'success' => true,
@@ -708,6 +730,14 @@ function createSystemNotification(
             ') submitted a ' .
             $scholarshipType .
             ' application.'
+        );
+
+        logActivity(
+            $pdo,
+            'Applicant Created',
+            'Applicants',
+            $fullName . ' (Student ID: ' . $studentId . ') submitted a ' . $scholarshipType . ' application.',
+            $newId
         );
 
         sendJson([

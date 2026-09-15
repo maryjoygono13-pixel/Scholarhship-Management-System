@@ -831,7 +831,8 @@ table.ledger,
 table.applicants-table,
 table.scholarships-table,
 table.records-table,
-table.notification-table {
+table.notification-table,
+table.history-table {
   border: 1px solid #d1d5db !important;
   border-radius: 12px;
   overflow: hidden;

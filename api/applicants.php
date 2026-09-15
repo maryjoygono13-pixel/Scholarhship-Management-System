@@ -134,6 +134,25 @@ try {
         $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
 
+if ($status !== null) {
+    $stmtWho = $pdo->prepare("SELECT student_id, first_name, last_name FROM applicants WHERE id = ?");
+    $stmtWho->execute([$id]);
+    $who = $stmtWho->fetch();
+    $whoName = $who
+        ? trim($who['first_name'] . ' ' . $who['last_name']) . ' (Student ID: ' . $who['student_id'] . ')'
+        : ('Applicant #' . $id);
+
+    $statusLower = strtolower($status);
+    if ($statusLower === 'approved') {
+        logActivity($pdo, 'Evaluation Approved', 'Evaluation', $whoName . ' was approved for their scholarship application.', $id);
+        logActivity($pdo, 'Scholarship Assignment', 'Scholarships', $whoName . ' was assigned their scholarship after approval.', $id);
+    } elseif ($statusLower === 'rejected') {
+        logActivity($pdo, 'Evaluation Rejected', 'Evaluation', $whoName . ' was rejected for their scholarship application.', $id);
+    } else {
+        logActivity($pdo, 'Status Changed', 'Evaluation', $whoName . ' status changed to "' . $status . '".', $id);
+    }
+}
+
 /*
  * If applicant is approved or rejected,
  * create an evaluation record.

@@ -32,6 +32,8 @@ try {
 
         $stmt = $pdo->prepare("DELETE FROM applicants WHERE id = ?");
         $stmt->execute([$id]);
+
+        logActivity($pdo, 'Applicant Deleted', 'Applicants', $title . ' was moved to Trash Bin.', $id);
     }
 
     sendJson(['success' => true, 'message' => 'Applicant moved to Trash Bin. Can be reverted anytime.']);

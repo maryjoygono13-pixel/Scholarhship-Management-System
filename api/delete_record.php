@@ -82,6 +82,8 @@ try {
 
     $stmt->execute([$id]);
 
+    logActivity($pdo, 'Record Deleted', 'Records', $title . ' was moved to Trash Bin.', $id);
+
     sendJson([
         'success' => true,
         'message' => 'Record moved to Trash Bin and removed from the Scholar Map.'

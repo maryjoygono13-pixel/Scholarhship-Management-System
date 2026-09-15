@@ -3,10 +3,19 @@ $page_title = "Account & System Settings";
 $page_css = "settings.css";
 include __DIR__ . '/../includes/header.php';
 
+require_once __DIR__ . '/../config/db_helper.php';
+require_once __DIR__ . '/../includes/settings_helper.php';
+$pdo = getDB();
+
 $success = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (isset($_POST['portal_config'])) {
+        setSetting($pdo, 'history_enabled', isset($_POST['history_enabled']) ? '1' : '0');
+    }
     $success = 'Account and security settings updated successfully!';
 }
+
+$historyEnabled = getSetting($pdo, 'history_enabled', '1') === '1';
 ?>
 
 <div class="main-content">
@@ -51,6 +60,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <p class="settings-subtitle">Manage portal preferences and administrative settings.</p>
 
             <form method="POST">
+                <input type="hidden" name="portal_config" value="1">
+
                 <div class="form-group">
                     <label>Academic Year</label>
                     <select class="form-input">
@@ -76,6 +87,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         </label>
                         <label class="checkbox-label">
                             <input type="checkbox" checked> Email alert on new submissions
+                        </label>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Menu Access</label>
+                    <div class="checkbox-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" name="history_enabled" <?= $historyEnabled ? 'checked' : '' ?>> Enable History / Audit Trail menu
                         </label>
                     </div>
                 </div>

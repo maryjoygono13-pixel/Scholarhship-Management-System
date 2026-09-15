@@ -17,6 +17,17 @@ try {
         $stmt = $pdo->prepare("UPDATE renewal_retention SET status = ?, remarks = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
         $stmt->execute([$newStatus, $remarks ?: "Status updated to $newStatus", $id]);
 
+        $stmtWho = $pdo->prepare("SELECT student_id, name FROM renewal_retention WHERE id = ?");
+        $stmtWho->execute([$id]);
+        $who = $stmtWho->fetch();
+        $whoName = $who ? ($who['name'] . ' (Student ID: ' . $who['student_id'] . ')') : ('Scholar #' . $id);
+
+        if ($action === 'renew') {
+            logActivity($pdo, 'Scholarship Renewal', 'Renewal & Retention', $whoName . ' scholarship was renewed (eligible).', $id);
+        } else {
+            logActivity($pdo, 'Status Changed', 'Renewal & Retention', $whoName . ' status changed to "' . $newStatus . '".', $id);
+        }
+
         sendJson(['success' => true, 'message' => "Scholar status updated to $newStatus."]);
     }
 

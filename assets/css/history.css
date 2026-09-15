@@ -1,0 +1,244 @@
+/* =========================================================
+   HISTORY / AUDIT TRAIL PAGE
+========================================================= */
+
+.page {
+    max-width: 1100px;
+    margin: 0 auto;
+}
+
+/* =========================================================
+   STAT CARDS
+========================================================= */
+
+.history-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-bottom: 20px;
+}
+
+.history-stat-card {
+    background: #fff;
+    border: 1px solid var(--slate-200, #e2e8f0);
+    border-radius: 14px;
+    padding: 18px 20px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.history-stat-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.history-stat-icon svg { width: 20px; height: 20px; }
+
+.history-stat-icon.total { background: #e8f5e9; color: var(--green-900, #134e2a); }
+.history-stat-icon.today { background: #dbeafe; color: #2563eb; }
+.history-stat-icon.user { background: #fef3c7; color: #b45309; }
+
+.history-stat-label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    margin-bottom: 2px;
+}
+
+.history-stat-card h1 {
+    font-size: 22px;
+    font-weight: 700;
+    color: #111827;
+    margin: 0;
+}
+
+.history-stat-user {
+    font-size: 15px !important;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 220px;
+}
+
+/* =========================================================
+   TOOLBAR EXTRAS
+========================================================= */
+
+.history-date-input {
+    height: 40px;
+    padding: 0 12px;
+    border: 1px solid var(--line, #d1d5db);
+    border-radius: 8px;
+    font-size: 13.5px;
+    color: #374151;
+    outline: none;
+    background: #fff;
+}
+
+/* =========================================================
+   TABLE
+========================================================= */
+
+.history-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13.5px;
+}
+
+.history-table th {
+    text-align: left;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #6b7280;
+    padding: 12px 16px;
+    white-space: nowrap;
+}
+
+.history-table td {
+    padding: 14px 16px;
+    color: #374151;
+    vertical-align: middle;
+}
+
+.history-table tbody tr { cursor: pointer; }
+.history-table tbody tr:hover { background: #f9fafb; }
+
+.history-table .desc-cell {
+    max-width: 380px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.history-table .module-pill {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 999px;
+    background: #f3f4f6;
+    color: #374151;
+    font-size: 11.5px;
+    font-weight: 600;
+}
+
+/* =========================================================
+   ACTION BADGES — grouped by nature of the action
+========================================================= */
+
+.action-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 11.5px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.action-created { background: #dcfce7; color: #15803d; }
+.action-updated { background: #dbeafe; color: #1d4ed8; }
+.action-deleted { background: #ffe4e6; color: #be123c; }
+.action-approved { background: #dcfce7; color: #15803d; }
+.action-rejected { background: #ffe4e6; color: #be123c; }
+.action-auth { background: #ede9fe; color: #6d28d9; }
+.action-status { background: #fef3c7; color: #b45309; }
+.action-default { background: #f3f4f6; color: #374151; }
+
+/* =========================================================
+   EMPTY STATE
+========================================================= */
+
+.empty {
+    padding: 60px 20px;
+    text-align: center;
+    color: #6b7280;
+}
+
+/* =========================================================
+   PAGINATION
+========================================================= */
+
+.history-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 16px;
+    font-size: 13px;
+    color: #6b7280;
+}
+
+.history-pagination .page-btns {
+    display: flex;
+    gap: 6px;
+}
+
+.history-pagination button {
+    height: 32px;
+    min-width: 32px;
+    padding: 0 10px;
+    border: 1px solid var(--line, #d1d5db);
+    background: #fff;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 13px;
+    color: #374151;
+}
+
+.history-pagination button:hover:not(:disabled) {
+    background: #f3f4f6;
+}
+
+.history-pagination button.active {
+    background: var(--green-900, #134e2a);
+    color: #fff;
+    border-color: var(--green-900, #134e2a);
+}
+
+.history-pagination button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* =========================================================
+   RESPONSIVE
+========================================================= */
+
+@media (max-width: 800px) {
+    .history-stats {
+        grid-template-columns: 1fr;
+    }
+
+    .table-header-toolbar {
+        flex-wrap: wrap;
+    }
+
+    .toolbar {
+        width: 100%;
+        flex: 1 1 100%;
+        flex-wrap: wrap;
+    }
+
+    .header-actions {
+        width: 100%;
+        margin-left: 0;
+        justify-content: flex-end;
+    }
+
+    .history-pagination {
+        flex-direction: column;
+        gap: 10px;
+        align-items: stretch;
+    }
+}

@@ -20,11 +20,14 @@ try {
         if ($id > 0) {
             $stmt = $pdo->prepare("UPDATE records SET student_id = ?, name = ?, scholarship_type = ?, status = ?, semester = ?, sy = ?, remarks = ? WHERE id = ?");
             $stmt->execute([$studentId, $name, $type, $status, $semester, $sy, $remarks, $id]);
+            logActivity($pdo, 'Record Updated', 'Records', $name . ' (Student ID: ' . $studentId . ') record was updated.', $id);
             sendJson(['success' => true, 'id' => $id, 'message' => 'Record updated successfully.']);
         } else {
             $stmt = $pdo->prepare("INSERT INTO records (student_id, name, scholarship_type, status, semester, sy, date_evaluated, remarks) VALUES (?, ?, ?, ?, ?, ?, DATE('now'), ?)");
             $stmt->execute([$studentId, $name, $type, $status, $semester, $sy, $remarks]);
-            sendJson(['success' => true, 'id' => (int)$pdo->lastInsertId(), 'message' => 'Record created successfully.']);
+            $newId = (int)$pdo->lastInsertId();
+            logActivity($pdo, 'Record Added', 'Records', $name . ' (Student ID: ' . $studentId . ') record was added.', $newId);
+            sendJson(['success' => true, 'id' => $newId, 'message' => 'Record created successfully.']);
         }
     }
     $statusParam = trim($_GET['status'] ?? '');

@@ -111,6 +111,20 @@ if (!isset($current_page) || empty($current_page) || $current_page === 'index') 
                     </a>
                 </li>
 
+                <?php
+                require_once __DIR__ . '/../config/db_helper.php';
+                require_once __DIR__ . '/settings_helper.php';
+                $historyMenuEnabled = getSetting(getDB(), 'history_enabled', '1') === '1';
+                ?>
+                <?php if ($historyMenuEnabled): ?>
+                <li class="nav-link <?= ($current_page === 'history') ? 'active' : '' ?>">
+                    <a href="<?= SITE_BASE ?>/history">
+                        <i data-lucide="clock"></i>
+                        <span class="text nav-text">History</span>
+                    </a>
+                </li>
+                <?php endif; ?>
+
                 <li class="nav-link <?= ($current_page === 'trash-bin') ? 'active' : '' ?>">
                     <a href="<?= SITE_BASE ?>/trash-bin">
                         <i data-lucide="rotate-ccw"></i>

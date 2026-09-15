@@ -220,6 +220,29 @@ function initDatabase(): PDO {
         deleted_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )");
 
+    // 10. Activity Logs / History Audit Trail Table
+    $pdo->exec("CREATE TABLE IF NOT EXISTS activity_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER DEFAULT 0,
+        user_name TEXT NOT NULL DEFAULT 'Registrar Staff',
+        action TEXT NOT NULL,
+        module TEXT NOT NULL,
+        description TEXT DEFAULT '',
+        record_id INTEGER DEFAULT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )");
+    $pdo->exec("CREATE INDEX IF NOT EXISTS idx_activity_logs_created_at ON activity_logs(created_at)");
+    $pdo->exec("CREATE INDEX IF NOT EXISTS idx_activity_logs_module ON activity_logs(module)");
+    $pdo->exec("CREATE INDEX IF NOT EXISTS idx_activity_logs_action ON activity_logs(action)");
+
+    // 11. Settings — simple key/value feature toggles & system config
+    $pdo->exec("CREATE TABLE IF NOT EXISTS settings (
+        setting_key TEXT PRIMARY KEY,
+        setting_value TEXT
+    )");
+    // History menu is accessible to everyone by default; can be turned off from Settings.
+    $pdo->exec("INSERT OR IGNORE INTO settings (setting_key, setting_value) VALUES ('history_enabled', '1')");
+
     // Seed Data if empty
     seedDataIfEmpty($pdo);
 

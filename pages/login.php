@@ -1,5 +1,7 @@
 <?php
 require_once __DIR__ . '/../config/config.php';
+require_once __DIR__ . '/../config/db_helper.php';
+require_once __DIR__ . '/../includes/activity_logger.php';
 
 if (!empty($_SESSION['user_logged_in'])) {
     header("Location: " . SITE_URL . "/dashboard");
@@ -18,8 +20,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         session_start();
         $_SESSION['user_logged_in'] = true;
         $_SESSION['user_role'] = 'registrar';
-        $_SESSION['user_identifier'] = $identifier;     
-        
+        $_SESSION['user_identifier'] = $identifier;
+
+        logActivity(getDB(), 'User Login', 'Authentication', $identifier . ' logged in.');
+
         header("Location: " . SITE_URL . "/dashboard");
         exit();
     } else {
