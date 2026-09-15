@@ -21,15 +21,9 @@
                         <option value="Information Technology">BS Information Technology</option>
                         <option value="Accountancy">BS Accountancy</option>
                         <option value="Business Administration">BS Business Administration</option>
-                        <option value="Food Preparation & Service Technology"> Food Preparation & Service Technology</option>
                         <option value="Political Science">BA Political Science</option>
                         <option value="Elementary Education">BE Elementary Education</option>
                         <option value="Secondary Education">BS Secondary Education</option>
-                        <option value="Public Administration">Master of Public Administration</option>
-                        <option value="Juris Doctor">Juris Doctor</option>
-                        <option value="Bookkeeping">Bookkeeping NC II</option>
-                        <option value="Caregiver">Caregiver NC II </option>
-                        <option value="Bread & Pastry Production">Bread & Pastry Production NC II</option>
                     </select>
                 </div>
             </div>
@@ -62,11 +56,6 @@
                 <div class="legend-item">
                     <span class="legend-dot" style="background:#f59e0b;"></span>
                     <span>BS Business Administration</span>
-                </div>
-
-                <div class="legend-item">
-                    <span class="legend-dot" style="background:#14b8a6;"></span>
-                    <span>Food Preparation &amp; Service Technology</span>
                 </div>
 
                 <div class="legend-item">

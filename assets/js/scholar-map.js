@@ -60,16 +60,10 @@ const departmentColors = {
     "Information Technology": "#2563eb",
     "Accountancy": "#7c3aed",
     "Business Administration": "#f59e0b",
-    "Food Preparation & Service Technology": "#14b8a6",
     "Political Science": "#84cc16",
     "Elementary Education": "#16a34a",
     "Secondary Education": "#06b6d4",
-    "Public Administration": "#f97316",
-    "Juris Doctor": "#dc2626",
-    "Bookkeeping": "#eab308",
-    "Caregiver": "#0f766e",
-    "Bread & Pastry Production": "#be185d",
-    "Other": "#64748b"
+
 };
 
 
@@ -94,13 +88,6 @@ function normalizeDepartment(deptStr) {
         return "Business Administration";
     }
     if (
-        d.includes("food") ||
-        d.includes("service") ||
-        d.includes("fpst")
-    ) {
-        return "Food Preparation & Service Technology";
-    }
-    if (
         d.includes("political")
     ) {
         return "Political Science";
@@ -121,30 +108,7 @@ function normalizeDepartment(deptStr) {
         d.includes("administration")
     ){
         return "Public Administration";
-    }
-    if (
-        d.includes("juris")||
-        d.includes("doctors")
-    ) {
-        return "Juris Doctor";
-    }
-    if (
-        d.includes("bookkeeping")
-    ){
-        return "Bookkeeping";
-    }
-    if (
-        d.includes("caregiver")
-    ){
-        return "Caregiver";
-    }
-    if (
-        d.includes("bread")||
-        d.includes("pastry")||
-        d.includes("production")
-    ){
-        return "Bread & Pastry Production";
-    }
+    }   
     return "Other";
 }
 
