@@ -322,8 +322,6 @@ function updateMajorOptions() {
 
         majors = [
             "Human Resource Development Management (HRDM)",
-            "Financial Management (FM)",
-            "Marketing Management (MM)"
         ];
     }
 
@@ -337,8 +335,6 @@ function updateMajorOptions() {
 
         majors = [
             "English",
-            "Science",
-            "Mathematics"
         ];
     }
 
@@ -2757,7 +2753,7 @@ if (
     "loading"
 ) {
 
-    document.addEventListener(  
+    document.addEventListener(
         "DOMContentLoaded",
         initApplicantsPage
     );

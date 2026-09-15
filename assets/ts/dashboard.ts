@@ -6,15 +6,19 @@ document.addEventListener("DOMContentLoaded", () => {
     "Academic": 65
   };
 
-  const monthlyData: Record<string, number> = {
-    "Jan": 18,
-    "Feb": 25,
-    "Mar": 34,
-    "Apr": 42,
-    "May": 23
-  };
+  const realMonthly = (window as any).monthlyApplicationsData as { labels: string[]; counts: number[] } | undefined;
 
-  const chartColors: string[] = ["#238f54", "#2ea263", "#3ab774", "#1b6336", "#42c082"];
+  const monthlyData: Record<string, number> = {};
+  if (realMonthly && Array.isArray(realMonthly.labels) && realMonthly.labels.length) {
+    realMonthly.labels.forEach((label, i) => {
+      monthlyData[label] = realMonthly.counts[i] ?? 0;
+    });
+  } else {
+    // Fallback sample data, used only if the server couldn't compute real counts.
+    Object.assign(monthlyData, { "Jan": 0, "Feb": 0, "Mar": 0, "Apr": 0, "May": 0, "Jun": 0 });
+  }
+
+  const chartColors: string[] = ["#238f54", "#2ea263", "#3ab774", "#1b6336", "#42c082", "#5fd39a"];
 
   function createChart(canvasId: string, dataObj: Record<string, number>): void {
     const ctx = document.getElementById(canvasId) as HTMLCanvasElement | null;

@@ -314,31 +314,6 @@
                             <option value="Bachelor of Secondary Education">
                                 Bachelor of Secondary Education (BSEd)
                             </option>
-
-                            <option value="Master in Public Administration">
-                                Master in Public Administration (MPA)
-                            </option>
-
-                            <option value="Juris Doctor">
-                                Juris Doctor (JD)
-                            </option>
-
-                            <option value="Food Preparation and Service Technology">
-                                Food Preparation and Service Technology
-                            </option>
-
-                            <option value="Bookkeeping NC II">
-                                Bookkeeping NC II
-                            </option>
-
-                            <option value="Caregiving NC II">
-                                Caregiving NC II
-                            </option>
-
-                            <option value="Bread and Pastry Production NC II">
-                                Bread and Pastry Production NC II
-                            </option>
-
                         </select>
                     </div>
 

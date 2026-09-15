@@ -7,28 +7,56 @@ include __DIR__ . '/../includes/header.php';
 
 require_once __DIR__ . '/../config/db_helper.php';
 
+function timeAgo(string $datetime): string {
+    $ts = strtotime($datetime);
+    if (!$ts) return $datetime;
+
+    $diff = time() - $ts;
+    if ($diff < 60) return 'Just now';
+    if ($diff < 3600) { $m = (int)($diff / 60); return $m . ' minute' . ($m === 1 ? '' : 's') . ' ago'; }
+    if ($diff < 86400) { $h = (int)($diff / 3600); return $h . ' hour' . ($h === 1 ? '' : 's') . ' ago'; }
+    $d = (int)($diff / 86400);
+    if ($d < 7) return $d . ' day' . ($d === 1 ? '' : 's') . ' ago';
+    return date('M j, Y', $ts);
+}
+
+function activityIcon(string $action): string {
+    $a = strtolower($action);
+    if (strpos($a, 'rejected') !== false) return 'x-circle';
+    if (strpos($a, 'approved') !== false) return 'check-check';
+    if (strpos($a, 'deleted') !== false) return 'trash-2';
+    if (strpos($a, 'created') !== false || strpos($a, 'added') !== false) return 'user-plus';
+    if (strpos($a, 'updated') !== false) return 'pencil';
+    if (strpos($a, 'login') !== false) return 'log-in';
+    if (strpos($a, 'logout') !== false) return 'log-out';
+    if (strpos($a, 'renewal') !== false || strpos($a, 'assignment') !== false) return 'graduation-cap';
+    if (strpos($a, 'status') !== false) return 'activity';
+    return 'bell';
+}
+
 try {
     $pdo = getDB();
 
-    // Total applicants still being processed
+    // Total applicants, matching the Applicants page: approved/rejected
+    // applicants are already decided, so they're excluded here too.
     $total_applicants = (int)$pdo->query("
         SELECT COUNT(*)
         FROM applicants
         WHERE LOWER(status) IN ('pending', 'review', 'interview')
     ")->fetchColumn();
 
-    // Applicants currently under evaluation
+    // Applicants awaiting a decision — pending review or already in the interview stage
     $under_evaluation = (int)$pdo->query("
         SELECT COUNT(*)
         FROM applicants
-        WHERE LOWER(status) IN ('review', 'interview')
+        WHERE LOWER(status) IN ('pending', 'review', 'interview')
     ")->fetchColumn();
 
-    // Approved applicants / active scholars
+    // Active scholars come from the actual scholar roster, not from applicants
     $active_scholars = (int)$pdo->query("
         SELECT COUNT(*)
-        FROM applicants
-        WHERE LOWER(status) = 'approved'
+        FROM scholars
+        WHERE LOWER(status) = 'active'
     ")->fetchColumn();
 
     // Renewal records needing attention
@@ -38,13 +66,53 @@ try {
         WHERE LOWER(status) IN ('at-risk', 'eligible')
     ")->fetchColumn();
 
+    // Recent activity, powered by the real audit trail
+    $recent_activity = $pdo->query("
+        SELECT action, module, description, created_at
+        FROM activity_logs
+        ORDER BY created_at DESC
+        LIMIT 5
+    ")->fetchAll(PDO::FETCH_ASSOC);
+
+    // Monthly Applications — real submission counts for the last 6 months,
+    // built from applicants.created_at rather than hardcoded sample data.
+    $monthly_buckets = [];
+    for ($i = 5; $i >= 0; $i--) {
+        $ts = strtotime("-$i months");
+        $monthly_buckets[date('Y-m', $ts)] = ['label' => date('M', $ts), 'count' => 0];
+    }
+
+    $monthlyStmt = $pdo->query("
+        SELECT strftime('%Y-%m', created_at) AS ym, COUNT(*) AS cnt
+        FROM applicants
+        WHERE created_at IS NOT NULL
+        GROUP BY ym
+    ");
+    foreach ($monthlyStmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        if (isset($monthly_buckets[$row['ym']])) {
+            $monthly_buckets[$row['ym']]['count'] = (int)$row['cnt'];
+        }
+    }
+
+    $monthly_labels = array_values(array_map(fn($m) => $m['label'], $monthly_buckets));
+    $monthly_counts = array_values(array_map(fn($m) => $m['count'], $monthly_buckets));
+
 } catch (Exception $e) {
     $total_applicants = 0;
     $under_evaluation = 0;
     $active_scholars = 0;
     $renewal_due = 0;
+    $recent_activity = [];
+    $monthly_labels = [];
+    $monthly_counts = [];
 }
 ?>
+<script>
+    window.monthlyApplicationsData = {
+        labels: <?= json_encode($monthly_labels) ?>,
+        counts: <?= json_encode($monthly_counts) ?>
+    };
+</script>
 
 <div class="main-content">
     <!-- Stat Cards -->
@@ -106,27 +174,25 @@ try {
     <!-- Notifications -->
     <div class="notification-container">
         <h3>Recent Activity & Alerts</h3>
-        <div class="notification-item">
-            <i data-lucide="calendar-check"></i>
-            <div>
-                <h4>Renewal Deadline Approaching</h4>
-                <p>15 active scholars require evaluation prior to next semester.</p>
+        <?php if (empty($recent_activity)): ?>
+            <div class="notification-item">
+                <i data-lucide="info"></i>
+                <div>
+                    <h4>No Recent Activity</h4>
+                    <p>System actions will show up here as they happen.</p>
+                </div>
             </div>
-        </div>
-        <div class="notification-item">
-            <i data-lucide="user-plus"></i>
-            <div>
-                <h4>New Application Received</h4>
-                <p>Juan Dela Cruz applied for Academic Excellence Scholarship.</p>
-            </div>
-        </div>
-        <div class="notification-item">
-            <i data-lucide="check-check"></i>
-            <div>
-                <h4>Evaluation Completed</h4>
-                <p>Committee completed batch review for 12 endorsement applicants.</p>
-            </div>
-        </div>
+        <?php else: ?>
+            <?php foreach ($recent_activity as $entry): ?>
+                <div class="notification-item">
+                    <i data-lucide="<?= htmlspecialchars(activityIcon($entry['action'])) ?>"></i>
+                    <div>
+                        <h4><?= htmlspecialchars($entry['action']) ?></h4>
+                        <p><?= htmlspecialchars($entry['description']) ?> &middot; <?= htmlspecialchars(timeAgo($entry['created_at'])) ?></p>
+                    </div>
+                </div>
+            <?php endforeach; ?>
+        <?php endif; ?>
     </div>
 </div>
 

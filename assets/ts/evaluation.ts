@@ -32,6 +32,7 @@ function normalizeEval(record: any): EvaluationApplicant {
   return {
     id: String(record.id ?? record._id ?? String(record.studentId ?? record.student_id ?? Math.random())),
     name: String(record.name ?? record.full_name ?? ""),
+    fullName: String(record.fullName ?? record.full_name ?? record.name ?? ""),
     studentId: String(record.studentId ?? record.student_id ?? ""),
     program: String(record.program ?? record.program_year ?? ""),
     major: String(record.major ?? ""),
@@ -358,7 +359,7 @@ function normalizeEval(record: any): EvaluationApplicant {
       '<div class="custom-modal-body" style="flex:1; overflow-y:auto;">' +
       '<div class="profile">' +
       '<div class="profile-top"><div class="avatar">' + initials(a.name) + "</div>" +
-      '<div><div class="eval-profile-name">' + esc(a.name) + " " + statusBadge(a.status) + '</div><div class="profile-id font-mono">' + esc(a.studentId) + "</div></div></div>" +
+      '<div><div class="eval-profile-name">' + esc(a.fullName) + " " + statusBadge(a.status) + '</div><div class="profile-id font-mono">' + esc(a.studentId) + "</div></div></div>" +
       '<div class="profile-meta">' +
       "<span>" + esc(formatDeptLine(a.program, a.major, a.yearLevel)) + "</span>" +
       "<span>" + esc(a.type) + " Scholarship</span>" +

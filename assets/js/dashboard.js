@@ -6,14 +6,17 @@ document.addEventListener("DOMContentLoaded", () => {
         "Endorsement": 32,
         "Academic": 65
     };
-    const monthlyData = {
-        "Jan": 18,
-        "Feb": 25,
-        "Mar": 34,
-        "Apr": 42,
-        "May": 23
-    };
-    const chartColors = ["#238f54", "#2ea263", "#3ab774", "#1b6336", "#42c082"];
+    const realMonthly = window.monthlyApplicationsData;
+    const monthlyData = {};
+    if (realMonthly && Array.isArray(realMonthly.labels) && realMonthly.labels.length) {
+        realMonthly.labels.forEach((label, i) => {
+            monthlyData[label] = realMonthly.counts[i] ?? 0;
+        });
+    }
+    else {
+        Object.assign(monthlyData, { "Jan": 0, "Feb": 0, "Mar": 0, "Apr": 0, "May": 0, "Jun": 0 });
+    }
+    const chartColors = ["#238f54", "#2ea263", "#3ab774", "#1b6336", "#42c082", "#5fd39a"];
     function createChart(canvasId, dataObj) {
         const ctx = document.getElementById(canvasId);
         if (!ctx)

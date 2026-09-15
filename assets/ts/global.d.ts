@@ -39,6 +39,7 @@ interface ApiResponse<T = any> {
 interface EvaluationApplicant {
   id: string;
   name: string;
+  fullName: string;
   studentId: string;
   program: string;
   major: string;

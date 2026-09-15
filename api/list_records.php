@@ -61,7 +61,7 @@ try {
 
     // Look up the applicant behind each record (if any) for richer academic details.
     $appStmt = $pdo->prepare("
-        SELECT program, major, year_level, gwa, gwa_req, failing_grades, units, enrolled, docs_complete
+        SELECT first_name, middle_name, last_name, program, major, year_level, gwa, gwa_req, failing_grades, units, enrolled, docs_complete
         FROM applicants
         WHERE id = ? OR student_id = ?
         ORDER BY id DESC
@@ -72,11 +72,24 @@ try {
         $appStmt->execute([(int)($r['applicant_id'] ?? 0), $r['student_id']]);
         $app = $appStmt->fetch();
 
+        // Prefer the applicant's structured name (so the table can show a
+        // middle initial and the detail view can show the full middle
+        // name); fall back to the record's own flat name when there's no
+        // matching applicant to pull first/middle/last from.
+        if ($app && !empty($app['first_name'])) {
+            $shortName = buildShortName($app['first_name'], $app['middle_name'] ?? '', $app['last_name']);
+            $fullName = buildFullName($app['first_name'], $app['middle_name'] ?? '', $app['last_name']);
+        } else {
+            $shortName = $r['name'];
+            $fullName = $r['name'];
+        }
+
         return [
             'id' => (int)$r['id'],
             'studentId' => $r['student_id'],
             'student_id' => $r['student_id'],
-            'name' => $r['name'],
+            'name' => $shortName,
+            'fullName' => $fullName,
             'scholarshipType' => $r['scholarship_type'],
             'scholarship_type' => $r['scholarship_type'],
             'status' => $r['status'],

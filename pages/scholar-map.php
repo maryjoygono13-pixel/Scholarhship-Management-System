@@ -73,31 +73,6 @@
                     <span>BS Secondary Education</span>
                 </div>
 
-                <div class="legend-item">
-                    <span class="legend-dot" style="background:#f97316;"></span>
-                    <span>Master in Public Administration</span>
-                </div>
-
-                <div class="legend-item">
-                    <span class="legend-dot" style="background:#dc2626;"></span>
-                    <span>Juris Doctor</span>
-                </div>
-
-                <div class="legend-item">
-                    <span class="legend-dot" style="background:#eab308;"></span>
-                    <span>Bookkeeping NC II</span>
-                </div>
-
-                <div class="legend-item">
-                    <span class="legend-dot" style="background:#0f766e;"></span>
-                    <span>Caregiver NC II </span>
-                </div>
-
-                <div class="legend-item">
-                    <span class="legend-dot" style="background:#be185d;"></span>
-                    <span>Bread & Pastry Production NC II</span>
-                </div>
-
                 </div>
 
             </div>

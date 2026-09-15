@@ -32,11 +32,7 @@ include __DIR__ . '/../includes/header.php';
             </div>
         </div>
         <div style="display:flex; gap:10px;">
-            <button class="btn-primary" id="addRecordBtn">
-                <i data-lucide="plus"></i>
-                Add Record
-            </button>
-            <button class="btn-primary btn-export">
+            <button class="btn-primary btn-export" id="exportRecordsBtn">
                 <i data-lucide="download"></i>
                 Export Records
             </button>
@@ -71,7 +67,7 @@ include __DIR__ . '/../includes/header.php';
     <div class="custom-modal-card">
         <div class="custom-modal-header">
             <div>
-                <h3 id="recFormTitle">Add Record</h3>
+                <h3 id="recFormTitle">Edit Record</h3>
                 <p>Log evaluation record details.</p>
             </div>
             <button type="button" class="custom-modal-close" id="recFormCloseBtn"><i data-lucide="x"></i></button>

@@ -4,8 +4,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const searchInput = document.querySelector(".search-wrap input");
     const filterType = document.getElementById("filterType");
     const filterStatus = document.getElementById("filterStatus");
-    const exportBtn = document.querySelector(".btn-export");
-    const addRecordBtn = document.getElementById("addRecordBtn");
+    const exportBtn = document.getElementById("exportRecordsBtn");
     const recFormOverlay = document.getElementById("recFormOverlay");
     const recFormTitle = document.getElementById("recFormTitle");
     const recFormCloseBtn = document.getElementById("recFormCloseBtn");
@@ -71,18 +70,21 @@ document.addEventListener("DOMContentLoaded", () => {
             return "";
         return value.split(" ")[0].split("T")[0];
     }
-    function renderRecords() {
-        if (!tableBody)
-            return;
+    function getFilteredRecords() {
         const query = searchInput ? searchInput.value.toLowerCase().trim() : "";
         const typeVal = filterType ? filterType.value.toLowerCase() : "all";
         const statusVal = filterStatus ? filterStatus.value.toLowerCase() : "all";
-        const filtered = recordsData.filter((r) => {
+        return recordsData.filter((r) => {
             const matchQuery = r.name.toLowerCase().includes(query) || r.studentId.toLowerCase().includes(query);
             const matchType = typeVal === "all" || r.scholarshipType.toLowerCase() === typeVal;
             const matchStatus = statusVal === "all" || statusVal === "all status" || r.status.toLowerCase() === statusVal;
             return matchQuery && matchType && matchStatus;
         });
+    }
+    function renderRecords() {
+        if (!tableBody)
+            return;
+        const filtered = getFilteredRecords();
         tableBody.innerHTML = "";
         if (filtered.length === 0) {
             tableBody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding: 24px; color: #6b7280;">No records found.</td></tr>`;
@@ -233,7 +235,7 @@ document.addEventListener("DOMContentLoaded", () => {
         recViewBody.innerHTML =
             '<div class="profile">' +
                 '<div class="profile-top"><div class="avatar">' + initials(r.name) + '</div>' +
-                '<div><div class="record-profile-name">' + esc(r.name) + ' <span class="status-badge ' + statusClass + '">' + esc(r.status) + '</span></div>' +
+                '<div><div class="record-profile-name">' + esc(r.fullName || r.name) + ' <span class="status-badge ' + statusClass + '">' + esc(r.status) + '</span></div>' +
                 '<div class="profile-id font-mono">' + esc(r.studentId) + '</div></div></div>' +
                 '<div class="profile-meta">' +
                 '<span>' + esc(typeAcronym(r.scholarshipType)) + ' Scholarship</span>' +
@@ -266,37 +268,27 @@ document.addEventListener("DOMContentLoaded", () => {
             recViewOverlay.classList.remove("open");
         viewingRecord = null;
     }
-    function openFormModal(editItem = null) {
-        if (!recFormOverlay)
+    function openFormModal(editItem) {
+        if (!recFormOverlay || !editItem)
             return;
-        if (editItem) {
-            if (recFormTitle)
-                recFormTitle.textContent = "Edit Evaluation Record";
-            if (recId)
-                recId.value = String(editItem.id);
-            if (recStudentId)
-                recStudentId.value = editItem.studentId;
-            if (recName)
-                recName.value = editItem.name;
-            if (recType)
-                recType.value = editItem.scholarshipType;
-            if (recStatus)
-                recStatus.value = editItem.status;
-            if (recSemester)
-                recSemester.value = editItem.semester;
-            if (recSy)
-                recSy.value = editItem.sy;
-            if (recRemarks)
-                recRemarks.value = editItem.remarks || '';
-        }
-        else {
-            if (recFormTitle)
-                recFormTitle.textContent = "Add Evaluation Record";
-            if (recForm)
-                recForm.reset();
-            if (recId)
-                recId.value = "";
-        }
+        if (recFormTitle)
+            recFormTitle.textContent = "Edit Evaluation Record";
+        if (recId)
+            recId.value = String(editItem.id);
+        if (recStudentId)
+            recStudentId.value = editItem.studentId;
+        if (recName)
+            recName.value = editItem.fullName || editItem.name;
+        if (recType)
+            recType.value = editItem.scholarshipType;
+        if (recStatus)
+            recStatus.value = editItem.status;
+        if (recSemester)
+            recSemester.value = editItem.semester;
+        if (recSy)
+            recSy.value = editItem.sy;
+        if (recRemarks)
+            recRemarks.value = editItem.remarks || '';
         recFormOverlay.classList.add("open");
     }
     function closeFormModal() {
@@ -369,8 +361,6 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         });
     }
-    if (addRecordBtn)
-        addRecordBtn.addEventListener("click", () => openFormModal());
     if (recFormCloseBtn)
         recFormCloseBtn.addEventListener("click", closeFormModal);
     if (recFormCancelBtn)
@@ -397,10 +387,44 @@ document.addEventListener("DOMContentLoaded", () => {
         filterType.addEventListener("change", renderRecords);
     if (filterStatus)
         filterStatus.addEventListener("change", renderRecords);
-    if (exportBtn) {
-        exportBtn.addEventListener("click", () => {
-            alert("Exporting scholarship records to CSV...");
+    function csvEscape(value) {
+        const str = value == null ? "" : String(value);
+        if (/[",\n]/.test(str))
+            return '"' + str.replace(/"/g, '""') + '"';
+        return str;
+    }
+    function exportRecordsToCsv() {
+        const rows = getFilteredRecords();
+        if (rows.length === 0) {
+            alert("No records to export for the current filters.");
+            return;
+        }
+        const headers = ["Student ID", "Name", "Scholarship Type", "Status", "Semester", "School Year", "Date Evaluated", "Remarks"];
+        const lines = [headers.map(csvEscape).join(",")];
+        rows.forEach((r) => {
+            lines.push([
+                r.studentId,
+                r.fullName || r.name,
+                r.scholarshipType,
+                r.status,
+                r.semester,
+                r.sy,
+                dateOnly(r.dateEvaluated),
+                r.remarks || "",
+            ].map(csvEscape).join(","));
         });
+        const blob = new Blob([lines.join("\r\n")], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = "scholarship-records-" + new Date().toISOString().slice(0, 10) + ".csv";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    }
+    if (exportBtn) {
+        exportBtn.addEventListener("click", exportRecordsToCsv);
     }
     loadRecords();
 });

@@ -45,9 +45,8 @@ try {
             return [
                 'id' => (string)$r['id'],
 
-                'name' => trim(
-                    $r['first_name'] . ' ' . $r['last_name']
-                ),
+                'name' => buildShortName($r['first_name'], $r['middle_name'] ?? '', $r['last_name']),
+                'fullName' => buildFullName($r['first_name'], $r['middle_name'] ?? '', $r['last_name']),
 
                 'studentId' => $r['student_id'],
                 'program' => $r['program'],
@@ -164,6 +163,7 @@ if ($status !== null && in_array(strtolower($status), ['approved', 'rejected']))
         SELECT
             student_id,
             first_name,
+            middle_name,
             last_name,
             scholarship_type,
             status,
@@ -177,9 +177,7 @@ if ($status !== null && in_array(strtolower($status), ['approved', 'rejected']))
 
     if ($applicant) {
 
-        $name = trim(
-            $applicant['first_name'] . ' ' . $applicant['last_name']
-        );
+        $name = buildFullName($applicant['first_name'], $applicant['middle_name'] ?? '', $applicant['last_name']);
 
         /*
          * Prevent duplicate records if the same applicant

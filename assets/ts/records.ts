@@ -3,8 +3,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const searchInput = document.querySelector<HTMLInputElement>(".search-wrap input");
   const filterType = document.getElementById("filterType") as HTMLSelectElement | null;
   const filterStatus = document.getElementById("filterStatus") as HTMLSelectElement | null;
-  const exportBtn = document.querySelector<HTMLElement>(".btn-export");
-  const addRecordBtn = document.getElementById("addRecordBtn");
+  const exportBtn = document.getElementById("exportRecordsBtn");
 
   const recFormOverlay = document.getElementById("recFormOverlay");
   const recFormTitle = document.getElementById("recFormTitle");
@@ -75,18 +74,22 @@ document.addEventListener("DOMContentLoaded", () => {
     return value.split(" ")[0].split("T")[0];
   }
 
-  function renderRecords(): void {
-    if (!tableBody) return;
+  function getFilteredRecords(): any[] {
     const query = searchInput ? searchInput.value.toLowerCase().trim() : "";
     const typeVal = filterType ? filterType.value.toLowerCase() : "all";
     const statusVal = filterStatus ? filterStatus.value.toLowerCase() : "all";
 
-    const filtered = recordsData.filter((r: any) => {
+    return recordsData.filter((r: any) => {
       const matchQuery = r.name.toLowerCase().includes(query) || r.studentId.toLowerCase().includes(query);
       const matchType = typeVal === "all" || r.scholarshipType.toLowerCase() === typeVal;
       const matchStatus = statusVal === "all" || statusVal === "all status" || r.status.toLowerCase() === statusVal;
       return matchQuery && matchType && matchStatus;
     });
+  }
+
+  function renderRecords(): void {
+    if (!tableBody) return;
+    const filtered = getFilteredRecords();
 
     tableBody.innerHTML = "";
     if (filtered.length === 0) {
@@ -264,7 +267,7 @@ document.addEventListener("DOMContentLoaded", () => {
     recViewBody.innerHTML =
       '<div class="profile">' +
       '<div class="profile-top"><div class="avatar">' + initials(r.name) + '</div>' +
-      '<div><div class="record-profile-name">' + esc(r.name) + ' <span class="status-badge ' + statusClass + '">' + esc(r.status) + '</span></div>' +
+      '<div><div class="record-profile-name">' + esc(r.fullName || r.name) + ' <span class="status-badge ' + statusClass + '">' + esc(r.status) + '</span></div>' +
       '<div class="profile-id font-mono">' + esc(r.studentId) + '</div></div></div>' +
       '<div class="profile-meta">' +
       '<span>' + esc(typeAcronym(r.scholarshipType)) + ' Scholarship</span>' +
@@ -299,23 +302,17 @@ document.addEventListener("DOMContentLoaded", () => {
     viewingRecord = null;
   }
 
-  function openFormModal(editItem: any = null): void {
-    if (!recFormOverlay) return;
-    if (editItem) {
-      if (recFormTitle) recFormTitle.textContent = "Edit Evaluation Record";
-      if (recId) recId.value = String(editItem.id);
-      if (recStudentId) recStudentId.value = editItem.studentId;
-      if (recName) recName.value = editItem.name;
-      if (recType) recType.value = editItem.scholarshipType;
-      if (recStatus) recStatus.value = editItem.status;
-      if (recSemester) recSemester.value = editItem.semester;
-      if (recSy) recSy.value = editItem.sy;
-      if (recRemarks) recRemarks.value = editItem.remarks || '';
-    } else {
-      if (recFormTitle) recFormTitle.textContent = "Add Evaluation Record";
-      if (recForm) recForm.reset();
-      if (recId) recId.value = "";
-    }
+  function openFormModal(editItem: any): void {
+    if (!recFormOverlay || !editItem) return;
+    if (recFormTitle) recFormTitle.textContent = "Edit Evaluation Record";
+    if (recId) recId.value = String(editItem.id);
+    if (recStudentId) recStudentId.value = editItem.studentId;
+    if (recName) recName.value = editItem.fullName || editItem.name;
+    if (recType) recType.value = editItem.scholarshipType;
+    if (recStatus) recStatus.value = editItem.status;
+    if (recSemester) recSemester.value = editItem.semester;
+    if (recSy) recSy.value = editItem.sy;
+    if (recRemarks) recRemarks.value = editItem.remarks || '';
     recFormOverlay.classList.add("open");
   }
 
@@ -381,7 +378,6 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  if (addRecordBtn) addRecordBtn.addEventListener("click", () => openFormModal());
   if (recFormCloseBtn) recFormCloseBtn.addEventListener("click", closeFormModal);
   if (recFormCancelBtn) recFormCancelBtn.addEventListener("click", closeFormModal);
 
@@ -402,10 +398,48 @@ document.addEventListener("DOMContentLoaded", () => {
   if (filterType) filterType.addEventListener("change", renderRecords);
   if (filterStatus) filterStatus.addEventListener("change", renderRecords);
 
-  if (exportBtn) {
-    exportBtn.addEventListener("click", () => {
-      alert("Exporting scholarship records to CSV...");
+  function csvEscape(value: any): string {
+    const str = value == null ? "" : String(value);
+    if (/[",\n]/.test(str)) return '"' + str.replace(/"/g, '""') + '"';
+    return str;
+  }
+
+  function exportRecordsToCsv(): void {
+    const rows = getFilteredRecords();
+    if (rows.length === 0) {
+      alert("No records to export for the current filters.");
+      return;
+    }
+
+    const headers = ["Student ID", "Name", "Scholarship Type", "Status", "Semester", "School Year", "Date Evaluated", "Remarks"];
+    const lines = [headers.map(csvEscape).join(",")];
+
+    rows.forEach((r: any) => {
+      lines.push([
+        r.studentId,
+        r.fullName || r.name,
+        r.scholarshipType,
+        r.status,
+        r.semester,
+        r.sy,
+        dateOnly(r.dateEvaluated),
+        r.remarks || "",
+      ].map(csvEscape).join(","));
     });
+
+    const blob = new Blob([lines.join("\r\n")], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "scholarship-records-" + new Date().toISOString().slice(0, 10) + ".csv";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }
+
+  if (exportBtn) {
+    exportBtn.addEventListener("click", exportRecordsToCsv);
   }
 
   loadRecords();
