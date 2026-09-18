@@ -61,24 +61,38 @@ include __DIR__ . '/../includes/header.php';
         <form id="schForm">
             <input type="hidden" id="schId" name="id">
             <div class="custom-modal-body" style="display:flex; flex-direction:column; gap:14px;">
-                <div class="field">
-                    <label style="font-size:13px; font-weight:600; color:#374151;">Scholarship Name <span style="color:red;">*</span></label>
-                    <input type="text" id="schName" name="name" placeholder="e.g. Academic Excellence Award" required style="width:100%; height:40px; padding:0 12px; border:1px solid #d1d5db; border-radius:8px; outline:none;">
-                </div>
-                <div class="field">
-                    <label style="font-size:13px; font-weight:600; color:#374151;">Code <span style="color:red;">*</span></label>
-                    <input type="text" id="schCode" name="code" placeholder="e.g. AEA" required style="width:100%; height:40px; padding:0 12px; border:1px solid #d1d5db; border-radius:8px; outline:none;">
-                </div>
+                <input type="hidden" id="schName" name="name">
+                <input type="hidden" id="schCode" name="code">
                 <div class="field">
                     <label style="font-size:13px; font-weight:600; color:#374151;">Type <span style="color:red;">*</span></label>
-                    <select id="schType" name="type" required style="width:100%; height:40px; padding:0 12px; border:1px solid #d1d5db; border-radius:8px; outline:none;">
-                        <option>Academic Merit</option>
-                        <option>Financial Need-Based</option>
-                        <option>Government Subsidy</option>
-                        <option>Special Program</option>
-                        <option>Athletic</option>
-                        <option>Community Service</option>
-                    </select>
+                    <input type="hidden" id="schType" name="type" required>
+                    <div class="pill-picker" id="schTypePicker">
+                        <div class="pill-picker-add" id="schTypeAddWrap">
+                            <button type="button" class="pill-add-btn" id="schTypeAddBtn" title="Add a new scholarship type" aria-label="Add a new scholarship type">
+                                <i data-lucide="plus"></i>
+                            </button>
+                            <input type="text" class="pill-add-input" id="schTypeAddInput" placeholder="New type name, then Enter" hidden>
+                        </div>
+                    </div>
+                </div>
+                <div class="field" id="schSubtypeField" hidden>
+                    <label style="font-size:13px; font-weight:600; color:#374151;">Sub-type</label>
+                    <input type="hidden" id="schSubtype" name="subtype">
+                    <div class="pill-picker" id="schSubtypePicker">
+                        <div class="pill-picker-add" id="schSubtypeAddWrap">
+                            <button type="button" class="pill-add-btn" id="schSubtypeAddBtn" title="Add a new sub-type" aria-label="Add a new sub-type">
+                                <i data-lucide="plus"></i>
+                            </button>
+                            <input type="text" class="pill-add-input" id="schSubtypeAddInput" placeholder="New sub-type name, then Enter" hidden>
+                        </div>
+                    </div>
+                </div>
+                <div class="field">
+                    <label style="font-size:13px; font-weight:600; color:#374151;">This will be saved as</label>
+                    <div class="identity-preview-box">
+                        <strong id="schPreviewName">Select a type to continue</strong>
+                        <span class="font-mono identity-preview-code" id="schPreviewCode"></span>
+                    </div>
                 </div>
                 <div class="field">
                     <label style="font-size:13px; font-weight:600; color:#374151;">GWA Requirement</label>

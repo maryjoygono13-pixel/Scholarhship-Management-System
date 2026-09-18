@@ -10,6 +10,7 @@ try {
         $code = trim($_POST['code'] ?? '');
         $description = trim($_POST['description'] ?? '');
         $type = trim($_POST['type'] ?? 'Academic');
+        $subtype = trim($_POST['subtype'] ?? '');
         $gwaReq = (float)($_POST['gwa_requirement'] ?? $_POST['gwaReq'] ?? 2.0);
         $slots = (int)($_POST['slots'] ?? 0);
         $coverage = trim($_POST['coverage'] ?? '');
@@ -20,14 +21,17 @@ try {
         }
 
         if ($id > 0) {
-            $stmt = $pdo->prepare("UPDATE scholarships SET name = ?, code = ?, description = ?, type = ?, gwa_requirement = ?, slots = ?, slots_available = ?, coverage = ?, status = ? WHERE id = ?");
-            $stmt->execute([$name, $code, $description, $type, $gwaReq, $slots, $slots, $coverage, $status, $id]);
+            $stmt = $pdo->prepare("UPDATE scholarships SET name = ?, code = ?, description = ?, type = ?, subtype = ?, gwa_requirement = ?, slots = ?, slots_available = ?, coverage = ?, status = ? WHERE id = ?");
+            $stmt->execute([$name, $code, $description, $type, $subtype, $gwaReq, $slots, $slots, $coverage, $status, $id]);
+            logActivity($pdo, 'Scholarship Updated', 'Scholarships', $name . ' (' . $code . ') was updated.', $id);
             sendJson(['success' => true, 'id' => $id, 'message' => 'Scholarship updated successfully.']);
         } else {
-            $stmt = $pdo->prepare("INSERT INTO scholarships (name, code, description, type, gwa_requirement, slots, slots_available, coverage, status) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
-            $stmt->execute([$name, $code, $description, $type, $gwaReq, $slots, $slots, $coverage, $status]);
-            sendJson(['success' => true, 'id' => (int)$pdo->lastInsertId(), 'message' => 'Scholarship added successfully.']);
+            $stmt = $pdo->prepare("INSERT INTO scholarships (name, code, description, type, subtype, gwa_requirement, slots, slots_available, coverage, status)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            $stmt->execute([$name, $code, $description, $type, $subtype, $gwaReq, $slots, $slots, $coverage, $status]);
+            $newId = (int)$pdo->lastInsertId();
+            logActivity($pdo, 'Scholarship Added', 'Scholarships', $name . ' (' . $code . ') was added.', $newId);
+            sendJson(['success' => true, 'id' => $newId, 'message' => 'Scholarship added successfully.']);
         }
     }
 
@@ -41,6 +45,7 @@ try {
             'code' => $r['code'],
             'description' => $r['description'],
             'type' => $r['type'],
+            'subtype' => $r['subtype'] ?? '',
             'gwaRequirement' => (float)$r['gwa_requirement'],
             'gwa_requirement' => (float)$r['gwa_requirement'],
             'slots' => (int)$r['slots'],

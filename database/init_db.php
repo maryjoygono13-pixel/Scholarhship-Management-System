@@ -29,6 +29,75 @@ function initDatabase(): PDO {
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )");
 
+    $scholarshipsCols = $pdo->query("PRAGMA table_info(scholarships)")->fetchAll(PDO::FETCH_ASSOC);
+    $scholarshipsColNames = array_column($scholarshipsCols, 'name');
+    if (!in_array('subtype', $scholarshipsColNames)) {
+        $pdo->exec("ALTER TABLE scholarships ADD COLUMN subtype TEXT DEFAULT ''");
+    }
+
+    // 2a. Scholarship Types / Sub-types — the selectable, growable taxonomy
+    // used by the Add/Edit Scholarship form's Type and Sub-type pickers.
+    $pdo->exec("CREATE TABLE IF NOT EXISTS scholarship_types (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL UNIQUE,
+        sort_order INTEGER DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )");
+
+    $pdo->exec("CREATE TABLE IF NOT EXISTS scholarship_subtypes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        type_id INTEGER NOT NULL,
+        name TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(type_id, name),
+        FOREIGN KEY (type_id) REFERENCES scholarship_types(id)
+    )");
+
+    $defaultTypes = [
+        'MERIT-BASED Academic Scholarship',
+        'NEED-BASED Scholarship',
+        'TALENT-BASED Scholarship',
+        'Community Service or Leadership Scholarship',
+        'Other types of Scholarship and Discount',
+        'CHED Scholarship',
+    ];
+    $insertType = $pdo->prepare("INSERT OR IGNORE INTO scholarship_types (name, sort_order) VALUES (?, ?)");
+    foreach ($defaultTypes as $i => $typeName) {
+        $insertType->execute([$typeName, $i + 1]);
+    }
+
+    // CHED Scholarship is the one category where the actual named programs
+    // already used elsewhere in this app (Records/Applicants) are known —
+    // seed those as its sub-types.
+    $chedTypeId = $pdo->query("SELECT id FROM scholarship_types WHERE name = 'CHED Scholarship'")->fetchColumn();
+    if ($chedTypeId) {
+        $chedSubtypes = [
+            'CMSP (CHED Merit Scholarship Program)',
+            'TDP (Tulong Dunong Program)',
+            'TES (Tertiary Education Subsidy)',
+            'COSCHO (Scholarship for Coconut Farmers and Their Families)',
+        ];
+        $insertSubtype = $pdo->prepare("INSERT OR IGNORE INTO scholarship_subtypes (type_id, name) VALUES (?, ?)");
+        foreach ($chedSubtypes as $subtypeName) {
+            $insertSubtype->execute([$chedTypeId, $subtypeName]);
+        }
+
+        // One-time backfill: the 4 scholarships already seeded under the old
+        // ad-hoc type values (Academic Merit / Financial Need-Based / etc.)
+        // are all genuinely CHED programs — reclassify them under the new
+        // CHED Scholarship type with their matching sub-type. Idempotent:
+        // once migrated, the WHERE code=... no longer matches a non-CHED type.
+        $reclassify = $pdo->prepare("UPDATE scholarships SET type = ?, subtype = ? WHERE code = ? AND type != ?");
+        foreach ([
+            'CMSP' => 'CMSP (CHED Merit Scholarship Program)',
+            'TDP' => 'TDP (Tulong Dunong Program)',
+            'TES' => 'TES (Tertiary Education Subsidy)',
+            'COSCHO' => 'COSCHO (Scholarship for Coconut Farmers and Their Families)',
+        ] as $code => $subtypeName) {
+            $reclassify->execute(['CHED Scholarship', $subtypeName, $code, 'CHED Scholarship']);
+        }
+    }
+
     // 3. Applicants Table
     $pdo->exec("CREATE TABLE IF NOT EXISTS applicants (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
