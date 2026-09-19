@@ -15,6 +15,9 @@ let loadedScholarsList: ScholarRecord[] = [];
 let editingScholarId: number | null = null;
 let deletingScholarId: number | null = null;
 
+const SCHOLARS_PAGE_SIZE = 10;
+let scholarsCurrentPage = 1;
+
 function getScholarEl<T extends HTMLElement = HTMLElement>(id: string): T | null {
   return document.getElementById(id) as T | null;
 }
@@ -67,12 +70,18 @@ function renderScholarsTable(): void {
 
   if (!loadedScholarsList || loadedScholarsList.length === 0) {
     if (emptyState) emptyState.style.display = "block";
+    renderScholarsPagination(0);
     return;
   }
 
   if (emptyState) emptyState.style.display = "none";
 
-  loadedScholarsList.forEach((s) => {
+  const totalPages = Math.max(1, Math.ceil(loadedScholarsList.length / SCHOLARS_PAGE_SIZE));
+  if (scholarsCurrentPage > totalPages) scholarsCurrentPage = totalPages;
+  if (scholarsCurrentPage < 1) scholarsCurrentPage = 1;
+  const pageItems = loadedScholarsList.slice((scholarsCurrentPage - 1) * SCHOLARS_PAGE_SIZE, scholarsCurrentPage * SCHOLARS_PAGE_SIZE);
+
+  pageItems.forEach((s) => {
     const tr = document.createElement("tr");
     const isMaintaining = Number(s.gwa) <= 1.50;
     const statusText = s.status || (isMaintaining ? "Active" : "Removed");
@@ -104,9 +113,48 @@ function renderScholarsTable(): void {
     tbody.appendChild(tr);
   });
 
+  renderScholarsPagination(loadedScholarsList.length);
+
   if (typeof (window as any).lucide !== "undefined") {
     (window as any).lucide.createIcons();
   }
+}
+
+function renderScholarsPagination(total: number): void {
+  const wrap = getScholarEl("scholarsPagination");
+  if (!wrap) return;
+
+  const totalPages = Math.max(1, Math.ceil(total / SCHOLARS_PAGE_SIZE));
+  if (scholarsCurrentPage > totalPages) scholarsCurrentPage = totalPages;
+  if (scholarsCurrentPage < 1) scholarsCurrentPage = 1;
+
+  if (total === 0) {
+    wrap.innerHTML = "";
+    return;
+  }
+
+  const start = (scholarsCurrentPage - 1) * SCHOLARS_PAGE_SIZE + 1;
+  const end = Math.min(scholarsCurrentPage * SCHOLARS_PAGE_SIZE, total);
+
+  const buttons = `<button type="button" class="active" data-page="${scholarsCurrentPage}" disabled>${scholarsCurrentPage}</button>`;
+
+  wrap.innerHTML =
+    `<span>Showing ${start}–${end} of ${total} entries</span>` +
+    `<div class="page-btns">` +
+    `<button type="button" data-page="${scholarsCurrentPage - 1}" ${scholarsCurrentPage <= 1 ? "disabled" : ""}>Prev</button>` +
+    buttons +
+    `<button type="button" data-page="${scholarsCurrentPage + 1}" ${scholarsCurrentPage >= totalPages ? "disabled" : ""}>Next</button>` +
+    `</div>`;
+
+  wrap.querySelectorAll<HTMLButtonElement>("button[data-page]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const p = parseInt(btn.getAttribute("data-page") || "", 10);
+      if (!isNaN(p) && p >= 1 && p <= totalPages) {
+        scholarsCurrentPage = p;
+        renderScholarsTable();
+      }
+    });
+  });
 }
 
 function openScholarModal(isEdit: boolean = false): void {
@@ -268,17 +316,22 @@ function initScholarsPage(): void {
     });
   }
 
+  function resetScholarsPageAndLoad(): void {
+    scholarsCurrentPage = 1;
+    loadScholarsData();
+  }
+
   const filterDept = getScholarEl("filterDepartment");
-  if (filterDept) filterDept.addEventListener("change", loadScholarsData);
+  if (filterDept) filterDept.addEventListener("change", resetScholarsPageAndLoad);
 
   const filterYear = getScholarEl("filterYear");
-  if (filterYear) filterYear.addEventListener("change", loadScholarsData);
+  if (filterYear) filterYear.addEventListener("change", resetScholarsPageAndLoad);
 
   const filterStatus = getScholarEl("filterStatus");
-  if (filterStatus) filterStatus.addEventListener("change", loadScholarsData);
+  if (filterStatus) filterStatus.addEventListener("change", resetScholarsPageAndLoad);
 
   const searchInput = getScholarEl("searchScholarInput");
-  if (searchInput) searchInput.addEventListener("input", loadScholarsData);
+  if (searchInput) searchInput.addEventListener("input", resetScholarsPageAndLoad);
 
   loadScholarsData();
 }

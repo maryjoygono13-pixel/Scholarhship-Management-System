@@ -27,11 +27,16 @@ const notifMessage = document.getElementById("notifMessage");
 let activeType = "";
 let recipientMode = "segment";
 let allApplicants = [];
+const NOTIF_PAGE_SIZE = 10;
+let notifCurrentPage = 1;
+let notifCurrentData = [];
 const TYPE_LABELS = {
     missing_requirements: "Missing requirements",
     renewal_deadline: "Renewal deadline",
     failed_retention: "Failed retention",
     approval_status: "Approval status",
+    new_applicant: "New applicant",
+    applicant_updated: "Applicant updated",
 };
 const TEMPLATES = {
     missing_requirements: {
@@ -104,22 +109,63 @@ async function refreshNotifications() {
             notifTableBody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:32px; color:var(--slate-400);">Couldn't load notifications: ${err.message}</td></tr>`;
     }
 }
+function renderNotifPagination(total) {
+    const wrap = document.getElementById("notificationPagination");
+    if (!wrap)
+        return;
+    const totalPages = Math.max(1, Math.ceil(total / NOTIF_PAGE_SIZE));
+    if (notifCurrentPage > totalPages)
+        notifCurrentPage = totalPages;
+    if (notifCurrentPage < 1)
+        notifCurrentPage = 1;
+    if (total === 0) {
+        wrap.innerHTML = "";
+        return;
+    }
+    const start = (notifCurrentPage - 1) * NOTIF_PAGE_SIZE + 1;
+    const end = Math.min(notifCurrentPage * NOTIF_PAGE_SIZE, total);
+    const buttons = `<button type="button" class="active" data-page="${notifCurrentPage}" disabled>${notifCurrentPage}</button>`;
+    wrap.innerHTML =
+        `<span>Showing ${start}–${end} of ${total} entries</span>` +
+        `<div class="page-btns">` +
+        `<button type="button" data-page="${notifCurrentPage - 1}" ${notifCurrentPage <= 1 ? "disabled" : ""}>Prev</button>` +
+        buttons +
+        `<button type="button" data-page="${notifCurrentPage + 1}" ${notifCurrentPage >= totalPages ? "disabled" : ""}>Next</button>` +
+        `</div>`;
+    wrap.querySelectorAll("button[data-page]").forEach(btn => {
+        btn.addEventListener("click", () => {
+            const p = parseInt(btn.getAttribute("data-page") || "", 10);
+            if (!isNaN(p) && p >= 1 && p <= totalPages) {
+                notifCurrentPage = p;
+                renderNotifTable(notifCurrentData);
+            }
+        });
+    });
+}
 function renderNotifTable(notifications) {
     if (!notifTableBody)
         return;
+    notifCurrentData = notifications || [];
     notifTableBody.innerHTML = "";
     if (!notifications || notifications.length === 0) {
         if (notifTableWrap)
             notifTableWrap.classList.add("hide");
         if (notifEmptyState)
             notifEmptyState.classList.add("show");
+        renderNotifPagination(0);
         return;
     }
     if (notifTableWrap)
         notifTableWrap.classList.remove("hide");
     if (notifEmptyState)
         notifEmptyState.classList.remove("show");
-    notifications.forEach(n => {
+    const totalPages = Math.max(1, Math.ceil(notifications.length / NOTIF_PAGE_SIZE));
+    if (notifCurrentPage > totalPages)
+        notifCurrentPage = totalPages;
+    if (notifCurrentPage < 1)
+        notifCurrentPage = 1;
+    const pageItems = notifications.slice((notifCurrentPage - 1) * NOTIF_PAGE_SIZE, notifCurrentPage * NOTIF_PAGE_SIZE);
+    pageItems.forEach(n => {
         const tr = document.createElement("tr");
         const statusIcon = n.status === "sent"
             ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>`
@@ -152,6 +198,7 @@ function renderNotifTable(notifications) {
         tr.addEventListener("click", () => openNotifViewModal(n));
         notifTableBody.appendChild(tr);
     });
+    renderNotifPagination(notifications.length);
     if (typeof lucide !== "undefined")
         lucide.createIcons();
 }
@@ -237,6 +284,7 @@ if (pillFilter) {
         document.querySelectorAll(".pill-btn").forEach(b => b.classList.remove("active"));
         btn.classList.add("active");
         activeType = btn.dataset.type || "";
+        notifCurrentPage = 1;
         refreshNotifications();
     });
 }

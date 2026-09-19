@@ -3,6 +3,8 @@
 let loadedDeletedItems = [];
 let restoringItemId = null;
 let purgingItemId = null;
+const TRASH_PAGE_SIZE = 10;
+let trashCurrentPage = 1;
 
 function getTrashEl(id) {
     return document.getElementById(id);
@@ -35,12 +37,18 @@ function renderTrashTable() {
 
     if (!loadedDeletedItems || loadedDeletedItems.length === 0) {
         if (emptyState) emptyState.style.display = "block";
+        renderTrashPagination(0);
         return;
     }
 
     if (emptyState) emptyState.style.display = "none";
 
-    loadedDeletedItems.forEach((item) => {
+    const totalPages = Math.max(1, Math.ceil(loadedDeletedItems.length / TRASH_PAGE_SIZE));
+    if (trashCurrentPage > totalPages) trashCurrentPage = totalPages;
+    if (trashCurrentPage < 1) trashCurrentPage = 1;
+    const pageItems = loadedDeletedItems.slice((trashCurrentPage - 1) * TRASH_PAGE_SIZE, trashCurrentPage * TRASH_PAGE_SIZE);
+
+    pageItems.forEach((item) => {
         const tr = document.createElement("tr");
         const typeKey = (item.item_type || "").toLowerCase();
         const badgeClass = `item-type-badge item-type-${typeKey}`;
@@ -63,9 +71,48 @@ function renderTrashTable() {
         tbody.appendChild(tr);
     });
 
+    renderTrashPagination(loadedDeletedItems.length);
+
     if (typeof lucide !== "undefined") {
         lucide.createIcons();
     }
+}
+
+function renderTrashPagination(total) {
+    const wrap = getTrashEl("trashPagination");
+    if (!wrap) return;
+
+    const totalPages = Math.max(1, Math.ceil(total / TRASH_PAGE_SIZE));
+    if (trashCurrentPage > totalPages) trashCurrentPage = totalPages;
+    if (trashCurrentPage < 1) trashCurrentPage = 1;
+
+    if (total === 0) {
+        wrap.innerHTML = "";
+        return;
+    }
+
+    const start = (trashCurrentPage - 1) * TRASH_PAGE_SIZE + 1;
+    const end = Math.min(trashCurrentPage * TRASH_PAGE_SIZE, total);
+
+    const buttons = `<button type="button" class="active" data-page="${trashCurrentPage}" disabled>${trashCurrentPage}</button>`;
+
+    wrap.innerHTML =
+        `<span>Showing ${start}–${end} of ${total} entries</span>` +
+        `<div class="page-btns">` +
+        `<button type="button" data-page="${trashCurrentPage - 1}" ${trashCurrentPage <= 1 ? "disabled" : ""}>Prev</button>` +
+        buttons +
+        `<button type="button" data-page="${trashCurrentPage + 1}" ${trashCurrentPage >= totalPages ? "disabled" : ""}>Next</button>` +
+        `</div>`;
+
+    wrap.querySelectorAll("button[data-page]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+            const p = parseInt(btn.getAttribute("data-page") || "", 10);
+            if (!isNaN(p) && p >= 1 && p <= totalPages) {
+                trashCurrentPage = p;
+                renderTrashTable();
+            }
+        });
+    });
 }
 
 window.confirmRestoreItem = function (event, id) {
@@ -122,7 +169,7 @@ function closePurgeModal() {
 
 function initTrashPage() {
     const typeFilter = getTrashEl("trashTypeFilter");
-    if (typeFilter) typeFilter.addEventListener("change", loadTrashData);
+    if (typeFilter) typeFilter.addEventListener("change", () => { trashCurrentPage = 1; loadTrashData(); });
 
     const emptyTrashBtn = getTrashEl("emptyTrashBtn");
     if (emptyTrashBtn) {

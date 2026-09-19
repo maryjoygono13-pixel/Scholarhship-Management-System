@@ -1,6 +1,47 @@
 <?php
 require_once __DIR__ . '/init.php';
 
+function restoreApplicantRow(PDO $pdo, array $data): void {
+    $stmtRestore = $pdo->prepare("INSERT OR REPLACE INTO applicants (
+        id, student_id, first_name, last_name, email, phone, birthdate, address, latitude, longitude,
+        school, program, year_level, gpa, scholarship_type, status, gwa, gwa_req, failing_grades,
+        units, enrolled, docs_complete, remarks, essay, transcript_file, recommendation_file, valid_id_file,
+        created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+
+    $stmtRestore->execute([
+        $data['id'] ?? null,
+        $data['student_id'] ?? '',
+        $data['first_name'] ?? '',
+        $data['last_name'] ?? '',
+        $data['email'] ?? '',
+        $data['phone'] ?? '',
+        $data['birthdate'] ?? '',
+        $data['address'] ?? '',
+        $data['latitude'] ?? null,
+        $data['longitude'] ?? null,
+        $data['school'] ?? '',
+        $data['program'] ?? '',
+        $data['year_level'] ?? '',
+        $data['gpa'] ?? 0,
+        $data['scholarship_type'] ?? 'Academic Merit',
+        $data['status'] ?? 'pending',
+        $data['gwa'] ?? 0,
+        $data['gwa_req'] ?? 1.75,
+        $data['failing_grades'] ?? 0,
+        $data['units'] ?? 21,
+        $data['enrolled'] ?? 1,
+        $data['docs_complete'] ?? 1,
+        $data['remarks'] ?? '',
+        $data['essay'] ?? '',
+        $data['transcript_file'] ?? '',
+        $data['recommendation_file'] ?? '',
+        $data['valid_id_file'] ?? '',
+        $data['created_at'] ?? date('Y-m-d H:i:s'),
+        date('Y-m-d H:i:s')
+    ]);
+}
+
 try {
     $id = (int)($_POST['id'] ?? $_GET['id'] ?? 0);
     if ($id <= 0) {
@@ -25,44 +66,7 @@ try {
     }
 
     if ($type === 'applicant') {
-        $stmtRestore = $pdo->prepare("INSERT OR REPLACE INTO applicants (
-            id, student_id, first_name, last_name, email, phone, birthdate, address, latitude, longitude,
-            school, program, year_level, gpa, scholarship_type, status, gwa, gwa_req, failing_grades,
-            units, enrolled, docs_complete, remarks, essay, transcript_file, recommendation_file, valid_id_file,
-            created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-
-        $stmtRestore->execute([
-            $data['id'] ?? null,
-            $data['student_id'] ?? '',
-            $data['first_name'] ?? '',
-            $data['last_name'] ?? '',
-            $data['email'] ?? '',
-            $data['phone'] ?? '',
-            $data['birthdate'] ?? '',
-            $data['address'] ?? '',
-            $data['latitude'] ?? null,
-            $data['longitude'] ?? null,
-            $data['school'] ?? '',
-            $data['program'] ?? '',
-            $data['year_level'] ?? '',
-            $data['gpa'] ?? 0,
-            $data['scholarship_type'] ?? 'Academic Merit',
-            $data['status'] ?? 'pending',
-            $data['gwa'] ?? 0,
-            $data['gwa_req'] ?? 1.75,
-            $data['failing_grades'] ?? 0,
-            $data['units'] ?? 21,
-            $data['enrolled'] ?? 1,
-            $data['docs_complete'] ?? 1,
-            $data['remarks'] ?? '',
-            $data['essay'] ?? '',
-            $data['transcript_file'] ?? '',
-            $data['recommendation_file'] ?? '',
-            $data['valid_id_file'] ?? '',
-            $data['created_at'] ?? date('Y-m-d H:i:s'),
-            date('Y-m-d H:i:s')
-        ]);
+        restoreApplicantRow($pdo, $data);
     } else if ($type === 'scholar') {
         $stmtRestore = $pdo->prepare("INSERT OR REPLACE INTO scholars (
             id, student_id, name, department, year_level, gwa, status, school_year, remarks, address, latitude, longitude, created_at, updated_at
@@ -139,8 +143,8 @@ try {
         ]);
     } else if ($type === 'import') {
         $stmtRestore = $pdo->prepare("INSERT OR REPLACE INTO imported_files (
-            id, file_type, file_name, file_size, records_count, imported_by, status, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+            id, file_type, file_name, file_size, records_count, imported_by, status, stored_path, created_applicant_ids, created_grade_ids, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
         $stmtRestore->execute([
             $data['id'] ?? null,
@@ -150,8 +154,59 @@ try {
             $data['records_count'] ?? 0,
             $data['imported_by'] ?? 'Registrar Staff',
             $data['status'] ?? 'Active',
+            $data['stored_path'] ?? null,
+            $data['created_applicant_ids'] ?? null,
+            $data['created_grade_ids'] ?? null,
             $data['created_at'] ?? date('Y-m-d H:i:s')
         ]);
+
+        // Bring back any applicants that were removed alongside this import.
+        if (!empty($data['created_applicant_snapshots']) && is_array($data['created_applicant_snapshots'])) {
+            foreach ($data['created_applicant_snapshots'] as $applicantSnapshot) {
+                if (is_array($applicantSnapshot)) {
+                    restoreApplicantRow($pdo, $applicantSnapshot);
+                }
+            }
+        }
+
+        // Bring back any subject grades that were removed alongside this
+        // import, then recompute GWA / failing count for whoever they belong to.
+        if (!empty($data['created_grade_snapshots']) && is_array($data['created_grade_snapshots'])) {
+            $restoreGradeStmt = $pdo->prepare("INSERT OR REPLACE INTO student_grades (
+                id, student_id, subject_code, subject_name, semester, school_year, grade, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+
+            $affectedStudentIds = [];
+            foreach ($data['created_grade_snapshots'] as $gradeSnapshot) {
+                if (!is_array($gradeSnapshot)) {
+                    continue;
+                }
+                $restoreGradeStmt->execute([
+                    $gradeSnapshot['id'] ?? null,
+                    $gradeSnapshot['student_id'] ?? '',
+                    $gradeSnapshot['subject_code'] ?? '',
+                    $gradeSnapshot['subject_name'] ?? '',
+                    $gradeSnapshot['semester'] ?? '1st Semester',
+                    $gradeSnapshot['school_year'] ?? '',
+                    $gradeSnapshot['grade'] ?? 0,
+                    $gradeSnapshot['created_at'] ?? date('Y-m-d H:i:s'),
+                    date('Y-m-d H:i:s')
+                ]);
+                if (!empty($gradeSnapshot['student_id'])) {
+                    $affectedStudentIds[$gradeSnapshot['student_id']] = true;
+                }
+            }
+
+            foreach (array_keys($affectedStudentIds) as $sid) {
+                $avgStmt = $pdo->prepare("SELECT AVG(grade) AS avg_grade, SUM(CASE WHEN grade > 3.00 THEN 1 ELSE 0 END) AS failing FROM student_grades WHERE student_id = ?");
+                $avgStmt->execute([$sid]);
+                $avgRow = $avgStmt->fetch(PDO::FETCH_ASSOC);
+                if ($avgRow && $avgRow['avg_grade'] !== null) {
+                    $pdo->prepare("UPDATE applicants SET gwa = ?, failing_grades = ?, updated_at = CURRENT_TIMESTAMP WHERE student_id = ?")
+                        ->execute([round((float)$avgRow['avg_grade'], 2), (int)$avgRow['failing'], $sid]);
+                }
+            }
+        }
     }
 
     // Delete item from Trash Bin

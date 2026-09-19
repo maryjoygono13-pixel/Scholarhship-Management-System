@@ -68,9 +68,17 @@ try {
         LIMIT 1
     ");
 
-    $data = array_map(function($r) use ($appStmt) {
+    $gradeStmt = $pdo->prepare("SELECT subject_code, grade FROM student_grades WHERE student_id = ?");
+
+    $data = array_map(function($r) use ($appStmt, $gradeStmt) {
         $appStmt->execute([(int)($r['applicant_id'] ?? 0), $r['student_id']]);
         $app = $appStmt->fetch();
+
+        $gradeStmt->execute([$r['student_id']]);
+        $grades = [];
+        foreach ($gradeStmt->fetchAll(PDO::FETCH_ASSOC) as $g) {
+            $grades[$g['subject_code']] = (float)$g['grade'];
+        }
 
         // Prefer the applicant's structured name (so the table can show a
         // middle initial and the detail view can show the full middle
@@ -107,6 +115,7 @@ try {
             'units' => $app ? (int)$app['units'] : null,
             'enrolled' => $app ? (bool)$app['enrolled'] : null,
             'docsComplete' => $app ? (bool)$app['docs_complete'] : null,
+            'grades' => (object)$grades,
         ];
     }, $rows);
 

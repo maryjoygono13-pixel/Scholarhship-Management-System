@@ -44,6 +44,7 @@ interface EvaluationApplicant {
   program: string;
   major: string;
   yearLevel: string;
+  semester: string;
   type: string;
   gwa: number;
   gwaReq: number;
@@ -53,6 +54,7 @@ interface EvaluationApplicant {
   docsComplete: boolean;
   status: string;
   remarks: string;
+  grades: Record<string, number>;
 }
 
 interface Window {

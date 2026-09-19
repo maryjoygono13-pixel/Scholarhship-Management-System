@@ -1,3 +1,7 @@
+function normalizeSemesterValue(val: string | undefined | null): string {
+  const v = (val || "").toLowerCase();
+  return (v.includes("2") || v.includes("second")) ? "2nd Semester" : "1st Semester";
+}
 document.addEventListener("DOMContentLoaded", () => {
   const ledgerBody = document.getElementById("ledgerBody");
   const countEligible = document.getElementById("countEligible");
@@ -27,6 +31,8 @@ document.addEventListener("DOMContentLoaded", () => {
   let ledgerData: any[] = [];
   let selectedRecord: any = null;
   let deletingRenId: number | null = null;
+  const RENEWAL_PAGE_SIZE = 10;
+  let renewalCurrentPage = 1;
 
   async function loadLedger(): Promise<void> {
     try {
@@ -60,11 +66,17 @@ document.addEventListener("DOMContentLoaded", () => {
 
     ledgerBody.innerHTML = "";
     if (filtered.length === 0) {
-      ledgerBody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:24px; color:#6b7280;">No scholars found.</td></tr>`;
+      ledgerBody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:24px; color:#6b7280;">No scholars found.</td></tr>`;
+      renderRenewalPagination(0);
       return;
     }
 
-    filtered.forEach((r: any) => {
+    const totalPages = Math.max(1, Math.ceil(filtered.length / RENEWAL_PAGE_SIZE));
+    if (renewalCurrentPage > totalPages) renewalCurrentPage = totalPages;
+    if (renewalCurrentPage < 1) renewalCurrentPage = 1;
+    const pageItems = filtered.slice((renewalCurrentPage - 1) * RENEWAL_PAGE_SIZE, renewalCurrentPage * RENEWAL_PAGE_SIZE);
+
+    pageItems.forEach((r: any) => {
       const tr = document.createElement("tr");
       const statusBadge = r.status === "eligible" ? "badge-eligible" : (r.status === "at-risk" ? "badge-at-risk" : "badge-terminated");
       tr.innerHTML = `
@@ -73,6 +85,7 @@ document.addEventListener("DOMContentLoaded", () => {
         <td><span class="font-mono">${r.gwa.toFixed(2)}</span></td>
         <td>${r.failingGrades > 0 ? `<span class="font-mono" style="color:red;">${r.failingGrades} Failing</span>` : "Passed All"}</td>
         <td>${r.enrolled ? "Enrolled" : "Not Enrolled"}</td>
+        <td><span class="font-mono">${r.semester || "1st Semester"}</span></td>
         <td><span class="status-badge ${statusBadge}">${r.status}</span></td>
         <td class="actions-cell">
           <button type="button" class="btn-icon-action edit" title="Edit / Review Scholar" onclick="editRenewal(event, ${r.id})">
@@ -88,7 +101,39 @@ document.addEventListener("DOMContentLoaded", () => {
       ledgerBody.appendChild(tr);
     });
 
+    renderRenewalPagination(filtered.length);
     if (typeof lucide !== "undefined") lucide.createIcons();
+  }
+
+  function renderRenewalPagination(total: number): void {
+    const wrap = document.getElementById("renewalPagination");
+    if (!wrap) return;
+    const totalPages = Math.max(1, Math.ceil(total / RENEWAL_PAGE_SIZE));
+    if (renewalCurrentPage > totalPages) renewalCurrentPage = totalPages;
+    if (renewalCurrentPage < 1) renewalCurrentPage = 1;
+    if (total === 0) {
+      wrap.innerHTML = "";
+      return;
+    }
+    const start = (renewalCurrentPage - 1) * RENEWAL_PAGE_SIZE + 1;
+    const end = Math.min(renewalCurrentPage * RENEWAL_PAGE_SIZE, total);
+    const buttons = `<button type="button" class="active" data-page="${renewalCurrentPage}" disabled>${renewalCurrentPage}</button>`;
+    wrap.innerHTML =
+      `<span>Showing ${start}–${end} of ${total} entries</span>` +
+      `<div class="page-btns">` +
+      `<button type="button" data-page="${renewalCurrentPage - 1}" ${renewalCurrentPage <= 1 ? "disabled" : ""}>Prev</button>` +
+      buttons +
+      `<button type="button" data-page="${renewalCurrentPage + 1}" ${renewalCurrentPage >= totalPages ? "disabled" : ""}>Next</button>` +
+      `</div>`;
+    wrap.querySelectorAll<HTMLButtonElement>("button[data-page]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const p = parseInt(btn.getAttribute("data-page") || "", 10);
+        if (!isNaN(p) && p >= 1 && p <= totalPages) {
+          renewalCurrentPage = p;
+          renderLedger();
+        }
+      });
+    });
   }
 
   window.openEvalModal = function(id: number): void {
@@ -103,6 +148,9 @@ document.addEventListener("DOMContentLoaded", () => {
       modalSeal.className = `status-badge ${badgeCls}`;
     }
     if (modalRemarksText) modalRemarksText.textContent = selectedRecord.remarks || "No remarks logged.";
+
+    const modalSemesterSelect = document.getElementById("modalSemesterSelect") as HTMLSelectElement | null;
+    if (modalSemesterSelect) modalSemesterSelect.value = normalizeSemesterValue(selectedRecord.semester);
 
     if (modalCriteria) {
       modalCriteria.innerHTML = `
@@ -193,14 +241,45 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   if (modalClose) modalClose.addEventListener("click", closeModal);
+
+  const modalSemesterSelectEl = document.getElementById("modalSemesterSelect") as HTMLSelectElement | null;
+  if (modalSemesterSelectEl) {
+    modalSemesterSelectEl.addEventListener("click", (e) => e.stopPropagation());
+    modalSemesterSelectEl.addEventListener("change", async () => {
+      if (!selectedRecord) return;
+      const newSemester = modalSemesterSelectEl.value;
+      try {
+        const apiPath = (typeof window !== "undefined" && (window as any).API_BASE) ? (window as any).API_BASE : "api";
+        const formData = new FormData();
+        formData.append("id", String(selectedRecord.id));
+        formData.append("action", "update_semester");
+        formData.append("semester", newSemester);
+        const res = await fetch(`${apiPath}/list_renewal.php`, { method: "POST", body: formData });
+        const json = await res.json();
+        if (json.success) {
+          selectedRecord.semester = newSemester;
+          await loadLedger();
+        } else {
+          alert(json.message || "Failed to update semester.");
+        }
+      } catch (e) {
+        alert("Server error while updating semester.");
+      }
+    });
+  }
+
   if (renewBtn) renewBtn.addEventListener("click", () => updateStatus("renew"));
   if (flagBtn) flagBtn.addEventListener("click", () => updateStatus("flag"));
 
   if (renDeleteCloseBtn) renDeleteCloseBtn.addEventListener("click", closeDeleteModal);
   if (renDeleteCancelBtn) renDeleteCancelBtn.addEventListener("click", closeDeleteModal);
 
-  if (searchBox) searchBox.addEventListener("input", renderLedger);
-  if (statusFilter) statusFilter.addEventListener("change", renderLedger);
+  function resetRenewalPageAndRender(): void {
+    renewalCurrentPage = 1;
+    renderLedger();
+  }
+  if (searchBox) searchBox.addEventListener("input", resetRenewalPageAndRender);
+  if (statusFilter) statusFilter.addEventListener("change", resetRenewalPageAndRender);
 
   loadLedger();
 });

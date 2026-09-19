@@ -21,6 +21,9 @@ let loadedApplicants: any[] = [];
 let editingApplicantId: number | null = null;
 let deletingApplicantId: number | null = null;
 
+const APPLICANTS_PAGE_SIZE = 10;
+let applicantsCurrentPage = 1;
+
 const checkIcon = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>`;
 
 const ICONS: Record<string, string> = {
@@ -89,6 +92,7 @@ function renderTable(): void {
       emptyState.style.display = 'block';
       emptyState.classList.add('show');
     }
+    renderApplicantsPagination(0);
     return;
   }
 
@@ -97,7 +101,12 @@ function renderTable(): void {
     emptyState.classList.remove('show');
   }
 
-  filtered.forEach(app => {
+  const totalPages = Math.max(1, Math.ceil(filtered.length / APPLICANTS_PAGE_SIZE));
+  if (applicantsCurrentPage > totalPages) applicantsCurrentPage = totalPages;
+  if (applicantsCurrentPage < 1) applicantsCurrentPage = 1;
+  const pageItems = filtered.slice((applicantsCurrentPage - 1) * APPLICANTS_PAGE_SIZE, applicantsCurrentPage * APPLICANTS_PAGE_SIZE);
+
+  pageItems.forEach(app => {
     const tr = document.createElement('tr');
     const statusLower = (app.status || '').toLowerCase();
     const statusBadgeClass = statusLower === 'approved' ? 'badge-approved' : (statusLower === 'rejected' ? 'badge-rejected' : 'badge-pending');
@@ -128,9 +137,48 @@ function renderTable(): void {
     tableBody.appendChild(tr);
   });
 
+  renderApplicantsPagination(filtered.length);
+
   if (typeof (window as any).lucide !== 'undefined') {
     (window as any).lucide.createIcons();
   }
+}
+
+function renderApplicantsPagination(total: number): void {
+  const wrap = getEl("applicantsPagination");
+  if (!wrap) return;
+
+  const totalPages = Math.max(1, Math.ceil(total / APPLICANTS_PAGE_SIZE));
+  if (applicantsCurrentPage > totalPages) applicantsCurrentPage = totalPages;
+  if (applicantsCurrentPage < 1) applicantsCurrentPage = 1;
+
+  if (total === 0) {
+    wrap.innerHTML = '';
+    return;
+  }
+
+  const start = (applicantsCurrentPage - 1) * APPLICANTS_PAGE_SIZE + 1;
+  const end = Math.min(applicantsCurrentPage * APPLICANTS_PAGE_SIZE, total);
+
+  const buttons = `<button type="button" class="active" data-page="${applicantsCurrentPage}" disabled>${applicantsCurrentPage}</button>`;
+
+  wrap.innerHTML =
+    `<span>Showing ${start}–${end} of ${total} entries</span>` +
+    `<div class="page-btns">` +
+    `<button type="button" data-page="${applicantsCurrentPage - 1}" ${applicantsCurrentPage <= 1 ? 'disabled' : ''}>Prev</button>` +
+    buttons +
+    `<button type="button" data-page="${applicantsCurrentPage + 1}" ${applicantsCurrentPage >= totalPages ? 'disabled' : ''}>Next</button>` +
+    `</div>`;
+
+  wrap.querySelectorAll<HTMLButtonElement>('button[data-page]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const p = parseInt(btn.getAttribute('data-page') || '', 10);
+      if (!isNaN(p) && p >= 1 && p <= totalPages) {
+        applicantsCurrentPage = p;
+        renderTable();
+      }
+    });
+  });
 }
 
 function openViewModal(app: any): void {
@@ -564,13 +612,13 @@ function initApplicantsPage(): void {
   if (viewCloseBtn2) viewCloseBtn2.addEventListener("click", closeViewModal);
 
   const searchInput = getEl<HTMLInputElement>("searchInput");
-  if (searchInput) searchInput.addEventListener("input", renderTable);
+  if (searchInput) searchInput.addEventListener("input", () => { applicantsCurrentPage = 1; renderTable(); });
 
   const filterType = getEl<HTMLSelectElement>("filterType");
-  if (filterType) filterType.addEventListener("change", renderTable);
+  if (filterType) filterType.addEventListener("change", () => { applicantsCurrentPage = 1; renderTable(); });
 
   const filterStatus = getEl<HTMLSelectElement>("filterStatus");
-  if (filterStatus) filterStatus.addEventListener("change", loadTableData);
+  if (filterStatus) filterStatus.addEventListener("change", () => { applicantsCurrentPage = 1; loadTableData(); });
 
   const studentId = document.querySelector<HTMLInputElement>('[data-field="studentId"]');
   const phoneNumber = document.querySelector<HTMLInputElement>('[data-field="phone"]');

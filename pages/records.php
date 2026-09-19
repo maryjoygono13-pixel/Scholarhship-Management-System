@@ -60,6 +60,7 @@ include __DIR__ . '/../includes/header.php';
             </table>
         </div>
     </div>
+    <div class="pagination-bar" id="recordsPagination"></div>
 </div>
 
 <!-- Add / Edit Record Modal -->
@@ -101,7 +102,10 @@ include __DIR__ . '/../includes/header.php';
                 </div>
                 <div class="field">
                     <label style="font-size:13px; font-weight:600; color:#374151;">Semester</label>
-                    <input type="text" id="recSemester" name="semester" placeholder="First Semester" style="width:100%; height:40px; padding:0 12px; border:1px solid #d1d5db; border-radius:8px; outline:none;">
+                    <select id="recSemester" name="semester" style="width:100%; height:40px; padding:0 12px; border:1px solid #d1d5db; border-radius:8px; outline:none;">
+                        <option value="1st Semester">1st Semester</option>
+                        <option value="2nd Semester">2nd Semester</option>
+                    </select>
                 </div>
                 <div class="field">
                     <label style="font-size:13px; font-weight:600; color:#374151;">School Year</label>

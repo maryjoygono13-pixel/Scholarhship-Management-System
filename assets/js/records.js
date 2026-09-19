@@ -1,4 +1,8 @@
 "use strict";
+function normalizeSemesterValue(val) {
+    const v = (val || "").toLowerCase();
+    return (v.includes("2") || v.includes("second")) ? "2nd Semester" : "1st Semester";
+}
 document.addEventListener("DOMContentLoaded", () => {
     const tableBody = document.getElementById("tableBody");
     const searchInput = document.querySelector(".search-wrap input");
@@ -32,6 +36,8 @@ document.addEventListener("DOMContentLoaded", () => {
     let deletingRecordId = null;
     let viewingRecord = null;
     let activeRecordTab = "overview";
+    const RECORDS_PAGE_SIZE = 10;
+    let recordsCurrentPage = 1;
     async function loadRecords() {
         try {
             const apiPath = (typeof window !== "undefined" && window.API_BASE) ? window.API_BASE : "api";
@@ -81,6 +87,39 @@ document.addEventListener("DOMContentLoaded", () => {
             return matchQuery && matchType && matchStatus;
         });
     }
+    function renderPaginationBar(total) {
+        const wrap = document.getElementById("recordsPagination");
+        if (!wrap)
+            return;
+        const totalPages = Math.max(1, Math.ceil(total / RECORDS_PAGE_SIZE));
+        if (recordsCurrentPage > totalPages)
+            recordsCurrentPage = totalPages;
+        if (recordsCurrentPage < 1)
+            recordsCurrentPage = 1;
+        if (total === 0) {
+            wrap.innerHTML = "";
+            return;
+        }
+        const start = (recordsCurrentPage - 1) * RECORDS_PAGE_SIZE + 1;
+        const end = Math.min(recordsCurrentPage * RECORDS_PAGE_SIZE, total);
+        const buttons = `<button type="button" class="active" data-page="${recordsCurrentPage}" disabled>${recordsCurrentPage}</button>`;
+        wrap.innerHTML =
+            `<span>Showing ${start}–${end} of ${total} entries</span>` +
+            `<div class="page-btns">` +
+            `<button type="button" data-page="${recordsCurrentPage - 1}" ${recordsCurrentPage <= 1 ? "disabled" : ""}>Prev</button>` +
+            buttons +
+            `<button type="button" data-page="${recordsCurrentPage + 1}" ${recordsCurrentPage >= totalPages ? "disabled" : ""}>Next</button>` +
+            `</div>`;
+        wrap.querySelectorAll("button[data-page]").forEach((btn) => {
+            btn.addEventListener("click", () => {
+                const p = parseInt(btn.getAttribute("data-page") || "", 10);
+                if (!isNaN(p) && p >= 1 && p <= totalPages) {
+                    recordsCurrentPage = p;
+                    renderRecords();
+                }
+            });
+        });
+    }
     function renderRecords() {
         if (!tableBody)
             return;
@@ -88,9 +127,16 @@ document.addEventListener("DOMContentLoaded", () => {
         tableBody.innerHTML = "";
         if (filtered.length === 0) {
             tableBody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding: 24px; color: #6b7280;">No records found.</td></tr>`;
+            renderPaginationBar(0);
             return;
         }
-        filtered.forEach((r) => {
+        const totalPages = Math.max(1, Math.ceil(filtered.length / RECORDS_PAGE_SIZE));
+        if (recordsCurrentPage > totalPages)
+            recordsCurrentPage = totalPages;
+        if (recordsCurrentPage < 1)
+            recordsCurrentPage = 1;
+        const pageItems = filtered.slice((recordsCurrentPage - 1) * RECORDS_PAGE_SIZE, recordsCurrentPage * RECORDS_PAGE_SIZE);
+        pageItems.forEach((r) => {
             const tr = document.createElement("tr");
             const badgeClass = r.status === "approved" ? "badge-approved" : (r.status === "rejected" ? "badge-rejected" : "badge-pending");
             tr.innerHTML = `
@@ -113,6 +159,7 @@ document.addEventListener("DOMContentLoaded", () => {
             tr.addEventListener("click", () => openViewModal(r));
             tableBody.appendChild(tr);
         });
+        renderPaginationBar(filtered.length);
         if (typeof lucide !== "undefined")
             lucide.createIcons();
     }
@@ -120,6 +167,29 @@ document.addEventListener("DOMContentLoaded", () => {
         const d = document.createElement("div");
         d.textContent = str == null ? "" : String(str);
         return d.innerHTML;
+    }
+    function gradeStatusCell(grade) {
+        if (grade === undefined || grade === null) {
+            return '<span class="badge badge-pending">Not yet graded</span>';
+        }
+        const passed = Number(grade) <= 3.00;
+        return '<span class="font-mono" style="font-weight:600; margin-right:8px;">' + Number(grade).toFixed(2) + '</span>' +
+            '<span class="badge ' + (passed ? 'badge-approved' : 'badge-rejected') + '">' + (passed ? 'Passed' : 'Failed') + '</span>';
+    }
+    function buildSemesterSubjectBlock(subjects, label, grades) {
+        if (!subjects.length) return "";
+        const g = grades || {};
+        const rows = subjects
+            .map((s) => '<tr><td><b class="font-mono">' + esc(s.code) + '</b></td><td>' + esc(s.name) + '</td><td>' + gradeStatusCell(g[s.code]) + '</td></tr>')
+            .join("");
+        return (
+            '<div style="margin-bottom:14px;">' +
+            '<div style="font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:0.03em; color:#134e2a; margin-bottom:6px;">' + esc(label) + '</div>' +
+            '<div style="border:1px solid #e2e8f0; border-radius:10px; overflow:hidden;">' +
+            '<table class="applicants-table" style="font-size:13px; margin:0; table-layout:fixed; width:100%;">' +
+            '<thead><tr><th style="width:18%;">Code</th><th style="width:57%;">Subject Description</th><th style="width:25%;">Status</th></tr></thead>' +
+            '<tbody>' + rows + '</tbody></table></div></div>'
+        );
     }
     function initials(name) {
         return (name || "").split(" ").map(n => n[0]).filter(Boolean).slice(0, 2).join("").toUpperCase();
@@ -132,7 +202,7 @@ document.addEventListener("DOMContentLoaded", () => {
      * line — "<program> · <year level>" — right next to the
      * course/department, never as a separate standalone line.
      */
-    function formatDeptLine(program, major, yearLevel) {
+    function cleanProgramName(program, yearLevel) {
         let base = (program || "").trim();
         const yl = (yearLevel || "").trim();
         if (yl) {
@@ -141,6 +211,11 @@ document.addEventListener("DOMContentLoaded", () => {
                 base = base.slice(0, base.length - suffix.length).trim();
             }
         }
+        return base;
+    }
+    function formatDeptLine(program, major, yearLevel) {
+        let base = cleanProgramName(program, yearLevel);
+        const yl = (yearLevel || "").trim();
         if (major) {
             base = base ? base + " — " + major : major;
         }
@@ -187,18 +262,19 @@ document.addEventListener("DOMContentLoaded", () => {
                 '</div>');
         }
         if (tab === "grades") {
-            const subjects = window.getCurriculumSubjects
-                ? window.getCurriculumSubjects(r.program || "", r.major || "", r.yearLevel || "")
-                : [];
-            const tableRows = subjects
-                .map((s) => '<tr><td><b class="font-mono">' + esc(s.code) + '</b></td><td>' + esc(s.name) + '</td><td><span class="badge badge-pending">Not yet graded</span></td></tr>')
-                .join("");
-            const breakdownHtml = subjects.length
-                ? '<div style="border:1px solid #e2e8f0; border-radius:10px; overflow:hidden;">' +
-                    '<table class="applicants-table" style="font-size:13px; margin:0;">' +
-                    '<thead><tr><th>Code</th><th>Subject Description</th><th>Status</th></tr></thead>' +
-                    '<tbody>' + tableRows + '</tbody></table></div>'
-                : '<p class="empty-note">No detailed subject-by-subject grade breakdown is recorded for this record.</p>';
+            const bySem = window.getCurriculumSubjectsBySemester
+                ? window.getCurriculumSubjectsBySemester(cleanProgramName(r.program, r.yearLevel), r.major || "", r.yearLevel || "")
+                : { firstSem: [], secondSem: [] };
+            const isSecondSem = (r.semester || "1st Semester") === "2nd Semester";
+            let breakdownHtml;
+            if (!bySem.firstSem.length && !bySem.secondSem.length) {
+                breakdownHtml = '<p class="empty-note">No detailed subject-by-subject grade breakdown is recorded for this record.</p>';
+            } else {
+                breakdownHtml = buildSemesterSubjectBlock(bySem.firstSem, "1st Semester", r.grades);
+                if (isSecondSem) {
+                    breakdownHtml += buildSemesterSubjectBlock(bySem.secondSem, "2nd Semester", r.grades);
+                }
+            }
             return '<div class="section"><h3>Academic Subject Breakdown</h3>' + breakdownHtml + '</div>';
         }
         if (tab === "enrollment") {
@@ -284,7 +360,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (recStatus)
             recStatus.value = editItem.status;
         if (recSemester)
-            recSemester.value = editItem.semester;
+            recSemester.value = normalizeSemesterValue(editItem.semester);
         if (recSy)
             recSy.value = editItem.sy;
         if (recRemarks)
@@ -381,12 +457,16 @@ document.addEventListener("DOMContentLoaded", () => {
         recDeleteCloseBtn.addEventListener("click", closeDeleteModal);
     if (recDeleteCancelBtn)
         recDeleteCancelBtn.addEventListener("click", closeDeleteModal);
+    function resetRecordsPageAndRender() {
+        recordsCurrentPage = 1;
+        renderRecords();
+    }
     if (searchInput)
-        searchInput.addEventListener("input", renderRecords);
+        searchInput.addEventListener("input", resetRecordsPageAndRender);
     if (filterType)
-        filterType.addEventListener("change", renderRecords);
+        filterType.addEventListener("change", resetRecordsPageAndRender);
     if (filterStatus)
-        filterStatus.addEventListener("change", renderRecords);
+        filterStatus.addEventListener("change", resetRecordsPageAndRender);
     function csvEscape(value) {
         const str = value == null ? "" : String(value);
         if (/[",\n]/.test(str))

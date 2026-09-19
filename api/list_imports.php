@@ -26,6 +26,7 @@ try {
             'recordsCount' => (int)$r['records_count'],
             'importedBy' => $r['imported_by'] ?? 'Registrar Staff',
             'status' => $r['status'] ?? 'Active',
+            'hasFile' => !empty($r['stored_path']) && is_file(__DIR__ . '/../' . $r['stored_path']),
             'createdAt' => $r['created_at'],
             'formattedDate' => date('M j, Y h:i A', strtotime($r['created_at']))
         ];

@@ -74,12 +74,15 @@ include __DIR__ . '/../includes/header.php';
           <th>GWA</th>
           <th>Grades</th>
           <th>Enrollment</th>
+          <th>Semester</th>
           <th>Status</th>
           <th style="text-align:right;">Actions</th>
         </tr>
       </thead>
       <tbody id="ledgerBody"></tbody>
     </table>
+
+    <div class="pagination-bar" id="renewalPagination"></div>
   </main>
 </div>
 
@@ -92,7 +95,10 @@ include __DIR__ . '/../includes/header.php';
         <p class="modal-id font-mono" id="modalId" style="font-size: 13px; color: #6b7280; margin-top: 2px;">—</p>
       </div>
       <div style="display: flex; align-items: center; gap: 12px;">
-        <span class="badge badge-neutral font-mono" style="font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 99px;">Term: 2025-2nd Sem</span>
+        <select id="modalSemesterSelect" class="font-mono" style="font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 99px; border: 1px solid #d1d5db; background: #fff; color: #134e2a; cursor: pointer;" title="Change this scholar's semester">
+          <option value="1st Semester">1st Semester</option>
+          <option value="2nd Semester">2nd Semester</option>
+        </select>
         <button type="button" class="custom-modal-close" id="modalClose"><i data-lucide="x"></i></button>
       </div>
     </div>

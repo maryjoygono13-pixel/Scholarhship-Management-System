@@ -41,7 +41,18 @@ try {
 
         $rows = $stmt->fetchAll();
 
-        $data = array_map(function ($r) {
+        $gradesMap = [];
+        $studentIds = array_column($rows, 'student_id');
+        if (!empty($studentIds)) {
+            $placeholders = implode(',', array_fill(0, count($studentIds), '?'));
+            $gradeStmt = $pdo->prepare("SELECT student_id, subject_code, grade FROM student_grades WHERE student_id IN ($placeholders)");
+            $gradeStmt->execute($studentIds);
+            foreach ($gradeStmt->fetchAll(PDO::FETCH_ASSOC) as $g) {
+                $gradesMap[$g['student_id']][$g['subject_code']] = (float)$g['grade'];
+            }
+        }
+
+        $data = array_map(function ($r) use ($gradesMap) {
             return [
                 'id' => (string)$r['id'],
 
@@ -52,6 +63,7 @@ try {
                 'program' => $r['program'],
                 'major' => $r['major'] ?? '',
                 'yearLevel' => $r['year_level'],
+                'semester' => $r['semester'] ?? '1st Semester',
                 'type' => $r['scholarship_type'],
 
                 'gwa' => (float)$r['gwa'],
@@ -64,7 +76,9 @@ try {
                 'docsComplete' => (bool)$r['docs_complete'],
 
                 'status' => $r['status'],
-                'remarks' => $r['remarks'] ?? ''
+                'remarks' => $r['remarks'] ?? '',
+
+                'grades' => (object)($gradesMap[$r['student_id']] ?? [])
             ];
         }, $rows);
 
@@ -167,7 +181,9 @@ if ($status !== null && in_array(strtolower($status), ['approved', 'rejected']))
             last_name,
             scholarship_type,
             status,
-            remarks
+            remarks,
+            semester,
+            school_year
         FROM applicants
         WHERE id = ?
     ");
@@ -221,8 +237,8 @@ if ($status !== null && in_array(strtolower($status), ['approved', 'rejected']))
                 $name,
                 $applicant['scholarship_type'],
                 strtolower($applicant['status']),
-                'First Semester',
-                '2025-2026',
+                $applicant['semester'] ?: '1st Semester',
+                $applicant['school_year'] ?: '2025-2026',
                 $applicant['remarks'] ?? ''
             ]);
         }

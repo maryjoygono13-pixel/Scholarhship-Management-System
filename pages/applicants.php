@@ -58,6 +58,7 @@
             <span>Click "Add Applicant" to create the first one.</span>
           </div>
         </div>
+        <div class="pagination-bar" id="applicantsPagination"></div>
 
         <div class="applicant-overlay" id="overlay">
           <div class="applicant-modal">
@@ -373,6 +374,28 @@
                                 4th Year
                             </option>
 
+                        </select>
+                    </div>
+
+                    <!-- SEMESTER -->
+                    <div class="field">
+                        <label>
+                            Semester
+                            <span class="req">*</span>
+                        </label>
+
+                        <select
+                            name="semester"
+                            data-field="semester"
+                            required
+                        >
+                            <option value="1st Semester">
+                                1st Semester
+                            </option>
+
+                            <option value="2nd Semester">
+                                2nd Semester
+                            </option>
                         </select>
                     </div>
 

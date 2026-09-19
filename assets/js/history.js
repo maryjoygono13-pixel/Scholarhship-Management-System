@@ -150,15 +150,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const start = (page - 1) * limit + 1;
         const end = Math.min(page * limit, total);
 
-        let buttons = "";
-        const windowSize = 5;
-        let startPage = Math.max(1, page - Math.floor(windowSize / 2));
-        let endPage = Math.min(totalPages, startPage + windowSize - 1);
-        startPage = Math.max(1, endPage - windowSize + 1);
-
-        for (let p = startPage; p <= endPage; p++) {
-            buttons += '<button type="button" class="' + (p === page ? "active" : "") + '" data-page="' + p + '">' + p + '</button>';
-        }
+        const buttons = '<button type="button" class="active" data-page="' + page + '" disabled>' + page + '</button>';
 
         paginationWrap.innerHTML =
             '<span>Showing ' + start + '–' + end + ' of ' + total + ' entries</span>' +
@@ -202,7 +194,7 @@ document.addEventListener("DOMContentLoaded", () => {
         tableWrap.innerHTML = '<div class="empty">Loading activity…</div>';
 
         try {
-            const params = buildParams({ page: currentPage, limit: 20 });
+            const params = buildParams({ page: currentPage, limit: 10 });
             const res = await fetch(`${apiBase}/history.php?${params.toString()}`);
             const json = await res.json();
 

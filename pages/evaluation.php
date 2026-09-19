@@ -41,6 +41,7 @@
                 <!-- Dynamic Evaluation Table rendered by JS -->
             </div>
         </div>
+        <div class="pagination-bar" id="evaluationPagination"></div>
     </div>
 
     <!-- Evaluation Review Modal Overlay -->

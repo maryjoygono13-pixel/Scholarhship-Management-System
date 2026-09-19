@@ -9,7 +9,30 @@ try {
         $action = trim($_POST['action'] ?? '');
         $remarks = trim($_POST['remarks'] ?? '');
 
-        if ($id <= 0 || !in_array($action, ['renew', 'flag', 'terminate'])) {
+        if ($id <= 0) {
+            sendError('Invalid action request.');
+        }
+
+        if ($action === 'update_semester') {
+            $semester = trim($_POST['semester'] ?? '');
+            if (!in_array($semester, ['1st Semester', '2nd Semester'], true)) {
+                sendError('Invalid semester value.');
+            }
+
+            $stmt = $pdo->prepare("UPDATE renewal_retention SET semester = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
+            $stmt->execute([$semester, $id]);
+
+            $stmtWho = $pdo->prepare("SELECT student_id, name FROM renewal_retention WHERE id = ?");
+            $stmtWho->execute([$id]);
+            $who = $stmtWho->fetch();
+            $whoName = $who ? ($who['name'] . ' (Student ID: ' . $who['student_id'] . ')') : ('Scholar #' . $id);
+
+            logActivity($pdo, 'Semester Changed', 'Renewal & Retention', $whoName . ' semester changed to "' . $semester . '".', $id);
+
+            sendJson(['success' => true, 'message' => "Semester updated to $semester.", 'semester' => $semester]);
+        }
+
+        if (!in_array($action, ['renew', 'flag', 'terminate'])) {
             sendError('Invalid action request.');
         }
 

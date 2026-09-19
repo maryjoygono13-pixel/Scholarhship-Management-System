@@ -63,6 +63,8 @@ include __DIR__ . '/../includes/header.php';
             <p style="font-size:13px; color:#94a3b8; margin-top:4px;">No deleted items found in this category.</p>
         </div>
     </div>
+
+    <div class="pagination-bar" id="trashPagination"></div>
 </div>
 
 <!-- Restore / Revert Confirm Modal -->

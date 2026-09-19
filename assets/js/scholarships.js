@@ -270,28 +270,63 @@ document.addEventListener("DOMContentLoaded", () => {
 
         if (!filterType) return;
 
-        const types = Array.from(
-            new Set(
-                scholarships
-                    .map(s => s.type)
-                    .filter(Boolean)
-            )
-        );
+        const previousValue = filterType.value;
 
         filterType.innerHTML =
             '<option value="all">All Scholarship Types</option>';
 
-        types.forEach(type => {
+        // Every canonical type (whether or not a scholarship program using
+        // it exists yet), each with its sub-types nested underneath so you
+        // can filter down to a specific sub-type, not just the parent type.
+        scholarshipTypes.forEach((t) => {
 
-            const opt = document.createElement("option");
+            const subtypes = t.subtypes || [];
 
-            opt.value = type;
-            opt.textContent = type;
+            if (subtypes.length === 0) {
+                const opt = document.createElement("option");
+                opt.value = t.name;
+                opt.textContent = t.name;
+                filterType.appendChild(opt);
+                return;
+            }
 
-            filterType.appendChild(opt);
+            const group = document.createElement("optgroup");
+            group.label = t.name;
 
+            const allOpt = document.createElement("option");
+            allOpt.value = t.name;
+            allOpt.textContent = `All ${t.name}`;
+            group.appendChild(allOpt);
+
+            subtypes.forEach((st) => {
+                const opt = document.createElement("option");
+                opt.value = t.name + "|" + st.name;
+                opt.textContent = st.name;
+                group.appendChild(opt);
+            });
+
+            filterType.appendChild(group);
         });
 
+        // Also surface any type/subtype actually used by an existing
+        // scholarship program that isn't in the canonical list yet (e.g.
+        // legacy data), so it stays filterable instead of silently
+        // disappearing from the dropdown.
+        const knownTypeNames = new Set(scholarshipTypes.map((t) => t.name));
+        const extraTypes = new Set(
+            scholarships
+                .map((s) => s.type)
+                .filter((type) => type && !knownTypeNames.has(type))
+        );
+        extraTypes.forEach((type) => {
+            const opt = document.createElement("option");
+            opt.value = type;
+            opt.textContent = type;
+            filterType.appendChild(opt);
+        });
+
+        const stillValid = Array.from(filterType.options).some((o) => o.value === previousValue);
+        filterType.value = stillValid ? previousValue : "all";
     }
 
 
@@ -317,14 +352,21 @@ document.addEventListener("DOMContentLoaded", () => {
             const name = String(s.name || "").toLowerCase();
             const code = String(s.code || "").toLowerCase();
             const type = String(s.type || "").toLowerCase();
+            const subtype = String(s.subtype || "").toLowerCase();
 
             const matchQuery =
                 name.includes(query) ||
                 code.includes(query);
 
-            const matchType =
-                typeVal === "all" ||
-                type === typeVal;
+            let matchType;
+            if (typeVal === "all") {
+                matchType = true;
+            } else if (typeVal.includes("|")) {
+                const [filterTypeName, filterSubtypeName] = typeVal.split("|");
+                matchType = type === filterTypeName && subtype === filterSubtypeName;
+            } else {
+                matchType = type === typeVal;
+            }
 
             return matchQuery && matchType;
 
@@ -1032,7 +1074,10 @@ document.addEventListener("DOMContentLoaded", () => {
        INITIAL LOAD
     ========================================================= */
 
-    loadScholarshipTypes().then(() => renderTypePicker());
+    loadScholarshipTypes().then(() => {
+        renderTypePicker();
+        populateFilterTypes();
+    });
     loadScholarships();
 
 });

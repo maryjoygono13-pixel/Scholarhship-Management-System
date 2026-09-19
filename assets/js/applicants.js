@@ -197,6 +197,9 @@ let loadedApplicants = [];
 let editingApplicantId = null;
 let deletingApplicantId = null;
 
+const APPLICANTS_PAGE_SIZE = 10;
+let applicantsCurrentPage = 1;
+
 const checkIcon = `
 <svg width="16" height="16" viewBox="0 0 24 24"
 fill="none" stroke="currentColor" stroke-width="3"
@@ -499,6 +502,8 @@ function renderTable() {
             );
         }
 
+        renderApplicantsPagination(0);
+
         return;
     }
 
@@ -514,7 +519,23 @@ function renderTable() {
     }
 
 
-    filtered.forEach(app => {
+    const totalPages =
+        Math.max(1, Math.ceil(filtered.length / APPLICANTS_PAGE_SIZE));
+
+    if (applicantsCurrentPage > totalPages)
+        applicantsCurrentPage = totalPages;
+
+    if (applicantsCurrentPage < 1)
+        applicantsCurrentPage = 1;
+
+    const pageItems =
+        filtered.slice(
+            (applicantsCurrentPage - 1) * APPLICANTS_PAGE_SIZE,
+            applicantsCurrentPage * APPLICANTS_PAGE_SIZE
+        );
+
+
+    pageItems.forEach(app => {
 
         const tr =
             document.createElement("tr");
@@ -614,8 +635,64 @@ function renderTable() {
     });
 
 
+    renderApplicantsPagination(filtered.length);
+
     if (typeof lucide !== "undefined")
         lucide.createIcons();
+}
+
+
+/* ============================================================
+   PAGINATION
+============================================================ */
+
+function renderApplicantsPagination(total) {
+
+    const wrap =
+        getEl("applicantsPagination");
+
+    if (!wrap)
+        return;
+
+    const totalPages =
+        Math.max(1, Math.ceil(total / APPLICANTS_PAGE_SIZE));
+
+    if (applicantsCurrentPage > totalPages)
+        applicantsCurrentPage = totalPages;
+
+    if (applicantsCurrentPage < 1)
+        applicantsCurrentPage = 1;
+
+    if (total === 0) {
+        wrap.innerHTML = "";
+        return;
+    }
+
+    const start =
+        (applicantsCurrentPage - 1) * APPLICANTS_PAGE_SIZE + 1;
+
+    const end =
+        Math.min(applicantsCurrentPage * APPLICANTS_PAGE_SIZE, total);
+
+    const buttons = `<button type="button" class="active" data-page="${applicantsCurrentPage}" disabled>${applicantsCurrentPage}</button>`;
+
+    wrap.innerHTML =
+        `<span>Showing ${start}–${end} of ${total} entries</span>` +
+        `<div class="page-btns">` +
+        `<button type="button" data-page="${applicantsCurrentPage - 1}" ${applicantsCurrentPage <= 1 ? "disabled" : ""}>Prev</button>` +
+        buttons +
+        `<button type="button" data-page="${applicantsCurrentPage + 1}" ${applicantsCurrentPage >= totalPages ? "disabled" : ""}>Next</button>` +
+        `</div>`;
+
+    wrap.querySelectorAll("button[data-page]").forEach(btn => {
+        btn.addEventListener("click", () => {
+            const p = parseInt(btn.getAttribute("data-page") || "", 10);
+            if (!isNaN(p) && p >= 1 && p <= totalPages) {
+                applicantsCurrentPage = p;
+                renderTable();
+            }
+        });
+    });
 }
 
 
@@ -818,6 +895,15 @@ function openViewModal(app) {
 
                 <span class="detail-value">
                     ${app.yearLevel || "N/A"}
+                </span>
+            </div>
+            <div class="detail-item">
+                <span class="detail-label">
+                    Semester
+                </span>
+
+                <span class="detail-value">
+                    ${app.semester || "1st Semester"}
                 </span>
             </div>
             <div class="detail-item">
@@ -1050,6 +1136,11 @@ window.editApplicant =
                     '[data-field="schoolYear"]'
                 );
 
+            const fSemester =
+                document.querySelector(
+                    '[data-field="semester"]'
+                );
+
             const fGpa =
                 document.querySelector(
                     '[data-field="gpa"]'
@@ -1147,6 +1238,10 @@ window.editApplicant =
             if (fYear)
                 fYear.value =
                     app.yearLevel || "";
+
+            if (fSemester)
+                fSemester.value =
+                    app.semester || "1st Semester";
 
 
             if (fGpa)
@@ -2315,6 +2410,119 @@ function initApplicantsPage() {
 
 
                             /* =====================================
+                               SAME STUDENT ID, DIFFERENT NAME
+                            ===================================== */
+
+                            else if (
+                                result &&
+                                result.nameMismatch
+                            ) {
+
+                                const existing =
+                                    result.existingApplicant ||
+                                    {};
+
+                                const existingName =
+                                    [
+                                        existing.firstName || "",
+                                        existing.lastName || ""
+                                    ]
+                                    .join(" ")
+                                    .trim();
+
+                                const saveAnywayMessage =
+                                    "Student ID " +
+                                    (existing.studentId || "") +
+                                    " is already on file under a different name: \"" +
+                                    existingName +
+                                    "\".\n\n" +
+                                    "You're entering a different name for this same ID.\n\n" +
+                                    "Click OK to save this anyway as a separate application.\n" +
+                                    "Click Cancel to choose a different option instead.";
+
+                                const saveAnyway =
+                                    window.confirm(
+                                        saveAnywayMessage
+                                    );
+
+                                if (saveAnyway) {
+
+                                    result =
+                                        await window.apiSaveApplicant(
+                                            form,
+                                            null,
+                                            { confirmNameMismatch: true }
+                                        );
+
+                                    if (
+                                        !result ||
+                                        !result.success
+                                    ) {
+
+                                        throw new Error(
+                                            result?.message ||
+                                            "Failed to save the applicant."
+                                        );
+                                    }
+
+                                    showAppNotification(
+                                        "Applicant added successfully.",
+                                        "success"
+                                    );
+
+                                } else {
+
+                                    const updateInsteadMessage =
+                                        "Would you like to UPDATE the existing record instead?\n\n" +
+                                        "This will rename \"" +
+                                        existingName +
+                                        "\" (Student ID " +
+                                        (existing.studentId || "") +
+                                        ") to the name and details you just entered.";
+
+                                    const shouldUpdateExisting =
+                                        window.confirm(
+                                            updateInsteadMessage
+                                        );
+
+                                    if (shouldUpdateExisting) {
+
+                                        result =
+                                            await window.apiSaveApplicant(
+                                                form,
+                                                existing.id
+                                            );
+
+                                        if (
+                                            !result ||
+                                            !result.success
+                                        ) {
+
+                                            throw new Error(
+                                                result?.message ||
+                                                "Failed to update the existing applicant."
+                                            );
+                                        }
+
+                                        showAppNotification(
+                                            "The existing applicant has been updated successfully.",
+                                            "success"
+                                        );
+
+                                    } else {
+
+                                        showAppNotification(
+                                            "Application was not saved.",
+                                            "info"
+                                        );
+
+                                        return;
+                                    }
+                                }
+                            }
+
+
+                            /* =====================================
                                NEW APPLICANT CREATED
                             ===================================== */
 
@@ -2661,7 +2869,10 @@ function initApplicantsPage() {
 
         searchInput.addEventListener(
             "input",
-            renderTable
+            () => {
+                applicantsCurrentPage = 1;
+                renderTable();
+            }
         );
     }
 
@@ -2678,7 +2889,10 @@ function initApplicantsPage() {
 
         filterType.addEventListener(
             "change",
-            renderTable
+            () => {
+                applicantsCurrentPage = 1;
+                renderTable();
+            }
         );
     }
 

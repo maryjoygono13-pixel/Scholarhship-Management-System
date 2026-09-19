@@ -8,7 +8,10 @@ require_once __DIR__ . '/init.php';
 function createSystemNotification(
     PDO $pdo,
     string $subject,
-    string $message
+    string $message,
+    string $type = 'approval_status',
+    ?string $recipientName = null,
+    $recipientId = null
 ) {
     try {
         $stmt = $pdo->prepare("
@@ -26,10 +29,10 @@ function createSystemNotification(
             )
             VALUES
             (
-                'approval_status',
+                ?,
                 'system',
-                NULL,
-                'Scholarship System',
+                ?,
+                ?,
                 '',
                 ?,
                 ?,
@@ -39,6 +42,9 @@ function createSystemNotification(
         ");
 
         $stmt->execute([
+            $type,
+            $recipientId,
+            $recipientName ?: 'Scholarship System',
             $subject,
             $message
         ]);
@@ -205,6 +211,13 @@ function createSystemNotification(
             $_POST['year_level'] ??
             ''
         );
+
+        $semester = trim(
+            $_POST['semester'] ?? ''
+        );
+        if (!in_array($semester, ['1st Semester', '2nd Semester'], true)) {
+            $semester = '1st Semester';
+        }
 
         $gpa = (float) ($_POST['gpa'] ?? 0);
 
@@ -443,6 +456,7 @@ function createSystemNotification(
                 program = ?,
                 major = ?,
                 year_level = ?,
+                semester = ?,
                 gpa = ?,
                 scholarship_type = ?,
                 essay = ?,
@@ -467,6 +481,7 @@ function createSystemNotification(
                 $program,
                 $major,
                 $yearLevel,
+                $semester,
                 $gpa,
                 $scholarshipType,
                 $essay
@@ -510,7 +525,10 @@ function createSystemNotification(
                 $fullName .
                 ' (Student ID: ' .
                 $studentId .
-                ') was updated in the scholarship system.'
+                ') was updated in the scholarship system.',
+                'applicant_updated',
+                $fullName,
+                $id
             );
 
             logActivity(
@@ -615,6 +633,56 @@ function createSystemNotification(
 
         /*
         * ============================================================
+        * CHECK STUDENT ID IS NOT ALREADY USED BY A DIFFERENT PERSON
+        * ============================================================
+        *
+        * The Student ID is not a unique/primary key in this system —
+        * the same ID can legitimately appear on multiple applications
+        * (different scholarship, different school year). But it
+        * should always belong to the SAME person. If this ID is
+        * already on file under a different name, warn instead of
+        * silently creating a second identity under the same ID.
+        */
+
+        if (empty($_POST['confirmNameMismatch'])) {
+
+            $nameCheckStmt = $pdo->prepare("
+                SELECT id, student_id, first_name, last_name, scholarship_type, school_year, status
+                FROM applicants
+                WHERE student_id = ?
+                ORDER BY id DESC
+                LIMIT 1
+            ");
+            $nameCheckStmt->execute([$studentId]);
+            $existingById = $nameCheckStmt->fetch(PDO::FETCH_ASSOC);
+
+            if ($existingById) {
+                $existingFullName = trim($existingById['first_name'] . ' ' . $existingById['last_name']);
+                $newFullName = trim($firstName . ' ' . $lastName);
+
+                if (strcasecmp($existingFullName, $newFullName) !== 0) {
+                    sendJson([
+                        'success' => false,
+                        'nameMismatch' => true,
+                        'existingApplicant' => [
+                            'id' => (int) $existingById['id'],
+                            'studentId' => $existingById['student_id'],
+                            'firstName' => $existingById['first_name'],
+                            'lastName' => $existingById['last_name'],
+                            'scholarshipType' => $existingById['scholarship_type'],
+                            'schoolYear' => $existingById['school_year'],
+                            'status' => $existingById['status']
+                        ],
+                        'message' =>
+                            'Student ID ' . $studentId . ' is already on file under a different name ("' .
+                            $existingFullName . '"). You are entering "' . $newFullName . '" for the same ID.'
+                    ]);
+                }
+            }
+        }
+
+        /*
+        * ============================================================
         * CREATE NEW APPLICANT
         * ============================================================
         *
@@ -651,6 +719,7 @@ function createSystemNotification(
             program,
             major,
             year_level,
+            semester,
             gpa,
             scholarship_type,
             status,
@@ -671,7 +740,7 @@ function createSystemNotification(
                 ?, ?, ?, ?, ?,
                 ?, ?, ?, ?, ?,
                 ?, ?, ?, ?, ?,
-                ?, ?, ?, ?, ?
+                ?, ?, ?, ?, ?, ?
             )
         ";
 
@@ -695,6 +764,7 @@ function createSystemNotification(
             $program,            // 15
             $major,              // 16
             $yearLevel,          // 17
+            $semester,           // 17b
             $gpa,                // 18
             $scholarshipType,    // 19
             $status,             // 20
@@ -729,7 +799,10 @@ function createSystemNotification(
             $studentId .
             ') submitted a ' .
             $scholarshipType .
-            ' application.'
+            ' application.',
+            'new_applicant',
+            $fullName,
+            $newId
         );
 
         logActivity(

@@ -53,6 +53,7 @@ include __DIR__ . '/../includes/header.php';
                         </tr>
                     </tbody>
                 </table>
+                <div class="pagination-bar" id="gradeFilesPagination"></div>
             </div>
         </div>
     </div>
@@ -98,6 +99,7 @@ include __DIR__ . '/../includes/header.php';
                         </tr>
                     </tbody>
                 </table>
+                <div class="pagination-bar" id="enrollmentFilesPagination"></div>
             </div>
         </div>
     </div>

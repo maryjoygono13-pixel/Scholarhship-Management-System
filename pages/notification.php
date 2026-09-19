@@ -59,6 +59,8 @@ include __DIR__ . '/../includes/header.php';
         <p>No notifications sent yet.</p>
         <span>Click "New notification" to send your first one.</span>
       </div>
+
+      <div class="pagination-bar" id="notificationPagination"></div>
     </div>
   </div>
 

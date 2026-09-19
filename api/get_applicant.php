@@ -75,6 +75,8 @@ try {
     'yearLevel' => $r['year_level'] ?? '',
     'year_level' => $r['year_level'] ?? '',
 
+    'semester' => $r['semester'] ?? '1st Semester',
+
     'gpa' => isset($r['gpa'])
         ? (float)$r['gpa']
         : 0,

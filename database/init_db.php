@@ -187,6 +187,14 @@ function initDatabase(): PDO {
         ");
     }
 
+    // Semester
+    if (!in_array('semester', $columnNames, true)) {
+        $pdo->exec("
+            ALTER TABLE applicants
+            ADD COLUMN semester TEXT DEFAULT '1st Semester'
+        ");
+    }
+
     // Location columns
     if (!in_array('latitude', $columnNames, true)) {
         $pdo->exec("
@@ -247,6 +255,22 @@ function initDatabase(): PDO {
         remarks TEXT DEFAULT '',
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )");
+
+    // 7. Student Grades Table (per-subject grades, keyed by student + subject + semester)
+    $pdo->exec("CREATE TABLE IF NOT EXISTS student_grades (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        student_id TEXT NOT NULL,
+        subject_code TEXT NOT NULL,
+        subject_name TEXT DEFAULT '',
+        semester TEXT NOT NULL DEFAULT '1st Semester',
+        school_year TEXT DEFAULT '',
+        grade REAL NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )");
+
+    $pdo->exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_student_grades_unique
+        ON student_grades (student_id, subject_code, semester)");
 
     // 8. Scholars Table
     $pdo->exec("CREATE TABLE IF NOT EXISTS scholars (
@@ -411,6 +435,45 @@ function seedDataIfEmpty(PDO $pdo): void {
         foreach ($renewalData as $ren) {
             $insertRen->execute($ren);
         }
+    }
+
+    // Imported Files Table
+    $pdo->exec("CREATE TABLE IF NOT EXISTS imported_files (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        file_type TEXT NOT NULL,
+        file_name TEXT NOT NULL,
+        file_size INTEGER DEFAULT 0,
+        records_count INTEGER DEFAULT 0,
+        imported_by TEXT DEFAULT 'Registrar Staff',
+        status TEXT NOT NULL DEFAULT 'Active',
+        stored_path TEXT DEFAULT NULL,
+        created_applicant_ids TEXT DEFAULT NULL,
+        created_grade_ids TEXT DEFAULT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )");
+
+    $impColumns = $pdo->query("PRAGMA table_info(imported_files)")->fetchAll(PDO::FETCH_ASSOC);
+    $impColumnNames = array_column($impColumns, 'name');
+
+    if (!in_array('stored_path', $impColumnNames, true)) {
+        $pdo->exec("
+            ALTER TABLE imported_files
+            ADD COLUMN stored_path TEXT DEFAULT NULL
+        ");
+    }
+
+    if (!in_array('created_applicant_ids', $impColumnNames, true)) {
+        $pdo->exec("
+            ALTER TABLE imported_files
+            ADD COLUMN created_applicant_ids TEXT DEFAULT NULL
+        ");
+    }
+
+    if (!in_array('created_grade_ids', $impColumnNames, true)) {
+        $pdo->exec("
+            ALTER TABLE imported_files
+            ADD COLUMN created_grade_ids TEXT DEFAULT NULL
+        ");
     }
 
     // Check if imported_files is empty

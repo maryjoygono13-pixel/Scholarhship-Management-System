@@ -53,7 +53,7 @@ async function apiGetApplicant(id) {
    SAVE APPLICANT
 ============================================================ */
 
-async function apiSaveApplicant(formEl, applicantId) {
+async function apiSaveApplicant(formEl, applicantId, options) {
 
     const formData = new FormData();
 
@@ -127,6 +127,10 @@ async function apiSaveApplicant(formEl, applicantId) {
         );
     }
 
+    if (options && options.confirmNameMismatch) {
+        formData.append("confirmNameMismatch", "1");
+    }
+
 
     /* --------------------------------------------------------
        Send request to PHP
@@ -162,6 +166,10 @@ async function apiSaveApplicant(formEl, applicantId) {
     -------------------------------------------------------- */
 
     if (json.duplicate) {
+        return json;
+    }
+
+    if (json.nameMismatch) {
         return json;
     }
 

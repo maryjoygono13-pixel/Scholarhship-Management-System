@@ -95,6 +95,8 @@ include __DIR__ . '/../includes/header.php';
             <p style="font-size:13px; color:#94a3b8; margin-top:4px;">Try adjusting your department, grade year, or search filters.</p>
         </div>
     </div>
+
+    <div class="pagination-bar" id="scholarsPagination"></div>
 </div>
 
 <!-- Add / Edit Scholar Modal -->

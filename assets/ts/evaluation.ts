@@ -12,7 +12,7 @@ const EVAL_API_BASE = "api/applicants.php";
  * "<program> · <year level>" — right next to the course/department,
  * never as a separate standalone line.
  */
-function formatDeptLine(program: string, major: string, yearLevel: string): string {
+function cleanProgramName(program: string, yearLevel: string): string {
   let base = (program || "").trim();
   const yl = (yearLevel || "").trim();
   if (yl) {
@@ -21,6 +21,11 @@ function formatDeptLine(program: string, major: string, yearLevel: string): stri
       base = base.slice(0, base.length - suffix.length).trim();
     }
   }
+  return base;
+}
+function formatDeptLine(program: string, major: string, yearLevel: string): string {
+  let base = cleanProgramName(program, yearLevel);
+  const yl = (yearLevel || "").trim();
   if (major) {
     base = base ? base + " — " + major : major;
   }
@@ -37,6 +42,7 @@ function normalizeEval(record: any): EvaluationApplicant {
     program: String(record.program ?? record.program_year ?? ""),
     major: String(record.major ?? ""),
     yearLevel: String(record.yearLevel ?? record.year_level ?? ""),
+    semester: String(record.semester ?? "1st Semester"),
     type: String(record.type ?? record.scholarship_type ?? ""),
     gwa: Number(record.gwa ?? record.current_gwa ?? 0),
     gwaReq: Number(record.gwaReq ?? record.gwa_requirement ?? 0),
@@ -46,6 +52,7 @@ function normalizeEval(record: any): EvaluationApplicant {
     docsComplete: Boolean(record.docsComplete ?? record.documents_complete ?? false),
     status: String(record.status ?? "review"),
     remarks: String(record.remarks ?? ""),
+    grades: record.grades && typeof record.grades === "object" ? record.grades : {},
   };
 }
 
@@ -53,6 +60,9 @@ function normalizeEval(record: any): EvaluationApplicant {
   let applicants: EvaluationApplicant[] = [];
   let selectedId: string | null = null;
   let activeTab = "overview";
+
+  const EVAL_PAGE_SIZE = 10;
+  let evalCurrentPage = 1;
 
   function initials(name: string): string {
     return name.split(" ").map((n) => n[0]).slice(0, 2).join("").toUpperCase();
@@ -132,6 +142,30 @@ function normalizeEval(record: any): EvaluationApplicant {
     return '<span class="badge ' + s.cls + '">' + s.label + "</span>";
   }
 
+  function gradeStatusCell(grade: number | undefined): string {
+    if (grade === undefined || grade === null) {
+      return '<span class="badge badge-pending">Not yet graded</span>';
+    }
+    const passed = Number(grade) <= 3.00;
+    return '<span class="font-mono" style="font-weight:600; margin-right:8px;">' + Number(grade).toFixed(2) + '</span>' +
+      '<span class="badge ' + (passed ? 'badge-approved' : 'badge-rejected') + '">' + (passed ? 'Passed' : 'Failed') + '</span>';
+  }
+  function buildSemesterSubjectBlock(subjects: { code: string; name: string }[], label: string, grades?: Record<string, number>): string {
+    if (!subjects.length) return "";
+    const g = grades || {};
+    const rows = subjects
+      .map((s) => '<tr><td><b class="font-mono">' + esc(s.code) + '</b></td><td>' + esc(s.name) + '</td><td>' + gradeStatusCell(g[s.code]) + '</td></tr>')
+      .join("");
+    return (
+      '<div style="margin-bottom:14px;">' +
+      '<div style="font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:0.03em; color:var(--green); margin-bottom:6px;">' + esc(label) + '</div>' +
+      '<div style="border:1px solid #e2e8f0; border-radius:10px; overflow:hidden;">' +
+      '<table class="applicants-table" style="font-size:13px; margin:0; table-layout:fixed; width:100%;">' +
+      '<thead><tr><th style="width:18%;">Code</th><th style="width:57%;">Subject Description</th><th style="width:25%;">Status</th></tr></thead>' +
+      '<tbody>' + rows + '</tbody></table></div></div>'
+    );
+  }
+
   function populateTypeFilter(): void {
     const sel = document.getElementById("filterType") as HTMLSelectElement | null;
     if (!sel) return;
@@ -159,6 +193,43 @@ function normalizeEval(record: any): EvaluationApplicant {
     });
   }
 
+  function renderEvalPagination(total: number): void {
+    const wrap = document.getElementById("evaluationPagination");
+    if (!wrap) return;
+
+    const totalPages = Math.max(1, Math.ceil(total / EVAL_PAGE_SIZE));
+    if (evalCurrentPage > totalPages) evalCurrentPage = totalPages;
+    if (evalCurrentPage < 1) evalCurrentPage = 1;
+
+    if (total === 0) {
+      wrap.innerHTML = "";
+      return;
+    }
+
+    const start = (evalCurrentPage - 1) * EVAL_PAGE_SIZE + 1;
+    const end = Math.min(evalCurrentPage * EVAL_PAGE_SIZE, total);
+
+    const buttons = '<button type="button" class="active" data-page="' + evalCurrentPage + '" disabled>' + evalCurrentPage + "</button>";
+
+    wrap.innerHTML =
+      "<span>Showing " + start + "–" + end + " of " + total + " entries</span>" +
+      '<div class="page-btns">' +
+      '<button type="button" data-page="' + (evalCurrentPage - 1) + '" ' + (evalCurrentPage <= 1 ? "disabled" : "") + ">Prev</button>" +
+      buttons +
+      '<button type="button" data-page="' + (evalCurrentPage + 1) + '" ' + (evalCurrentPage >= totalPages ? "disabled" : "") + ">Next</button>" +
+      "</div>";
+
+    wrap.querySelectorAll<HTMLButtonElement>("button[data-page]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const p = parseInt(btn.getAttribute("data-page") || "", 10);
+        if (!isNaN(p) && p >= 1 && p <= totalPages) {
+          evalCurrentPage = p;
+          renderTable();
+        }
+      });
+    });
+  }
+
   function renderTable(): void {
     const wrap = document.getElementById("tableWrap");
     if (!wrap) return;
@@ -166,14 +237,21 @@ function normalizeEval(record: any): EvaluationApplicant {
 
     if (applicants.length === 0) {
       wrap.innerHTML = '<div class="empty">No applicants yet.<br>Applicants added elsewhere will appear here.</div>';
+      renderEvalPagination(0);
       return;
     }
     if (list.length === 0) {
       wrap.innerHTML = '<div class="empty">No applicants match your filters.</div>';
+      renderEvalPagination(0);
       return;
     }
 
-    let rows = list
+    const totalPages = Math.max(1, Math.ceil(list.length / EVAL_PAGE_SIZE));
+    if (evalCurrentPage > totalPages) evalCurrentPage = totalPages;
+    if (evalCurrentPage < 1) evalCurrentPage = 1;
+    const pageItems = list.slice((evalCurrentPage - 1) * EVAL_PAGE_SIZE, evalCurrentPage * EVAL_PAGE_SIZE);
+
+    let rows = pageItems
       .map((a) => {
         return (
           '<tr data-id="' + a.id + '" class="' + (a.id === selectedId ? "active" : "") + '">' +
@@ -207,6 +285,8 @@ function normalizeEval(record: any): EvaluationApplicant {
         if (id) selectApplicant(id);
       });
     });
+
+    renderEvalPagination(list.length);
   }
 
   function selectApplicant(id: string): void {
@@ -261,27 +341,25 @@ function normalizeEval(record: any): EvaluationApplicant {
     }
 
     if (activeTab === "grades") {
-      const subjects = (window as any).getCurriculumSubjects
-        ? (window as any).getCurriculumSubjects(a.program, a.major, a.yearLevel)
-        : [];
+      const bySem = (window as any).getCurriculumSubjectsBySemester
+        ? (window as any).getCurriculumSubjectsBySemester(cleanProgramName(a.program, a.yearLevel), a.major, a.yearLevel)
+        : { firstSem: [], secondSem: [] };
+      const isSecondSem = (a.semester || "1st Semester") === "2nd Semester";
 
-      const tableRows = subjects
-        .map(
-          (s: { code: string; name: string }) =>
-            '<tr><td><b class="font-mono">' + esc(s.code) + '</b></td><td>' + esc(s.name) + '</td><td><span class="badge badge-pending">Not yet graded</span></td></tr>'
-        )
-        .join("");
-
-      const breakdownHtml = subjects.length
-        ? '<div style="border:1px solid #e2e8f0; border-radius:10px; overflow:hidden; margin-bottom:14px;">' +
-          '<table class="applicants-table" style="font-size:13px; margin:0;">' +
-          '<thead><tr><th>Code</th><th>Subject Description</th><th>Status</th></tr></thead>' +
-          '<tbody>' + tableRows + '</tbody></table></div>'
-        : '<p style="font-size:12.5px; color:#6b7280; margin-bottom:14px;">' +
+      let breakdownHtml: string;
+      if (!bySem.firstSem.length && !bySem.secondSem.length) {
+        breakdownHtml =
+          '<p style="font-size:12.5px; color:#6b7280; margin-bottom:14px;">' +
           (a.yearLevel
             ? 'No curriculum reference is available for this program/major yet.'
             : "Set the applicant's year level to view the subject breakdown.") +
           '</p>';
+      } else {
+        breakdownHtml = buildSemesterSubjectBlock(bySem.firstSem, "1st Semester", a.grades);
+        if (isSecondSem) {
+          breakdownHtml += buildSemesterSubjectBlock(bySem.secondSem, "2nd Semester", a.grades);
+        }
+      }
 
       return (
         '<div class="section"><h3>Academic Subject Breakdown</h3>' +
@@ -299,7 +377,7 @@ function normalizeEval(record: any): EvaluationApplicant {
         '<div class="view-detail-grid">' +
         '<div class="detail-item"><span class="detail-label">Enrollment Status</span><span class="detail-value highlight">' + (a.enrolled ? "Validated & Official" : "Unconfirmed") + '</span></div>' +
         '<div class="detail-item"><span class="detail-label">Academic Year</span><span class="detail-value font-mono">2025 - 2026</span></div>' +
-        '<div class="detail-item"><span class="detail-label">Semester</span><span class="detail-value">2nd Semester</span></div>' +
+        '<div class="detail-item"><span class="detail-label">Semester</span><span class="detail-value">' + esc(a.semester || "1st Semester") + '</span></div>' +
         '<div class="detail-item"><span class="detail-label">Registrar Verified</span><span class="detail-value">Office of the Registrar</span></div>' +
         '<div class="detail-item full-width"><span class="detail-label">Degree Program</span><span class="detail-value">' + esc(formatDeptLine(a.program, a.major, a.yearLevel)) + '</span></div>' +
         '</div></div>'
@@ -443,9 +521,14 @@ function normalizeEval(record: any): EvaluationApplicant {
   const filterStatusEl = document.getElementById("filterStatus");
   const searchInputEl = document.getElementById("searchInput");
 
-  if (filterTypeEl) filterTypeEl.addEventListener("change", renderTable);
-  if (filterStatusEl) filterStatusEl.addEventListener("change", renderTable);
-  if (searchInputEl) searchInputEl.addEventListener("input", renderTable);
+  function resetEvalPageAndRender(): void {
+    evalCurrentPage = 1;
+    renderTable();
+  }
+
+  if (filterTypeEl) filterTypeEl.addEventListener("change", resetEvalPageAndRender);
+  if (filterStatusEl) filterStatusEl.addEventListener("change", resetEvalPageAndRender);
+  if (searchInputEl) searchInputEl.addEventListener("input", resetEvalPageAndRender);
 
   const evalOverlay = document.getElementById("evalModalOverlay");
   if (evalOverlay) {
