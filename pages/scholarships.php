@@ -112,6 +112,11 @@ include __DIR__ . '/../includes/header.php';
                 <div class="field">
                     <label style="font-size:13px; font-weight:600; color:#374151;">Total Slots</label>
                     <input type="number" id="schSlots" name="slots" placeholder="50" style="width:100%; height:40px; padding:0 12px; border:1px solid #d1d5db; border-radius:8px; outline:none;">
+                    <label style="display:flex; align-items:center; gap:8px; margin-top:8px; font-size:13px; color:#374151; cursor:pointer;">
+                        <input type="checkbox" id="schUnlimited" name="unlimited_slots" value="1">
+                        No slot limit (unlimited)
+                    </label>
+                    <span style="font-size:12px; color:#6b7280; display:block; margin-top:4px;">For scholarships given to every student who meets the GWA requirement, such as MERIT-BASED Academic.</span>
                 </div>
                 <div class="field">
                     <label style="font-size:13px; font-weight:600; color:#374151;">Coverage / Benefits</label>

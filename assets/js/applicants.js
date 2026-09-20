@@ -919,11 +919,11 @@ function openViewModal(app) {
 
             <div class="detail-item">
                 <span class="detail-label">
-                    Current GPA / GWA
+                    Current GWA (from academic records)
                 </span>
 
                 <span class="detail-value font-mono">
-                    ${app.gpa || app.gwa || "N/A"}
+                    ${app.gwa > 0 ? Number(app.gwa).toFixed(2) : "Not yet available"}
                 </span>
             </div>
 
@@ -1141,11 +1141,6 @@ window.editApplicant =
                     '[data-field="semester"]'
                 );
 
-            const fGpa =
-                document.querySelector(
-                    '[data-field="gpa"]'
-                );
-
 
             const fType =
                 document.querySelector(
@@ -1243,10 +1238,6 @@ window.editApplicant =
                 fSemester.value =
                     app.semester || "1st Semester";
 
-
-            if (fGpa)
-                fGpa.value =
-                    app.gpa || "";
 
 
             if (fType) {

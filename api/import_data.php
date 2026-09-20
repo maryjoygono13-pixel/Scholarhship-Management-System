@@ -51,6 +51,7 @@
         $createdApplicantIds = [];
         $createdGradeIds = [];
         $nameMismatches = [];
+        $invalidPrograms = [];   // rows skipped because their Program isn't one the school offers
 
         if ($ext === 'csv' && ($handle = fopen($fileTmp, "r")) !== FALSE) {
             $header = fgetcsv($handle, 2000, ",");
@@ -82,6 +83,7 @@
                 'enrolled'        => ['enrolled', 'enrollment', 'enrollment_status', 'status'],
                 'school_year'     => ['school_year', 'schoolyear', 'sy'],
                 'program'         => ['program', 'course'],
+                'major'           => ['major', 'majors', 'specialization'],
                 'year_level'      => ['year_level', 'yearlevel', 'year', 'grade_level'],
                 'semester'        => ['semester', 'sem'],
                 'scholarship_type'=> ['scholarship_type', 'scholarshiptype', 'scholarship'],
@@ -141,6 +143,19 @@
 
                     $schoolYearVal = isset($resolved['school_year']) ? trim($row[$resolved['school_year']] ?? '') : '';
                     $programVal = isset($resolved['program']) ? trim($row[$resolved['program']] ?? '') : '';
+                    if ($programVal !== '') {
+                        // The program must be one the school really offers (also accepts short forms
+                        // such as BSIT or "Nursing"); anything else is skipped and reported.
+                        $canonicalProgram = resolveProgramName($programVal);
+                        if ($canonicalProgram === null) {
+                            $invalidPrograms[] = $studentId . ' (' . $programVal . ')';
+                            continue;
+                        }
+                        $programVal = $canonicalProgram;
+                    }
+                    // BSBA / BSEd need a major to have a subject list; use the one in the file, or the only one there is.
+                    $majorRaw = isset($resolved['major']) ? trim($row[$resolved['major']] ?? '') : '';
+                    $majorVal = $programVal !== '' ? resolveMajor($programVal, $majorRaw) : '';
                     $yearLevelVal = isset($resolved['year_level']) ? trim($row[$resolved['year_level']] ?? '') : '';
                     $genderVal = isset($resolved['gender']) ? trim($row[$resolved['gender']] ?? '') : '';
                     $birthdateVal = isset($resolved['birthdate']) ? trim($row[$resolved['birthdate']] ?? '') : '';
@@ -168,9 +183,7 @@
                     if (isset($resolved['semester'])) {
                         $rawSem = strtolower(trim($row[$resolved['semester']] ?? ''));
                         if ($rawSem !== '') {
-                            $semesterVal = (strpos($rawSem, '2') !== false || strpos($rawSem, 'second') !== false)
-                                ? '2nd Semester'
-                                : '1st Semester';
+                            $semesterVal = normalizeSemesterName($rawSem);
                         }
                     }
 
@@ -221,6 +234,7 @@
                         foreach ([
                             'school_year' => $schoolYearVal,
                             'program' => $programVal,
+                            'major' => $majorVal,
                             'year_level' => $yearLevelVal,
                             'gender' => $genderVal,
                             'birthdate' => $birthdateVal,
@@ -253,9 +267,9 @@
                             $insertStmt = $pdo->prepare("
                                 INSERT INTO applicants
                                     (student_id, first_name, last_name, gender, age, birthdate, email, phone, school, address,
-                                    school_year, program, year_level, semester, scholarship_type, status, enrolled, docs_complete)
+                                    school_year, program, major, year_level, semester, scholarship_type, status, enrolled, docs_complete)
                                 VALUES
-                                    (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, 1)
+                                    (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, 1)
                             ");
                             $insertStmt->execute([
                                 $studentId,
@@ -270,8 +284,9 @@
                                 $addressVal,
                                 $schoolYearVal,
                                 $programVal,
+                                $majorVal,
                                 $yearLevelVal,
-                                $semesterVal ?? '1st Semester',
+                                $semesterVal ?? getActiveSemester($pdo),
                                 $scholarshipTypeVal,
                                 $enrolledVal ?? 1,
                             ]);
@@ -310,7 +325,7 @@
                         continue;
                     }
 
-                    $applicantStmt = $pdo->prepare("SELECT semester, school_year FROM applicants WHERE student_id = ? ORDER BY id DESC LIMIT 1");
+                    $applicantStmt = $pdo->prepare("SELECT semester, school_year, program, major, year_level FROM applicants WHERE student_id = ? ORDER BY id DESC LIMIT 1");
                     $applicantStmt->execute([$studentId]);
                     $applicantRow = $applicantStmt->fetch(PDO::FETCH_ASSOC);
 
@@ -321,11 +336,9 @@
 
                     $rowSemester = isset($resolved['semester']) ? strtolower(trim($row[$resolved['semester']] ?? '')) : '';
                     if ($rowSemester !== '') {
-                        $semesterForGrade = (strpos($rowSemester, '2') !== false || strpos($rowSemester, 'second') !== false)
-                            ? '2nd Semester'
-                            : '1st Semester';
+                        $semesterForGrade = normalizeSemesterName($rowSemester);
                     } else {
-                        $semesterForGrade = $applicantRow['semester'] ?: '1st Semester';
+                        $semesterForGrade = $applicantRow['semester'] ?: getActiveSemester($pdo);
                     }
 
                     $schoolYearForGrade = isset($resolved['school_year']) ? trim($row[$resolved['school_year']] ?? '') : '';
@@ -349,17 +362,24 @@
                     ");
 
                     foreach ($pairs as [$subjectCode, $gradeVal]) {
+                        // A grade belongs to the semester its subject is in for the student's program;
+                        // an explicit Semester column in the file, or the student's own semester, is the fallback.
+                        $gradeSemester = $semesterForGrade;
+                        if ($rowSemester === '') {
+                            $gradeSemester = curriculumSemesterForSubject((string)$applicantRow['program'], (string)$applicantRow['major'], (string)$applicantRow['year_level'], (string)$subjectCode) ?? $semesterForGrade;
+                        }
+
                         // Only rows this import newly adds (not ones it merely
                         // overwrites) get tracked, so deleting the import later
                         // can safely remove exactly what it added — matching how
                         // Enrollment imports only undo applicants they created.
-                        $gradeCheckStmt->execute([$studentId, $subjectCode, $semesterForGrade]);
+                        $gradeCheckStmt->execute([$studentId, $subjectCode, $gradeSemester]);
                         $existedBefore = $gradeCheckStmt->fetchColumn() !== false;
 
-                        $gradeInsert->execute([$studentId, $subjectCode, $subjectNameVal, $semesterForGrade, $schoolYearForGrade, $gradeVal]);
+                        $gradeInsert->execute([$studentId, $subjectCode, $subjectNameVal, $gradeSemester, $schoolYearForGrade, $gradeVal]);
 
                         if (!$existedBefore) {
-                            $gradeCheckStmt->execute([$studentId, $subjectCode, $semesterForGrade]);
+                            $gradeCheckStmt->execute([$studentId, $subjectCode, $gradeSemester]);
                             $newGradeId = $gradeCheckStmt->fetchColumn();
                             if ($newGradeId !== false) {
                                 $createdGradeIds[] = (int)$newGradeId;
@@ -374,21 +394,17 @@
             }
             fclose($handle);
 
-            // Recompute GWA and failing-grade count for every student touched by this import,
-            // from the average of all their recorded subject grades (1.0 = highest, 5.0 = fail;
-            // a grade above 3.00 counts as failing, matching this school's grading scale).
+            // Recompute GWA and failing-grade count for every student touched by this import.
+            // GWA is kept per semester; the applicant's own figures follow their current semester.
             foreach (array_keys($affectedGradeStudentIds) as $sid) {
-                $avgStmt = $pdo->prepare("SELECT AVG(grade) AS avg_grade, SUM(CASE WHEN grade > 3.00 THEN 1 ELSE 0 END) AS failing FROM student_grades WHERE student_id = ?");
-                $avgStmt->execute([$sid]);
-                $avgRow = $avgStmt->fetch(PDO::FETCH_ASSOC);
-                if ($avgRow && $avgRow['avg_grade'] !== null) {
-                    $updateGwa = $pdo->prepare("UPDATE applicants SET gwa = ?, failing_grades = ?, updated_at = CURRENT_TIMESTAMP WHERE student_id = ?");
-                    $updateGwa->execute([round((float)$avgRow['avg_grade'], 2), (int)$avgRow['failing'], $sid]);
-                }
+                recalculateApplicantGwa($pdo, (string)$sid);
             }
         } else {
             $processed = rand(15, 45); // Simulated row count — no Excel parser is available on this server
         }
+
+        // New grades / new applicants may make students qualify for the Merit-based scholarship.
+        syncMeritScholars($pdo);
 
         $fileSize = $_FILES['file']['size'] ?? 0;
         $recordsProcessed = max(1, $processed);
@@ -420,6 +436,9 @@
                 $preview = array_slice($unmatchedIds, 0, 5);
                 $message .= " " . count($unmatchedIds) . " row(s) had no matching applicant and no name to create one (e.g. " . implode(', ', $preview) . ").";
             }
+            if (!empty($invalidPrograms)) {
+                $message .= " SKIPPED " . count($invalidPrograms) . " row(s) because the program doesn't exist (" . implode('; ', array_slice($invalidPrograms, 0, 6)) . "). Valid programs: " . implode(', ', array_keys(KNOWN_PROGRAMS)) . ".";
+            }
             if (!empty($nameMismatches)) {
                 $preview = array_slice($nameMismatches, 0, 5);
                 $message .= " WARNING: " . count($nameMismatches) . " Student ID(s) were updated even though the imported name didn't match the name on file — please review: " . implode('; ', $preview) . ".";
@@ -446,6 +465,7 @@
             'matched' => $matchedCount,
             'created' => $createdCount,
             'unmatched' => count($unmatchedIds),
+            'invalidPrograms' => $invalidPrograms,
             'nameMismatches' => $nameMismatches,
             'message' => $message
         ]);

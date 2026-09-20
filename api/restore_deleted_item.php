@@ -90,8 +90,8 @@ try {
         ]);
     } else if ($type === 'scholarship') {
         $stmtRestore = $pdo->prepare("INSERT OR REPLACE INTO scholarships (
-            id, name, code, description, type, gwa_requirement, slots, slots_available, coverage, status, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            id, name, code, description, type, gwa_requirement, slots, slots_available, unlimited_slots, coverage, status, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
         $stmtRestore->execute([
             $data['id'] ?? null,
@@ -102,6 +102,7 @@ try {
             $data['gwa_requirement'] ?? 1.50,
             $data['slots'] ?? 50,
             $data['slots_available'] ?? 25,
+            $data['unlimited_slots'] ?? 0,
             $data['coverage'] ?? '',
             $data['status'] ?? 'active',
             $data['created_at'] ?? date('Y-m-d H:i:s')
@@ -198,13 +199,7 @@ try {
             }
 
             foreach (array_keys($affectedStudentIds) as $sid) {
-                $avgStmt = $pdo->prepare("SELECT AVG(grade) AS avg_grade, SUM(CASE WHEN grade > 3.00 THEN 1 ELSE 0 END) AS failing FROM student_grades WHERE student_id = ?");
-                $avgStmt->execute([$sid]);
-                $avgRow = $avgStmt->fetch(PDO::FETCH_ASSOC);
-                if ($avgRow && $avgRow['avg_grade'] !== null) {
-                    $pdo->prepare("UPDATE applicants SET gwa = ?, failing_grades = ?, updated_at = CURRENT_TIMESTAMP WHERE student_id = ?")
-                        ->execute([round((float)$avgRow['avg_grade'], 2), (int)$avgRow['failing'], $sid]);
-                }
+                recalculateApplicantGwa($pdo, (string)$sid);
             }
         }
     }

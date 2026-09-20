@@ -10,6 +10,10 @@ include __DIR__ . '/../includes/header.php';
  <main class="page">
 
     <div class="summary-row" id="summaryRow">
+      <div class="summary-card pending">
+        <div class="label">Pending</div>
+        <div class="value" id="countPending">0</div>
+      </div>
       <div class="summary-card eligible">
         <div class="label">Eligible</div>
         <div class="value" id="countEligible">0</div>
@@ -42,8 +46,9 @@ include __DIR__ . '/../includes/header.php';
       <div class="select-wrap">
         <select id="semesterFilter">
           <option value="">All Semesters</option>
-          <option value="first">First Semester</option>
-          <option value="second">Second Semester</option>
+          <option value="1st Semester">1st Semester</option>
+          <option value="2nd Semester">2nd Semester</option>
+          <option value="Summer Term">Summer Term</option>
         </select>
       </div>
 
@@ -59,11 +64,17 @@ include __DIR__ . '/../includes/header.php';
       <div class="select-wrap">
         <select id="statusFilter">
           <option value="">All statuses</option>
+          <option value="pending">Pending</option>
           <option value="eligible">Eligible</option>
           <option value="at-risk">At-Risk</option>
           <option value="terminated">Terminated</option>
         </select>
       </div>
+
+      <button type="button" class="btn-export" id="exportRenewalBtn">
+        <i data-lucide="download"></i>
+        Export
+      </button>
     </div>
 
     <table class="ledger" id="ledgerTable">
@@ -95,10 +106,7 @@ include __DIR__ . '/../includes/header.php';
         <p class="modal-id font-mono" id="modalId" style="font-size: 13px; color: #6b7280; margin-top: 2px;">—</p>
       </div>
       <div style="display: flex; align-items: center; gap: 12px;">
-        <select id="modalSemesterSelect" class="font-mono" style="font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 99px; border: 1px solid #d1d5db; background: #fff; color: #134e2a; cursor: pointer;" title="Change this scholar's semester">
-          <option value="1st Semester">1st Semester</option>
-          <option value="2nd Semester">2nd Semester</option>
-        </select>
+        <span id="modalSemesterBadge" class="font-mono" style="font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 99px; border: 1px solid #d1d5db; background: #fff; color: #134e2a;" title="Set by the Active Semester in Settings">—</span>
         <button type="button" class="custom-modal-close" id="modalClose"><i data-lucide="x"></i></button>
       </div>
     </div>

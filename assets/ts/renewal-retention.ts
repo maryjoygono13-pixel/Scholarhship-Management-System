@@ -1,9 +1,11 @@
 function normalizeSemesterValue(val: string | undefined | null): string {
   const v = (val || "").toLowerCase();
+  if (v.includes("summer")) return "Summer Term";
   return (v.includes("2") || v.includes("second")) ? "2nd Semester" : "1st Semester";
 }
 document.addEventListener("DOMContentLoaded", () => {
   const ledgerBody = document.getElementById("ledgerBody");
+  const countPending = document.getElementById("countPending");
   const countEligible = document.getElementById("countEligible");
   const countAtRisk = document.getElementById("countAtRisk");
   const countTerminated = document.getElementById("countTerminated");
@@ -11,6 +13,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const searchBox = document.getElementById("searchBox") as HTMLInputElement | null;
   const statusFilter = document.getElementById("statusFilter") as HTMLSelectElement | null;
+  const semesterFilter = document.getElementById("semesterFilter") as HTMLSelectElement | null;
 
   const modalOverlay = document.getElementById("modalOverlay");
   const modalClose = document.getElementById("modalClose");
@@ -41,6 +44,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (json.success) {
         ledgerData = json.data;
         if (json.summary) {
+          if (countPending) countPending.textContent = String(json.summary.pending ?? 0);
           if (countEligible) countEligible.textContent = String(json.summary.eligible);
           if (countAtRisk) countAtRisk.textContent = String(json.summary.at_risk);
           if (countTerminated) countTerminated.textContent = String(json.summary.terminated);
@@ -57,11 +61,13 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!ledgerBody) return;
     const query = searchBox ? searchBox.value.toLowerCase().trim() : "";
     const statusVal = statusFilter ? statusFilter.value.toLowerCase() : "";
+    const semVal = semesterFilter ? semesterFilter.value : "";
 
     const filtered = ledgerData.filter((r: any) => {
       const matchQuery = r.name.toLowerCase().includes(query) || r.studentId.toLowerCase().includes(query);
       const matchStatus = !statusVal || r.status.toLowerCase() === statusVal;
-      return matchQuery && matchStatus;
+      const matchSem = !semVal || normalizeSemesterValue(r.semester) === semVal;
+      return matchQuery && matchStatus && matchSem;
     });
 
     ledgerBody.innerHTML = "";
@@ -78,7 +84,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     pageItems.forEach((r: any) => {
       const tr = document.createElement("tr");
-      const statusBadge = r.status === "eligible" ? "badge-eligible" : (r.status === "at-risk" ? "badge-at-risk" : "badge-terminated");
+      const statusBadge = r.status === "eligible" ? "badge-eligible" : (r.status === "pending" ? "badge-pending" : (r.status === "at-risk" ? "badge-at-risk" : "badge-terminated"));
       tr.innerHTML = `
         <td><strong class="font-mono">${r.studentId}</strong></td>
         <td>${r.name}</td>
@@ -144,13 +150,14 @@ document.addEventListener("DOMContentLoaded", () => {
     if (modalId) modalId.textContent = `Student ID: ${selectedRecord.studentId}`;
     if (modalSeal) {
       modalSeal.textContent = selectedRecord.status.toUpperCase();
-      const badgeCls = selectedRecord.status === 'eligible' ? 'badge-approved' : (selectedRecord.status === 'at-risk' ? 'badge-pending' : 'badge-rejected');
+      const badgeCls = selectedRecord.status === 'eligible' ? 'badge-approved' : (selectedRecord.status === 'at-risk' || selectedRecord.status === 'pending' ? 'badge-pending' : 'badge-rejected');
       modalSeal.className = `status-badge ${badgeCls}`;
     }
     if (modalRemarksText) modalRemarksText.textContent = selectedRecord.remarks || "No remarks logged.";
 
-    const modalSemesterSelect = document.getElementById("modalSemesterSelect") as HTMLSelectElement | null;
-    if (modalSemesterSelect) modalSemesterSelect.value = normalizeSemesterValue(selectedRecord.semester);
+    // Read-only: the term follows the Active Semester in Settings.
+    const modalSemesterBadge = document.getElementById("modalSemesterBadge");
+    if (modalSemesterBadge) modalSemesterBadge.textContent = normalizeSemesterValue(selectedRecord.semester);
 
     if (modalCriteria) {
       modalCriteria.innerHTML = `
@@ -252,32 +259,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
   if (modalClose) modalClose.addEventListener("click", closeModal);
 
-  const modalSemesterSelectEl = document.getElementById("modalSemesterSelect") as HTMLSelectElement | null;
-  if (modalSemesterSelectEl) {
-    modalSemesterSelectEl.addEventListener("click", (e) => e.stopPropagation());
-    modalSemesterSelectEl.addEventListener("change", async () => {
-      if (!selectedRecord) return;
-      const newSemester = modalSemesterSelectEl.value;
-      try {
-        const apiPath = (typeof window !== "undefined" && (window as any).API_BASE) ? (window as any).API_BASE : "api";
-        const formData = new FormData();
-        formData.append("id", String(selectedRecord.id));
-        formData.append("action", "update_semester");
-        formData.append("semester", newSemester);
-        const res = await fetch(`${apiPath}/list_renewal.php`, { method: "POST", body: formData });
-        const json = await res.json();
-        if (json.success) {
-          selectedRecord.semester = newSemester;
-          await loadLedger();
-        } else {
-          alert(json.message || "Failed to update semester.");
-        }
-      } catch (e) {
-        alert("Server error while updating semester.");
-      }
-    });
-  }
-
   if (renewBtn) renewBtn.addEventListener("click", () => updateStatus("renew"));
   if (flagBtn) flagBtn.addEventListener("click", () => updateStatus("flag"));
 
@@ -290,6 +271,59 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   if (searchBox) searchBox.addEventListener("input", resetRenewalPageAndRender);
   if (statusFilter) statusFilter.addEventListener("change", resetRenewalPageAndRender);
+  if (semesterFilter) semesterFilter.addEventListener("change", resetRenewalPageAndRender);
+
+  function csvEscape(value: any): string {
+    const str = value == null ? "" : String(value);
+    if (/[",\n\r]/.test(str)) return '"' + str.replace(/"/g, '""') + '"';
+    return str;
+  }
+
+  // Exports the whole ledger (every term, every status), not just what the
+  // current search/filters happen to show.
+  function exportRenewalToCsv(): void {
+    if (ledgerData.length === 0) {
+      alert("There are no Renewal & Retention records to export.");
+      return;
+    }
+
+    const headers = [
+      "Student ID", "Name", "Scholarship Type", "GWA", "Required GWA", "Meets GWA",
+      "Failing Grades", "Enrollment", "School Year", "Semester", "Status", "Remarks"
+    ];
+    const lines = [headers.map(csvEscape).join(",")];
+
+    ledgerData.forEach((r: any) => {
+      lines.push([
+        r.studentId,
+        r.name,
+        r.scholarshipType,
+        Number(r.gwa).toFixed(2),
+        Number(r.gwaRequirement).toFixed(2),
+        r.meetsGwa === false ? "No" : "Yes",
+        r.failingGrades,
+        r.enrolled ? "Enrolled" : "Not Enrolled",
+        r.schoolYear,
+        r.semester,
+        r.status,
+        r.remarks || "",
+      ].map(csvEscape).join(","));
+    });
+
+    // BOM so Excel reads names with accents (ñ) correctly.
+    const blob = new Blob(["\ufeff" + lines.join("\r\n")], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "renewal-retention-" + new Date().toISOString().slice(0, 10) + ".csv";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }
+
+  const exportRenewalBtn = document.getElementById("exportRenewalBtn");
+  if (exportRenewalBtn) exportRenewalBtn.addEventListener("click", exportRenewalToCsv);
 
   loadLedger();
 });

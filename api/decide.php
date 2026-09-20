@@ -21,15 +21,26 @@ try {
 
     if ($app && in_array($decision, ['approved', 'rejected'])) {
         $stmtRec = $pdo->prepare("INSERT INTO records (applicant_id, student_id, name, scholarship_type, status, semester, sy, date_evaluated, remarks) 
-            VALUES (?, ?, ?, ?, ?, 'First Semester', '2025-2026', DATE('now'), ?)");
+            VALUES (?, ?, ?, ?, ?, ?, ?, DATE('now'), ?)");
         $stmtRec->execute([
             $app['id'],
             $app['student_id'],
             trim($app['first_name'] . ' ' . $app['last_name']),
             $app['scholarship_type'],
-            $decision,
+            $decision === 'approved' ? 'pending' : $decision,   // approved = pending until renewed
+            normalizeSemesterName($app['semester'] ?? getActiveSemester($pdo)),
+            trim((string)($app['school_year'] ?? '')) !== '' ? trim($app['school_year']) : getActiveSchoolYear($pdo),
             $remarks ?: ($decision === 'approved' ? 'Approved by committee' : 'Rejected by committee')
         ]);
+
+        if ($decision === 'approved') {
+            $newRecord = $pdo->prepare("SELECT * FROM records WHERE id = ?");
+            $newRecord->execute([(int)$pdo->lastInsertId()]);
+            $recordRow = $newRecord->fetch(PDO::FETCH_ASSOC);
+            if ($recordRow) {
+                sendRecordToRenewal($pdo, $recordRow);
+            }
+        }
     }
 
     sendJson(['success' => true, 'message' => "Applicant marked as $decision."]);

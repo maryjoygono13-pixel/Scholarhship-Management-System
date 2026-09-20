@@ -33,6 +33,11 @@ function formatDeptLine(program: string, major: string, yearLevel: string): stri
   return yl ? base + " · " + yl : base;
 }
 
+function normalizeSemesterGwa(raw: any): { first: number | null; second: number | null; summer: number | null } {
+  const num = (v: any): number | null => (v == null || v === "" || Number(v) <= 0 ? null : Number(v));
+  return { first: num(raw && raw.first), second: num(raw && raw.second), summer: num(raw && raw.summer) };
+}
+
 function normalizeEval(record: any): EvaluationApplicant {
   return {
     id: String(record.id ?? record._id ?? String(record.studentId ?? record.student_id ?? Math.random())),
@@ -45,6 +50,7 @@ function normalizeEval(record: any): EvaluationApplicant {
     semester: String(record.semester ?? "1st Semester"),
     type: String(record.type ?? record.scholarship_type ?? ""),
     gwa: Number(record.gwa ?? record.current_gwa ?? 0),
+    semesterGwa: normalizeSemesterGwa(record.semesterGwa),
     gwaReq: Number(record.gwaReq ?? record.gwa_requirement ?? 0),
     failingGrades: Number(record.failingGrades ?? record.failing_grades ?? 0),
     units: Number(record.units ?? record.units_earned ?? 0),
@@ -77,12 +83,38 @@ function normalizeEval(record: any): EvaluationApplicant {
     if (gwa <= req + 0.5) return "var(--amber)";
     return "var(--red)";
   }
-  function showToast(msg: string): void {
+  function fmtGwa(v: number | null): string {
+    return v == null ? "\u2014" : Number(v).toFixed(2);
+  }
+  function semGwaCell(v: number | null, req: number): string {
+    return '<td class="font-mono" style="font-weight:600;color:' + (v == null ? "var(--ink-soft)" : gwaColor(v, req)) + '">' + fmtGwa(v) + "</td>";
+  }
+  function semesterSummaryCard(label: string, v: number | null, req: number): string {
+    const has = v != null;
+    const pass = has && (v as number) <= req;
+    return '<div class="summary-card"><div class="big font-mono" style="color:' + (has ? gwaColor(v as number, req) : "var(--ink-soft)") + '">' + fmtGwa(v) + '</div><div class="lbl">' + label + '</div><div class="sub" style="color:' + (!has ? "var(--ink-soft)" : pass ? "var(--green)" : "var(--red)") + '">' + (!has ? "NO GRADES YET" : pass ? "PASSED" : "FAILED") + "</div></div>";
+  }
+  // Why this applicant can't be approved right now, or "" when they can. Mirrors the checks
+  // the Approve button and the server make, so the reason is visible before clicking.
+  function approveBlockReason(a: EvaluationApplicant): string {
+    if (!(a.gwa > 0)) return "Can't approve yet: no grades are recorded for " + a.semester + ". Import the academic records in Data Management.";
+    if (a.gwa > a.gwaReq) return "Can't approve: " + a.semester + " GWA " + Number(a.gwa).toFixed(2) + " is above the required " + Number(a.gwaReq).toFixed(2) + " for " + a.type + ".";
+    return "";
+  }
+  function approveBlockNote(a: EvaluationApplicant): string {
+    const reason = approveBlockReason(a);
+    return reason ? '<span style="margin-right:auto; max-width:52%; font-size:12.5px; line-height:1.35; color:var(--red); font-weight:600;">' + esc(reason) + "</span>" : "";
+  }
+
+  function showToast(msg: string, kind?: "success" | "error"): void {
     const t = document.getElementById("toast");
     if (!t) return;
     t.textContent = msg;
+    t.classList.remove("toast-success", "toast-error");
+    if (kind) t.classList.add("toast-" + kind);
     t.classList.add("show");
-    setTimeout(() => t.classList.remove("show"), 2200);
+    // Longer messages (e.g. why an approval was refused) stay up long enough to read.
+    setTimeout(() => t.classList.remove("show"), msg.length > 40 ? 5000 : 2200);
   }
 
   async function loadApplicants(): Promise<void> {
@@ -93,11 +125,12 @@ function normalizeEval(record: any): EvaluationApplicant {
       applicants = Array.isArray(data) ? data.map(normalizeEval) : [];
     } catch (e) {
       applicants = [];
-      showToast("Could not load applicants from server.");
+      showToast("Could not load applicants from server.", "error");
     }
   }
 
-  async function saveApplicant(applicant: EvaluationApplicant): Promise<void> {
+  // Returns true only when the server accepted the change; otherwise an error toast explains why.
+  async function saveApplicant(applicant: EvaluationApplicant): Promise<boolean> {
     try {
       const res = await fetch(EVAL_API_BASE + "?id=" + encodeURIComponent(applicant.id), {
         method: "PATCH",
@@ -108,9 +141,15 @@ function normalizeEval(record: any): EvaluationApplicant {
           remarks: applicant.remarks,
         }),
       });
-      if (!res.ok) throw new Error("Save failed: " + res.status);
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        showToast(body && body.message ? body.message : "Could not save (error " + res.status + ").", "error");
+        return false;
+      }
+      return true;
     } catch (e) {
-      showToast("Could not save — check your API connection.");
+      showToast("Could not save — check your API connection.", "error");
+      return false;
     }
   }
 
@@ -121,11 +160,12 @@ function normalizeEval(record: any): EvaluationApplicant {
   }
 
   function computeChecklist(a: EvaluationApplicant): ChecklistItem[] {
-    const gwaPass = a.gwa <= a.gwaReq;
+    const hasGwa = a.gwa > 0;
+    const gwaPass = hasGwa && a.gwa <= a.gwaReq;
     const failPass = Number(a.failingGrades) === 0;
     return [
       { label: "Currently Enrolled", value: a.enrolled ? "Enrolled" : "Not Enrolled", pass: a.enrolled },
-      { label: "GWA Requirement (\u2264 " + a.gwaReq + ")", value: gwaPass ? "Passed" : "Failed", pass: gwaPass },
+      { label: "GWA Requirement (\u2264 " + a.gwaReq + ")", value: hasGwa ? (gwaPass ? "Passed" : "Failed") : "No grades yet", pass: gwaPass },
       { label: "No Failing Grade", value: failPass ? "Passed" : "Failed", pass: failPass },
       { label: "Complete Documents", value: a.docsComplete ? "Complete" : "Missing", pass: a.docsComplete },
     ];
@@ -150,7 +190,7 @@ function normalizeEval(record: any): EvaluationApplicant {
     return '<span class="font-mono" style="font-weight:600; margin-right:8px;">' + Number(grade).toFixed(2) + '</span>' +
       '<span class="badge ' + (passed ? 'badge-approved' : 'badge-rejected') + '">' + (passed ? 'Passed' : 'Failed') + '</span>';
   }
-  function buildSemesterSubjectBlock(subjects: { code: string; name: string }[], label: string, grades?: Record<string, number>): string {
+  function buildSemesterSubjectBlock(subjects: { code: string; name: string }[], label: string, grades?: Record<string, number>, gwa?: number | null): string {
     if (!subjects.length) return "";
     const g = grades || {};
     const rows = subjects
@@ -158,7 +198,7 @@ function normalizeEval(record: any): EvaluationApplicant {
       .join("");
     return (
       '<div style="margin-bottom:14px;">' +
-      '<div style="font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:0.03em; color:var(--green); margin-bottom:6px;">' + esc(label) + '</div>' +
+      '<div style="font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:0.03em; color:var(--green); margin-bottom:6px; display:flex; justify-content:space-between;"><span>' + esc(label) + '</span><span class="font-mono" style="text-transform:none;">GWA ' + fmtGwa(gwa == null ? null : gwa) + '</span></div>' +
       '<div style="border:1px solid #e2e8f0; border-radius:10px; overflow:hidden;">' +
       '<table class="applicants-table" style="font-size:13px; margin:0; table-layout:fixed; width:100%;">' +
       '<thead><tr><th style="width:18%;">Code</th><th style="width:57%;">Subject Description</th><th style="width:25%;">Status</th></tr></thead>' +
@@ -257,7 +297,7 @@ function normalizeEval(record: any): EvaluationApplicant {
           '<tr data-id="' + a.id + '" class="' + (a.id === selectedId ? "active" : "") + '">' +
           '<td><div class="who"><div class="avatar">' + initials(a.name) + '</div><div><div class="name">' + esc(a.name) + '</div><div class="id font-mono">' + esc(a.studentId) + "</div></div></div></td>" +
           '<td class="type-cell">' + esc(a.type) + "</td>" +
-          '<td class="font-mono" style="font-weight:600;color:' + gwaColor(a.gwa, a.gwaReq) + '">' + Number(a.gwa).toFixed(2) + "</td>" +
+          semGwaCell(a.semesterGwa.first, a.gwaReq) + semGwaCell(a.semesterGwa.second, a.gwaReq) +
           '<td><span style="color:' + (a.enrolled ? "var(--green)" : "var(--red)") + '"><span class="dot" style="background:' + (a.enrolled ? "var(--green)" : "var(--red)") + '"></span>' + (a.enrolled ? "Enrolled" : "Not Enrolled") + "</span></td>" +
           '<td style="color:' + (a.docsComplete ? "var(--ink)" : "var(--red)") + '">' + (a.docsComplete ? "Complete" : "Missing") + "</td>" +
           "<td>" + statusBadge(a.status) + "</td>" +
@@ -269,7 +309,7 @@ function normalizeEval(record: any): EvaluationApplicant {
 
     wrap.innerHTML =
       '<table class="applicants-table"><thead><tr>' +
-      '<th>Applicant</th><th>Scholarship Type</th><th>GWA</th><th>Enrollment</th><th>Documents</th><th>Status</th><th class="actions-head">Action</th>' +
+      '<th>Applicant</th><th>Scholarship Type</th><th>1st Sem GWA</th><th>2nd Sem GWA</th><th>Enrollment</th><th>Documents</th><th>Status</th><th class="actions-head">Action</th>' +
       '</tr></thead><tbody>' + rows + '</tbody></table>';
 
     wrap.querySelectorAll<HTMLElement>("[data-review]").forEach((btn) => {
@@ -312,7 +352,8 @@ function normalizeEval(record: any): EvaluationApplicant {
     if (activeTab === "overview") {
       return (
         '<div class="section"><h3>Academic Summary</h3><div class="summary-grid">' +
-        '<div class="summary-card"><div class="big font-mono" style="color:' + gwaColor(a.gwa, a.gwaReq) + '">' + Number(a.gwa).toFixed(2) + '</div><div class="lbl">GWA</div><div class="sub" style="color:' + (a.gwa <= a.gwaReq ? "var(--green)" : "var(--red)") + '">' + (a.gwa <= a.gwaReq ? "PASSED" : "FAILED") + "</div></div>" +
+        semesterSummaryCard("1st Semester GWA", a.semesterGwa.first, a.gwaReq) +
+        semesterSummaryCard("2nd Semester GWA", a.semesterGwa.second, a.gwaReq) +
         '<div class="summary-card"><div class="big font-mono">' + a.failingGrades + '</div><div class="lbl">Failing Grades</div><div class="sub" style="color:var(--ink-soft)">' + (Number(a.failingGrades) === 0 ? "None" : "Review") + "</div></div>" +
         '<div class="summary-card"><div class="big font-mono">' + a.units + '</div><div class="lbl">Units Earned</div><div class="sub" style="color:var(--ink-soft)">Units</div></div>' +
         "</div></div>" +
@@ -344,7 +385,9 @@ function normalizeEval(record: any): EvaluationApplicant {
       const bySem = (window as any).getCurriculumSubjectsBySemester
         ? (window as any).getCurriculumSubjectsBySemester(cleanProgramName(a.program, a.yearLevel), a.major, a.yearLevel)
         : { firstSem: [], secondSem: [] };
-      const isSecondSem = (a.semester || "1st Semester") === "2nd Semester";
+      // 2nd Semester and Summer Term both show the 2nd-semester subjects below the 1st.
+      const semLower = String(a.semester || "").toLowerCase();
+      const isSecondSem = semLower.includes("2") || semLower.includes("second") || semLower.includes("summer");
 
       let breakdownHtml: string;
       if (!bySem.firstSem.length && !bySem.secondSem.length) {
@@ -355,9 +398,9 @@ function normalizeEval(record: any): EvaluationApplicant {
             : "Set the applicant's year level to view the subject breakdown.") +
           '</p>';
       } else {
-        breakdownHtml = buildSemesterSubjectBlock(bySem.firstSem, "1st Semester", a.grades);
+        breakdownHtml = buildSemesterSubjectBlock(bySem.firstSem, "1st Semester", a.grades, a.semesterGwa.first);
         if (isSecondSem) {
-          breakdownHtml += buildSemesterSubjectBlock(bySem.secondSem, "2nd Semester", a.grades);
+          breakdownHtml += buildSemesterSubjectBlock(bySem.secondSem, "2nd Semester", a.grades, a.semesterGwa.second);
         }
       }
 
@@ -365,8 +408,8 @@ function normalizeEval(record: any): EvaluationApplicant {
         '<div class="section"><h3>Academic Subject Breakdown</h3>' +
         breakdownHtml +
         '<div style="padding:14px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; display:flex; justify-content:space-between; align-items:center;">' +
-        '<span style="font-size:13px; font-weight:600; color:#334155;">Cumulative GWA Target</span>' +
-        '<span class="font-mono" style="font-size:16px; font-weight:700; color:var(--green);">' + Number(a.gwa).toFixed(2) + '</span>' +
+        '<span style="font-size:13px; font-weight:600; color:#334155;">GWA per semester (required \u2264 ' + Number(a.gwaReq).toFixed(2) + ')</span>' +
+        '<span class="font-mono" style="font-size:14px; font-weight:700; color:var(--green);">1st: ' + fmtGwa(a.semesterGwa.first) + ' &nbsp;|&nbsp; 2nd: ' + fmtGwa(a.semesterGwa.second) + '</span>' +
         '</div></div>'
       );
     }
@@ -447,9 +490,10 @@ function normalizeEval(record: any): EvaluationApplicant {
       '<div id="evalTabContainer">' + getTabBodyHtml(a) + '</div>' +
       "</div>" +
       '<div class="custom-modal-footer">' +
+      approveBlockNote(a) +
       '<button type="button" class="btn-secondary ' + (a.status === "interview" ? "active-choice" : "") + '" data-decide="interview">For Interview</button>' +
       '<button type="button" class="btn-danger" data-decide="rejected">Reject</button>' +
-      '<button type="button" class="btn-primary" data-decide="approved">Approve</button>' +
+      '<button type="button" class="btn-primary" data-decide="approved"' + (approveBlockReason(a) ? ' title="' + esc(approveBlockReason(a)) + '" style="opacity:0.55;"' : "") + '>Approve</button>' +
       "</div>";
 
     const closeBtn = panel.querySelector("#closePanelBtn");
@@ -472,16 +516,31 @@ function normalizeEval(record: any): EvaluationApplicant {
         const decision = btn.getAttribute("data-decide");
         if (!decision) return;
         const remarksEl = panel.querySelector<HTMLTextAreaElement>("#remarksInput");
-        if (decision === "approved" && a.gwa > a.gwaReq) {
-          showToast("Cannot approve: GWA " + Number(a.gwa).toFixed(2) + " does not meet the required " + Number(a.gwaReq).toFixed(2) + " for " + a.type + ".");
+        if (decision === "approved" && a.gwa <= 0) {
+          showToast("Cannot approve: no grades are recorded for the current semester yet. Import the academic records in Data Management first.", "error");
           return;
         }
+        if (decision === "approved" && a.gwa > a.gwaReq) {
+          showToast("Cannot approve: GWA " + Number(a.gwa).toFixed(2) + " does not meet the required " + Number(a.gwaReq).toFixed(2) + " for " + a.type + ".", "error");
+          return;
+        }
+        const previousStatus = a.status;
+        const previousRemarks = a.remarks;
         a.status = decision;
         a.remarks = remarksEl ? remarksEl.value : a.remarks || "";
-        await saveApplicant(a);
+        const saved = await saveApplicant(a);
+        if (!saved) {
+          // Not saved (e.g. the server refused): undo the local change; the error toast stays up.
+          a.status = previousStatus;
+          a.remarks = previousRemarks;
+          return;
+        }
         renderTable();
         renderRightPanel();
-        showToast(decision === "approved" ? "Applicant approved." : decision === "rejected" ? "Applicant rejected." : "Moved to interview.");
+        showToast(
+          decision === "approved" ? "Applicant approved." : decision === "rejected" ? "Applicant rejected." : "Moved to interview.",
+          decision === "rejected" ? undefined : "success"
+        );
       });
     });
     const remarksEl = panel.querySelector<HTMLTextAreaElement>("#remarksInput");
@@ -501,7 +560,7 @@ function normalizeEval(record: any): EvaluationApplicant {
       evalGradeHeaderBtn.addEventListener("click", () => gradeFile.click());
       gradeFile.addEventListener("change", function (this: HTMLInputElement) {
         if (this.files && this.files.length > 0) {
-          showToast(`Academic records file "${this.files[0].name}" imported!`);
+          showToast(`Academic records file "${this.files[0].name}" imported!`, "success");
           this.value = "";
         }
       });
@@ -514,7 +573,7 @@ function normalizeEval(record: any): EvaluationApplicant {
       evalEnrollmentHeaderBtn.addEventListener("click", () => enrollmentFile.click());
       enrollmentFile.addEventListener("change", function (this: HTMLInputElement) {
         if (this.files && this.files.length > 0) {
-          showToast(`Enrollment records file "${this.files[0].name}" imported!`);
+          showToast(`Enrollment records file "${this.files[0].name}" imported!`, "success");
           this.value = "";
         }
       });

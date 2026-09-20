@@ -120,6 +120,20 @@ select {
 .btn-export:hover {
     background: var(--green-800, #1b6336);
 }
+
+/* Marks a record whose scholar was already sent to Renewal & Retention for that term. */
+.sent-tag {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 2px 8px;
+    border-radius: 99px;
+    background: #eef6f0;
+    border: 1px solid #cfe6d6;
+    color: #134e2a;
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+}
 .page{
     max-width: 1000px;
     margin: 0 auto;

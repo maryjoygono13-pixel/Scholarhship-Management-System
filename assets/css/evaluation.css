@@ -509,7 +509,7 @@ tbody tr:hover {
 .summary-grid {
     display: grid;
 
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(2, 1fr);
 
     gap: 10px;
 }
@@ -711,9 +711,15 @@ textarea {
 
     border-radius: 8px;
 
-    font-size: 12.5px;
+    font-size: 13.5px;
+    font-weight: 500;
+    max-width: min(420px, calc(100vw - 40px));
+    line-height: 1.4;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
 
-    z-index: 60;
+    /* Must sit above the evaluation modal overlay (z-index up to 999999), otherwise
+       messages such as "Cannot approve" are hidden behind it. */
+    z-index: 1000001;
 
     opacity: 0;
 
@@ -726,6 +732,16 @@ textarea {
     opacity: 1;
 
     transform: translateY(0);
+}
+
+/* Approve / For Interview succeeded */
+.toast.toast-success {
+    background: #15803d;
+}
+
+/* Refused or failed (e.g. "Cannot approve") */
+.toast.toast-error {
+    background: #b91c1c;
 }
 
 

@@ -56,22 +56,26 @@ try {
      */
     if ($studentId !== '') {
 
-        // Remove from scholars
-        $stmtScholar = $pdo->prepare("
-            DELETE FROM scholars
-            WHERE student_id = ?
-        ");
+        // A student can hold more than one scholarship type, so only remove what belongs
+        // to THIS record: its own application (same scholarship type), not the student's others.
+        if ((int)($rec['applicant_id'] ?? 0) > 0) {
+            $stmtApplicant = $pdo->prepare("DELETE FROM applicants WHERE id = ?");
+            $stmtApplicant->execute([(int)$rec['applicant_id']]);
+        } else {
+            $stmtApplicant = $pdo->prepare("
+                DELETE FROM applicants
+                WHERE student_id = ? AND LOWER(TRIM(scholarship_type)) = LOWER(TRIM(?))
+            ");
+            $stmtApplicant->execute([$studentId, (string)$rec['scholarship_type']]);
+        }
 
-        $stmtScholar->execute([$studentId]);
-
-
-        // Remove from applicants
-        $stmtApplicant = $pdo->prepare("
-            DELETE FROM applicants
-            WHERE student_id = ?
-        ");
-
-        $stmtApplicant->execute([$studentId]);
+        // The scholar entry (and their map pin) goes only when this was their last record.
+        $stmtOthers = $pdo->prepare("SELECT COUNT(*) FROM records WHERE student_id = ? AND id != ?");
+        $stmtOthers->execute([$studentId, $id]);
+        if ((int)$stmtOthers->fetchColumn() === 0) {
+            $stmtScholar = $pdo->prepare("DELETE FROM scholars WHERE student_id = ?");
+            $stmtScholar->execute([$studentId]);
+        }
     }
 
     // Finally delete the record

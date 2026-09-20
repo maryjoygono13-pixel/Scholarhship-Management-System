@@ -212,14 +212,13 @@ function createSystemNotification(
             ''
         );
 
-        $semester = trim(
-            $_POST['semester'] ?? ''
-        );
-        if (!in_array($semester, ['1st Semester', '2nd Semester'], true)) {
-            $semester = '1st Semester';
-        }
+        // The semester is never chosen on the form; it follows the Active Semester
+        // in Settings > Portal Configuration (only used for new applicants).
+        $semester = getActiveSemester($pdo);
 
-        $gpa = (float) ($_POST['gpa'] ?? 0);
+        // GPA/GWA is not entered here any more: it comes from the academic records
+        // imported in Data Management, so a new applicant starts at 0.
+        $gpa = 0.0;
 
         $scholarshipType = trim(
             $_POST['scholarshipType'] ??
@@ -467,8 +466,6 @@ function createSystemNotification(
                 program = ?,
                 major = ?,
                 year_level = ?,
-                semester = ?,
-                gpa = ?,
                 scholarship_type = ?,
                 gwa_req = ?,
                 essay = ?,
@@ -493,8 +490,6 @@ function createSystemNotification(
                 $program,
                 $major,
                 $yearLevel,
-                $semester,
-                $gpa,
                 $scholarshipType,
                 $gwaReq,
                 $essay
@@ -796,6 +791,11 @@ function createSystemNotification(
         $insertStmt->execute($insertParams);
 
         $newId = (int) $pdo->lastInsertId();
+
+        // The student may already have imported grades (e.g. applying for a second scholarship):
+        // pick their GWA up now instead of waiting for the next import.
+        recalculateApplicantGwa($pdo, $studentId);
+        syncMeritScholars($pdo);   // every applicant is considered for the Merit-based scholarship
 
         $fullName =
             trim(

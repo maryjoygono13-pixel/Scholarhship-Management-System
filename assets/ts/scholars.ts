@@ -5,6 +5,13 @@ interface ScholarRecord {
   department: string;
   year_level: number;
   gwa: number;
+  gwa_first?: number | null;
+  gwa_second?: number | null;
+  gwa_summer?: number | null;
+  gwaSemester?: string | null;
+  scholarshipType?: string;
+  thresholdRequirement?: number;
+  displayStatus?: string;
   status: string;
   school_year: string;
   remarks?: string;
@@ -83,22 +90,31 @@ function renderScholarsTable(): void {
 
   pageItems.forEach((s) => {
     const tr = document.createElement("tr");
-    const isMaintaining = Number(s.gwa) <= 1.50;
-    const statusText = s.status || (isMaintaining ? "Active" : "Removed");
-    const badgeClass = isMaintaining && statusText.toLowerCase() === "active" ? "badge-maintained" : "badge-removed";
-    const gwaClass = isMaintaining ? "gwa-pass" : "gwa-fail";
+    // GWA and the requirement come from the server: grades per semester, and the
+    // GWA required by this scholar's own scholarship.
+    const required = Number(s.thresholdRequirement ?? 1.50);
+    const isMaintaining = s.maintainsGrade !== undefined ? !!s.maintainsGrade : Number(s.gwa) <= required;
+    const statusText = s.displayStatus || s.status || (isMaintaining ? "Active" : "Removed");
+    const badgeClass = statusText.toLowerCase() === "active" ? "badge-maintained" : "badge-removed";
+    const semGwaPill = (v: number | null | undefined): string => {
+      if (v === null || v === undefined) return '<span class="gwa-pill gwa-none">\u2014</span>';
+      return '<span class="gwa-pill ' + (Number(v) <= required ? "gwa-pass" : "gwa-fail") + '">' + Number(v).toFixed(2) + '</span>';
+    };
+    const gwaBasis = s.gwaSemester
+      ? "GWA " + Number(s.gwa).toFixed(2) + " (" + s.gwaSemester + ") \u00b7 required \u2264 " + required.toFixed(2)
+      : "No grades imported \u00b7 required \u2264 " + required.toFixed(2);
 
     tr.innerHTML = `
       <td><strong class="font-mono">${s.student_id}</strong></td>
-      <td><strong>${s.name}</strong></td>
+      <td><strong>${s.name}</strong>${s.scholarshipType ? '<span class="status-sub">' + s.scholarshipType + '</span>' : ""}</td>
       <td><span class="dept-tag">${s.department}</span></td>
       <td><span class="badge-year">Year ${s.year_level}</span></td>
-      <td><span class="gwa-pill ${gwaClass}">${Number(s.gwa).toFixed(2)}</span></td>
+      <td>${semGwaPill(s.gwa_first)}</td>
+      <td>${semGwaPill(s.gwa_second)}</td>
       <td><span class="font-mono">${s.school_year || '2025-2026'}</span></td>
       <td>
-        <span class="${badgeClass}">
-          ${statusText} ${isMaintaining ? '(<= 1.50)' : '(Below 1.50)'}
-        </span>
+        <span class="${badgeClass}">${statusText}</span>
+        <span class="status-sub">${gwaBasis}</span>
       </td>
       <td class="actions-cell">
         <button type="button" class="btn-icon-action edit" title="Edit Scholar" onclick="editScholarEntry(event, ${s.id})">
@@ -188,7 +204,6 @@ function closeScholarModal(): void {
   const fName = getScholarEl<HTMLInputElement>("modalName");
   const fDepartment = getScholarEl<HTMLSelectElement>("modalDepartment");
   const fYearLevel = getScholarEl<HTMLSelectElement>("modalYearLevel");
-  const fGwa = getScholarEl<HTMLInputElement>("modalGwa");
   const fSchoolYear = getScholarEl<HTMLInputElement>("modalSchoolYear");
   const fRemarks = getScholarEl<HTMLTextAreaElement>("modalRemarks");
 
@@ -196,7 +211,6 @@ function closeScholarModal(): void {
   if (fName) fName.value = scholar.name || "";
   if (fDepartment) fDepartment.value = scholar.department || "Information Technology";
   if (fYearLevel) fYearLevel.value = String(scholar.year_level || 1);
-  if (fGwa) fGwa.value = String(scholar.gwa || 1.50);
   if (fSchoolYear) fSchoolYear.value = scholar.school_year || "2025-2026";
   if (fRemarks) fRemarks.value = scholar.remarks || "";
 
@@ -283,7 +297,6 @@ function initScholarsPage(): void {
       const fName = getScholarEl<HTMLInputElement>("modalName");
       const fDepartment = getScholarEl<HTMLSelectElement>("modalDepartment");
       const fYearLevel = getScholarEl<HTMLSelectElement>("modalYearLevel");
-      const fGwa = getScholarEl<HTMLInputElement>("modalGwa");
       const fSchoolYear = getScholarEl<HTMLInputElement>("modalSchoolYear");
       const fRemarks = getScholarEl<HTMLTextAreaElement>("modalRemarks");
 
@@ -293,7 +306,6 @@ function initScholarsPage(): void {
         name: fName ? fName.value.trim() : "",
         department: fDepartment ? fDepartment.value : "Information Technology",
         year_level: fYearLevel ? Number(fYearLevel.value) : 1,
-        gwa: fGwa ? Number(fGwa.value) : 1.50,
         school_year: fSchoolYear ? fSchoolYear.value.trim() : "2025-2026",
         remarks: fRemarks ? fRemarks.value.trim() : "",
       };

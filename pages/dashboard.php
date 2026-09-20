@@ -7,6 +7,7 @@ include __DIR__ . '/../includes/header.php';
 
 require_once __DIR__ . '/../config/db_helper.php';
 require_once __DIR__ . '/../includes/scholarship_distribution.php';
+require_once __DIR__ . '/../includes/merit_helper.php';
 
 function timeAgo(string $datetime): string {
     $ts = strtotime($datetime);
@@ -53,6 +54,9 @@ try {
         WHERE LOWER(status) IN ('pending', 'review', 'interview')
     ")->fetchColumn();
 
+    // Merit-based scholars are added to the roster automatically
+    syncMeritScholars($pdo);
+
     // Active scholars come from the actual scholar roster, not from applicants
     $active_scholars = (int)$pdo->query("
         SELECT COUNT(*)
@@ -64,7 +68,7 @@ try {
     $renewal_due = (int)$pdo->query("
         SELECT COUNT(*)
         FROM renewal_retention
-        WHERE LOWER(status) IN ('at-risk', 'eligible')
+        WHERE LOWER(status) IN ('pending', 'at-risk')
     ")->fetchColumn();
 
     // Recent activity, powered by the real audit trail
@@ -167,30 +171,37 @@ try {
 
     <!-- Charts -->
     <div class="charts-wrapper">
+        <div class="dist-summary">
+            <div class="dist-stat">
+                <span class="dist-stat-label">Total Approved Scholars</span>
+                <strong class="dist-stat-value" id="distTotalApproved"><?= number_format($distribution['totalApproved']) ?></strong>
+            </div>
+            <div class="dist-stat">
+                <span class="dist-stat-label">Total Scholarship Types</span>
+                <strong class="dist-stat-value" id="distTotalTypes"><?= number_format($distribution['totalTypes']) ?></strong>
+            </div>
+            <div class="dist-stat">
+                <span class="dist-stat-label">Most Populated Scholarship Type</span>
+                <strong class="dist-stat-value dist-stat-text" id="distMostPopular"><?= $distribution['mostPopular'] ? htmlspecialchars($distribution['mostPopular']['type']) . ' (' . (int)$distribution['mostPopular']['count'] . ')' : '—' ?></strong>
+            </div>
+        </div>
+
         <div class="chart-block">
             <div class="chart-title">Scholarship Distribution</div>
-            <div class="dist-summary">
-                <div class="dist-stat">
-                    <span class="dist-stat-label">Total Approved Scholars</span>
-                    <strong class="dist-stat-value" id="distTotalApproved"><?= number_format($distribution['totalApproved']) ?></strong>
+            <div class="chart-scroll">
+                <div class="chart-canvas-wrap" id="distChartWrap">
+                    <canvas id="scholarshipChart" role="img" aria-label="Vertical bar chart of approved scholars by scholarship type."></canvas>
                 </div>
-                <div class="dist-stat">
-                    <span class="dist-stat-label">Total Scholarship Types</span>
-                    <strong class="dist-stat-value" id="distTotalTypes"><?= number_format($distribution['totalTypes']) ?></strong>
-                </div>
-                <div class="dist-stat dist-stat-wide">
-                    <span class="dist-stat-label">Most Populated Scholarship Type</span>
-                    <strong class="dist-stat-value dist-stat-text" id="distMostPopular"><?= $distribution['mostPopular'] ? htmlspecialchars($distribution['mostPopular']['type']) . ' (' . (int)$distribution['mostPopular']['count'] . ')' : '—' ?></strong>
-                </div>
-            </div>
-            <div class="dist-chart-wrap" id="distChartWrap">
-                <canvas id="scholarshipChart" role="img" aria-label="Horizontal bar chart of approved scholars by scholarship type."></canvas>
             </div>
         </div>
 
         <div class="chart-block">
             <div class="chart-title">Monthly Applications</div>
-            <canvas id="monthlyChart" role="img" aria-label="Bar chart of monthly applications."></canvas>
+            <div class="chart-scroll">
+                <div class="chart-canvas-wrap">
+                    <canvas id="monthlyChart" role="img" aria-label="Bar chart of monthly applications."></canvas>
+                </div>
+            </div>
         </div>
     </div>
 

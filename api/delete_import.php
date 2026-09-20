@@ -79,13 +79,7 @@ try {
 
             // Recompute GWA / failing count for anyone who lost a grade.
             foreach ($affectedStudentIds as $sid) {
-                $avgStmt = $pdo->prepare("SELECT AVG(grade) AS avg_grade, SUM(CASE WHEN grade > 3.00 THEN 1 ELSE 0 END) AS failing FROM student_grades WHERE student_id = ?");
-                $avgStmt->execute([$sid]);
-                $avgRow = $avgStmt->fetch(PDO::FETCH_ASSOC);
-                $newGwa = ($avgRow && $avgRow['avg_grade'] !== null) ? round((float)$avgRow['avg_grade'], 2) : 0;
-                $newFailing = ($avgRow && $avgRow['failing'] !== null) ? (int)$avgRow['failing'] : 0;
-                $pdo->prepare("UPDATE applicants SET gwa = ?, failing_grades = ?, updated_at = CURRENT_TIMESTAMP WHERE student_id = ?")
-                    ->execute([$newGwa, $newFailing, $sid]);
+                recalculateApplicantGwa($pdo, (string)$sid, true);
             }
         }
 

@@ -10,7 +10,7 @@
 
 .summary-row {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 12px;
   margin-bottom: 20px;
 }
@@ -41,6 +41,7 @@
   margin-top: 4px;
 }
 
+.summary-card.pending .value { color: #b45309; }
 .summary-card.eligible .value { color: #238f54; }
 .summary-card.at-risk .value { color: #dc2626; }
 .summary-card.terminated .value { color: #dc2626; }
@@ -60,6 +61,33 @@
 }
 
 .toolbar input[type="search"] { flex: 1; max-width: 320px;   }
+
+.btn-export {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-left: auto;
+  align-self: stretch;   /* same height as the filter dropdowns */
+  flex-shrink: 0;
+  white-space: nowrap;
+  box-sizing: border-box;
+  padding: 0 16px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: var(--green-900, #134e2a);
+  color: #fff;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1;
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+.btn-export:hover { background: var(--green-800, #1b6336); }
+
+.btn-export svg, .btn-export i { width: 16px; height: 16px; }
 
 /* ---------------- Table ---------------- */
 .ledger {

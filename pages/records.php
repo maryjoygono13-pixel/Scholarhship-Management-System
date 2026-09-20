@@ -25,8 +25,24 @@ include __DIR__ . '/../includes/header.php';
             <div class="select-wrap">
                 <select id="filterStatus">
                     <option value="all">All Status</option>
+                    <option value="pending">Pending</option>
                     <option value="approved">Approved</option>
                     <option value="rejected">Rejected</option>
+                </select>
+                <i data-lucide="chevron-down"></i>
+            </div>
+            <div class="select-wrap">
+                <select id="filterSemester">
+                    <option value="all">All Semesters</option>
+                    <option value="1st">1st Semester</option>
+                    <option value="2nd">2nd Semester</option>
+                    <option value="summer">Summer Term</option>
+                </select>
+                <i data-lucide="chevron-down"></i>
+            </div>
+            <div class="select-wrap">
+                <select id="filterSy">
+                    <option value="all">All School Years</option>
                 </select>
                 <i data-lucide="chevron-down"></i>
             </div>
@@ -96,20 +112,10 @@ include __DIR__ . '/../includes/header.php';
                 <div class="field">
                     <label style="font-size:13px; font-weight:600; color:#374151;">Status</label>
                     <select id="recStatus" name="status" style="width:100%; height:40px; padding:0 12px; border:1px solid #d1d5db; border-radius:8px; outline:none;">
+                        <option value="pending">Pending (awaiting renewal check)</option>
                         <option value="approved">Approved</option>
                         <option value="rejected">Rejected</option>
                     </select>
-                </div>
-                <div class="field">
-                    <label style="font-size:13px; font-weight:600; color:#374151;">Semester</label>
-                    <select id="recSemester" name="semester" style="width:100%; height:40px; padding:0 12px; border:1px solid #d1d5db; border-radius:8px; outline:none;">
-                        <option value="1st Semester">1st Semester</option>
-                        <option value="2nd Semester">2nd Semester</option>
-                    </select>
-                </div>
-                <div class="field">
-                    <label style="font-size:13px; font-weight:600; color:#374151;">School Year</label>
-                    <input type="text" id="recSy" name="sy" placeholder="2025-2026" style="width:100%; height:40px; padding:0 12px; border:1px solid #d1d5db; border-radius:8px; outline:none;">
                 </div>
                 <div class="field">
                     <label style="font-size:13px; font-weight:600; color:#374151;">Remarks</label>

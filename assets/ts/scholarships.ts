@@ -19,6 +19,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const schSubtype = document.getElementById("schSubtype") as HTMLInputElement | null;
   const schGwa = document.getElementById("schGwa") as HTMLInputElement | null;
   const schSlots = document.getElementById("schSlots") as HTMLInputElement | null;
+  const schUnlimited = document.getElementById("schUnlimited") as HTMLInputElement | null;
   const schCoverage = document.getElementById("schCoverage") as HTMLTextAreaElement | null;
 
   const schViewOverlay = document.getElementById("schViewOverlay");
@@ -500,9 +501,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       <td>
         <span class="font-mono">
-          ${s.slotsAvailable ?? 0}
-          &nbsp;/&nbsp;
-          ${s.slots ?? 0}
+          ${s.unlimitedSlots ? "Unlimited" : `${s.slotsAvailable ?? 0} &nbsp;/&nbsp; ${s.slots ?? 0}`}
         </span>
       </td>
 
@@ -689,7 +688,7 @@ document.addEventListener("DOMContentLoaded", () => {
         </div>
         <div class="detail-item">
           <span class="detail-label">Total Slots Capacity</span>
-          <span class="detail-value font-mono">${s.slots} (${s.slotsAvailable} available)</span>
+          <span class="detail-value font-mono">${s.unlimitedSlots ? "Unlimited (no slot limit)" : `${s.slots} (${s.slotsAvailable} available)`}</span>
         </div>
         <div class="detail-item full-width">
           <span class="detail-label">Benefit Coverage & Overview</span>
@@ -704,6 +703,16 @@ document.addEventListener("DOMContentLoaded", () => {
     if (schViewOverlay) schViewOverlay.classList.remove("open");
   }
 
+  // "No slot limit": the Total Slots box is switched off while it is ticked.
+  function syncUnlimitedSlots(): void {
+    const unlimited = !!(schUnlimited && schUnlimited.checked);
+    if (!schSlots) return;
+    schSlots.disabled = unlimited;
+    if (unlimited) schSlots.value = "";
+    schSlots.placeholder = unlimited ? "Unlimited" : "50";
+  }
+  if (schUnlimited) schUnlimited.addEventListener("change", syncUnlimitedSlots);
+
   function openFormModal(editItem: any = null): void {
     if (!schFormOverlay) return;
     if (editItem) {
@@ -711,6 +720,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (schId) schId.value = String(editItem.id);
       if (schGwa) schGwa.value = String(editItem.gwaRequirement);
       if (schSlots) schSlots.value = String(editItem.slots);
+      if (schUnlimited) schUnlimited.checked = !!editItem.unlimitedSlots;
       if (schCoverage) schCoverage.value = editItem.coverage || '';
 
       const matchedType = scholarshipTypes.find((t) => t.name === editItem.type);
@@ -735,6 +745,7 @@ document.addEventListener("DOMContentLoaded", () => {
       renderSubtypePicker();
       updateIdentityPreview();
     }
+    syncUnlimitedSlots();
     schFormOverlay.classList.add("open");
     if (typeof lucide !== "undefined") lucide.createIcons();
   }

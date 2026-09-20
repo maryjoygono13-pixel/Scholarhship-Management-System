@@ -22,6 +22,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const schSubtype = document.getElementById("schSubtype");
     const schGwa = document.getElementById("schGwa");
     const schSlots = document.getElementById("schSlots");
+    const schUnlimited = document.getElementById("schUnlimited");
     const schCoverage = document.getElementById("schCoverage");
 
     const schViewOverlay = document.getElementById("schViewOverlay");
@@ -539,9 +540,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
             <td>
                 <span class="font-mono">
-                    ${s.slotsAvailable ?? 0}
-                    &nbsp;/&nbsp;
-                    ${s.slots ?? 0}
+                    ${s.unlimitedSlots ? "Unlimited" : `${s.slotsAvailable ?? 0} &nbsp;/&nbsp; ${s.slots ?? 0}`}
                 </span>
             </td>
 
@@ -808,8 +807,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     </span>
 
                     <span class="detail-value font-mono">
-                        ${s.slots ?? 0}
-                        (${s.slotsAvailable ?? 0} available)
+                        ${s.unlimitedSlots ? "Unlimited (no slot limit)" : `${s.slots ?? 0} (${s.slotsAvailable ?? 0} available)`}
                     </span>
 
                 </div>
@@ -853,6 +851,18 @@ document.addEventListener("DOMContentLoaded", () => {
        ADD / EDIT FORM MODAL
     ========================================================= */
 
+    // "No slot limit": the Total Slots box is switched off while it is ticked.
+    function syncUnlimitedSlots() {
+        const unlimited = !!(schUnlimited && schUnlimited.checked);
+        if (!schSlots)
+            return;
+        schSlots.disabled = unlimited;
+        if (unlimited)
+            schSlots.value = "";
+        schSlots.placeholder = unlimited ? "Unlimited" : "50";
+    }
+    if (schUnlimited)
+        schUnlimited.addEventListener("change", syncUnlimitedSlots);
     function openFormModal(editItem = null) {
 
         if (!schFormOverlay) return;
@@ -895,6 +905,10 @@ document.addEventListener("DOMContentLoaded", () => {
                     String(editItem.slots ?? "");
             }
 
+            if (schUnlimited) {
+                schUnlimited.checked = !!editItem.unlimitedSlots;
+            }
+
             if (schCoverage) {
                 schCoverage.value =
                     editItem.coverage || "";
@@ -927,6 +941,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
 
+        syncUnlimitedSlots();
         schFormOverlay.classList.add("open");
         if (typeof lucide !== "undefined") lucide.createIcons();
 

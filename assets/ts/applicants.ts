@@ -221,8 +221,8 @@ function openViewModal(app: any): void {
         <span class="detail-value">${app.scholarshipType}</span>
       </div>
       <div class="detail-item">
-        <span class="detail-label">Current GPA / GWA</span>
-        <span class="detail-value font-mono">${app.gpa || app.gwa || 'N/A'}</span>
+        <span class="detail-label">Current GWA (from academic records)</span>
+        <span class="detail-value font-mono">${app.gwa > 0 ? Number(app.gwa).toFixed(2) : 'Not yet available'}</span>
       </div>
       <div class="detail-item full-width">
         <span class="detail-label">Home Address</span>
@@ -260,7 +260,6 @@ function closeViewModal(): void {
     const fSchool = document.querySelector<HTMLInputElement>('[data-field="school"]');
     const fProg = document.querySelector<HTMLInputElement>('[data-field="program"]');
     const fYear = document.querySelector<HTMLSelectElement>('[data-field="yearLevel"]');
-    const fGpa = document.querySelector<HTMLInputElement>('[data-field="gpa"]');
     const fType = document.querySelector<HTMLSelectElement>('[data-field="scholarshipType"]');
     const fEssay = document.querySelector<HTMLTextAreaElement>('[data-field="essay"]');
 
@@ -274,7 +273,6 @@ function closeViewModal(): void {
     if (fSchool) fSchool.value = app.school || '';
     if (fProg) fProg.value = app.program || '';
     if (fYear) fYear.value = app.yearLevel || '';
-    if (fGpa) fGpa.value = app.gpa || '';
     if (fType) {
       const wantedType = app.scholarshipType || '';
       if (wantedType && !Array.from(fType.options).some(o => o.value === wantedType)) {

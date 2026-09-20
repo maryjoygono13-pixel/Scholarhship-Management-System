@@ -2,6 +2,9 @@
 $page_title = 'Scholars';
 $page_css = 'scholars.css';
 include __DIR__ . '/../includes/header.php';
+require_once __DIR__ . '/../config/db_helper.php';
+require_once __DIR__ . '/../includes/term_helper.php';
+$activeSchoolYear = getActiveSchoolYear(getDB());
 ?>
 
 <div class="scholars-container">
@@ -13,12 +16,12 @@ include __DIR__ . '/../includes/header.php';
                 Scholarship Grade Maintenance Policy
             </h3>
             <p>
-                To maintain active scholarship status, scholars must achieve and retain a GWA of <strong>1.50 or higher</strong> (≤ 1.50).
-                Scholars whose GWA falls below 1.50 (> 1.50) are automatically flagged for removal.
+                To maintain active scholarship status, scholars must keep the GWA required by their scholarship (a lower number is better, so a GWA of <strong>1.50</strong> or below meets a 1.50 requirement).
+                GWA comes from the imported academic records and is tracked separately for each semester. Scholars whose latest GWA is above their requirement are automatically flagged for removal.
             </p>
         </div>
         <div class="rule-chip">
-            Requirement: ≤ 1.50 GWA
+            Requirement: set per scholarship
         </div>
     </div>
 
@@ -52,8 +55,8 @@ include __DIR__ . '/../includes/header.php';
 
             <!-- Status Filter -->
             <select id="filterStatus" class="filter-select">
-                <option value="above" selected>GWA Above (≤ 1.50)</option>
-                <option value="below">GWA Below (> 1.50)</option>
+                <option value="above" selected>Meets GWA Requirement</option>
+                <option value="below">Below GWA Requirement</option>
             </select>
         </div>
 
@@ -78,7 +81,8 @@ include __DIR__ . '/../includes/header.php';
                     <th>Name</th>
                     <th>Department</th>
                     <th>Grade Year</th>
-                    <th>Current GWA</th>
+                    <th>1st Sem GWA</th>
+                    <th>2nd Sem GWA</th>
                     <th>School Year</th>
                     <th>Status</th>
                     <th style="text-align:right;">Actions</th>
@@ -145,14 +149,8 @@ include __DIR__ . '/../includes/header.php';
                 </div>
 
                 <div style="grid-column: span 1;">
-                    <label style="display:block; font-size:13px; font-weight:600; margin-bottom:6px; color:#334155;">Current GWA (1.00 - 3.00) *</label>
-                    <input type="number" step="0.01" min="1.00" max="5.00" id="modalGwa" required placeholder="e.g. 1.25" class="search-input-field" style="width:100%;">
-                    <span style="font-size:11.5px; color:#64748b; margin-top:4px; display:block;">Rule: ≤ 1.50 = Active, > 1.50 = Removed</span>
-                </div>
-
-                <div style="grid-column: span 1;">
                     <label style="display:block; font-size:13px; font-weight:600; margin-bottom:6px; color:#334155;">School Year</label>
-                    <input type="text" id="modalSchoolYear" value="2025-2026" class="search-input-field" style="width:100%;">
+                    <input type="text" id="modalSchoolYear" value="<?= htmlspecialchars($activeSchoolYear) ?>" class="search-input-field" style="width:100%;">
                 </div>
 
                 <div style="grid-column: span 2;">

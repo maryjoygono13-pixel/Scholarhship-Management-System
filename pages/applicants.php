@@ -377,45 +377,6 @@
                         </select>
                     </div>
 
-                    <!-- SEMESTER -->
-                    <div class="field">
-                        <label>
-                            Semester
-                            <span class="req">*</span>
-                        </label>
-
-                        <select
-                            name="semester"
-                            data-field="semester"
-                            required
-                        >
-                            <option value="1st Semester">
-                                1st Semester
-                            </option>
-
-                            <option value="2nd Semester">
-                                2nd Semester
-                            </option>
-                        </select>
-                    </div>
-
-
-                    <!-- GPA -->
-                    <div class="field">
-                        <label>
-                            GPA / General average
-                            <span class="req">*</span>
-                        </label>
-
-                        <input
-                            type="text"
-                            name="gpa"
-                            placeholder="e.g. 1.75 or 92%"
-                            data-field="gpa"
-                            required
-                        >
-                    </div>
-
                 </div>
 
             </div>

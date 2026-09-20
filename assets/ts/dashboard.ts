@@ -57,12 +57,15 @@ document.addEventListener("DOMContentLoaded", () => {
           data: values,
           backgroundColor: labels.map((_, i) => chartColors[i % chartColors.length]),
           borderRadius: 6,
-          maxBarThickness: 44
+          maxBarThickness: 72,
+          categoryPercentage: 0.8,
+          barPercentage: 0.85
         }]
       },
       options: {
         responsive: true,
-        maintainAspectRatio: true,
+        maintainAspectRatio: false,
+        layout: { padding: { top: 24 } },
         plugins: {
           legend: { display: false },
           tooltip: {
@@ -75,10 +78,12 @@ document.addEventListener("DOMContentLoaded", () => {
           y: {
             beginAtZero: true,
             ticks: { precision: 0, color: "#6b7280" },
+            afterFit: (axis: any) => { axis.width = 44; },
             grid: { color: "rgba(0,0,0,0.04)" }
           },
           x: {
             ticks: { color: "#6b7280" },
+            afterFit: (axis: any) => { axis.height = 72; },
             grid: { display: false }
           }
         }
@@ -94,10 +99,9 @@ document.addEventListener("DOMContentLoaded", () => {
   ========================================================= */
   const DISTRIBUTION_REFRESH_MS = 10000;
   const distCanvas = document.getElementById("scholarshipChart") as HTMLCanvasElement | null;
-  const distWrap = document.getElementById("distChartWrap");
   let distChart: any = null;
 
-  // Writes each bar's count at its end, so 0-value types are visible too.
+  // Writes each bar's count above it, so 0-value types are visible too.
   const barValueLabels = {
     id: "barValueLabels",
     afterDatasetsDraw(chart: any) {
@@ -107,13 +111,15 @@ document.addEventListener("DOMContentLoaded", () => {
       ctx.save();
       ctx.font = "600 12px sans-serif";
       ctx.fillStyle = "#374151";
-      ctx.textBaseline = "middle";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "bottom";
       meta.data.forEach((bar: any, i: number) => {
-        ctx.fillText(String(values[i]), bar.x + 8, bar.y);
+        ctx.fillText(String(values[i]), bar.x, bar.y - 6);
       });
       ctx.restore();
     }
   };
+
 
   function renderDistribution(data: DistributionData): void {
     const items = data.types || [];
@@ -131,12 +137,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (!distCanvas) return;
 
-    const labels = items.map((i) => wrapLabel(i.type, 30));
+    const labels = items.map((i) => wrapLabel(i.type, 12));
     const values = items.map((i) => i.count);
     const colors = items.map((_, i) => chartColors[i % chartColors.length]);
 
-    // One row per type: the chart grows with the number of types.
-    if (distWrap) distWrap.style.height = Math.max(220, items.length * 46 + 50) + "px";
 
     if (distChart) {
       distChart.data.labels = labels;
@@ -155,14 +159,15 @@ document.addEventListener("DOMContentLoaded", () => {
           data: values,
           backgroundColor: colors,
           borderRadius: 6,
-          maxBarThickness: 28
+          maxBarThickness: 72,
+          categoryPercentage: 0.8,
+          barPercentage: 0.85
         }]
       },
       options: {
-        indexAxis: "y",
         responsive: true,
         maintainAspectRatio: false,
-        layout: { padding: { right: 32 } },
+        layout: { padding: { top: 24 } },
         plugins: {
           legend: { display: false },
           tooltip: {
@@ -171,18 +176,20 @@ document.addEventListener("DOMContentLoaded", () => {
             cornerRadius: 6,
             callbacks: {
               title: (ctx: any[]) => items[ctx[0].dataIndex] ? items[ctx[0].dataIndex].type : "",
-              label: (ctx: any) => `Total Approved Scholars: ${ctx.parsed.x}`
+              label: (ctx: any) => `Total Approved Scholars: ${ctx.parsed.y}`
             }
           }
         },
         scales: {
-          x: {
+          y: {
             beginAtZero: true,
             ticks: { precision: 0, color: "#6b7280" },
+            afterFit: (axis: any) => { axis.width = 44; },
             grid: { color: "rgba(0,0,0,0.04)" }
           },
-          y: {
-            ticks: { color: "#374151" },
+          x: {
+            ticks: { color: "#374151", autoSkip: false, maxRotation: 0, minRotation: 0, font: { size: 11 } },
+            afterFit: (axis: any) => { axis.height = 72; },
             grid: { display: false }
           }
         }

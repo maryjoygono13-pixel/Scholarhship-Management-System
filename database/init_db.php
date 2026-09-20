@@ -34,6 +34,11 @@ function initDatabase(): PDO {
     if (!in_array('subtype', $scholarshipsColNames)) {
         $pdo->exec("ALTER TABLE scholarships ADD COLUMN subtype TEXT DEFAULT ''");
     }
+    // Some scholarships (e.g. MERIT-BASED Academic, for students who reach the GWA) have no
+    // cap on how many students can hold them.
+    if (!in_array('unlimited_slots', $scholarshipsColNames)) {
+        $pdo->exec("ALTER TABLE scholarships ADD COLUMN unlimited_slots INTEGER NOT NULL DEFAULT 0");
+    }
 
     // 2a. Scholarship Types / Sub-types — the selectable, growable taxonomy
     // used by the Add/Edit Scholarship form's Type and Sub-type pickers.
@@ -327,6 +332,10 @@ function initDatabase(): PDO {
     if (!in_array('longitude', $scholarsColNames)) {
         $pdo->exec("ALTER TABLE scholars ADD COLUMN longitude REAL DEFAULT NULL");
     }
+    // The scholarship a scholar holds (set for those added automatically by the Merit scholarship).
+    if (!in_array('scholarship_type', $scholarsColNames)) {
+        $pdo->exec("ALTER TABLE scholars ADD COLUMN scholarship_type TEXT DEFAULT ''");
+    }
 
     // 9. Deleted Items / Trash Bin Table
     $pdo->exec("CREATE TABLE IF NOT EXISTS deleted_items (
@@ -361,6 +370,9 @@ function initDatabase(): PDO {
     )");
     // History menu is accessible to everyone by default; can be turned off from Settings.
     $pdo->exec("INSERT OR IGNORE INTO settings (setting_key, setting_value) VALUES ('history_enabled', '1')");
+    // Active term: everything (Applicants, Records, Renewal & Retention) follows these.
+    $pdo->exec("INSERT OR IGNORE INTO settings (setting_key, setting_value) VALUES ('active_semester', '1st Semester')");
+    $pdo->exec("INSERT OR IGNORE INTO settings (setting_key, setting_value) VALUES ('active_school_year', '2025-2026')");
 
     // Seed Data if empty
     seedDataIfEmpty($pdo);
@@ -369,9 +381,13 @@ function initDatabase(): PDO {
 }
 
 function seedDataIfEmpty(PDO $pdo): void {
+    // Demo data is planted ONCE, on a brand-new install. Without this, deleting everyone on a
+    // page (e.g. all Scholars) made the sample rows reappear on the next page load.
+    $demoSeeded = $pdo->query("SELECT setting_value FROM settings WHERE setting_key = 'demo_data_seeded'")->fetchColumn() === '1';
+
     // Check if scholars is empty
     $stmtScholars = $pdo->query("SELECT COUNT(*) FROM scholars");
-    if ($stmtScholars->fetchColumn() == 0) {
+    if (!$demoSeeded && $stmtScholars->fetchColumn() == 0) {
         $sampleScholars = [
             ['20230001', 'Juan Dela Cruz', 'Information Technology', 2, 1.25, 'Active', '2025-2026', 'Maintaining high academic standing (1.25 GWA <= 1.50)', 'Maasin City, Southern Leyte', 10.1333, 124.8333],
             ['20230004', 'Angelica Reyes', 'Nursing', 2, 1.15, 'Active', '2025-2026', 'Dean\'s Lister, excellent performance', 'Hilongos, Leyte', 10.3739, 124.7497],
@@ -391,7 +407,7 @@ function seedDataIfEmpty(PDO $pdo): void {
     }
     // Check if scholarships is empty
     $stmtSch = $pdo->query("SELECT COUNT(*) FROM scholarships");
-    if ($stmtSch->fetchColumn() == 0) {
+    if (!$demoSeeded && $stmtSch->fetchColumn() == 0) {
         $scholarships = [
             ['CMSP (CHED Merit Scholarship Program)', 'CMSP', 'A competitive academic scholarship for students with high grades (such as a 93% GWA or higher in Grade 12).', 'Academic Merit', 1.50, 50, 25, 'Full Tuition & Academic Allowance', 'active'],
             ['TDP (Tulong Dunong Program)', 'TDP', 'A grant-in-aid financial assistance program meant to help partial college costs and expenses.', 'Financial Need-Based', 2.25, 100, 45, 'Partial College Costs & Expenses', 'active'],
@@ -406,7 +422,7 @@ function seedDataIfEmpty(PDO $pdo): void {
 
     // Check if applicants is empty
     $stmtApp = $pdo->query("SELECT COUNT(*) FROM applicants");
-    if ($stmtApp->fetchColumn() == 0) {
+    if (!$demoSeeded && $stmtApp->fetchColumn() == 0) {
         $applicants = [
             ['20230001', 'Juan', 'Dela Cruz', 'juan.delacruz@email.com', '09171234567', '2003-05-14', 'Maasin City, Southern Leyte', 10.1333, 124.8333, 'College of Maasin', 'BS Information Technology · 2nd Year', '2nd Year', 1.43, 'Academic Merit', 'pending', 1.43, 1.75, 0, 21, 1, 1, 'Top rank in class'],
             ['20230002', 'Maria', 'Santos', 'maria.santos@email.com', '09189876543', '2002-11-20', 'Macrohon, Southern Leyte', 10.0833, 124.9333, 'College of Maasin', 'BS Computer Science · 3rd Year', '3rd Year', 1.65, 'Academic Merit', 'review', 1.65, 1.75, 0, 21, 1, 1, 'Requires Dean recommendation verification'],
@@ -423,7 +439,7 @@ function seedDataIfEmpty(PDO $pdo): void {
 
     // Check if notifications is empty
     $stmtNotif = $pdo->query("SELECT COUNT(*) FROM notifications");
-    if ($stmtNotif->fetchColumn() == 0) {
+    if (!$demoSeeded && $stmtNotif->fetchColumn() == 0) {
         $notifications = [
             ['missing_requirements', 'segment', null, 'Missing Documents Group', 'juan.delacruz@email.com', 'Action needed: missing scholarship requirements', 'Hi Juan, your application is missing the Certificate of Indigency. Please submit before deadline.', '2026-08-20', 'sent', '2026-08-08 10:30:00'],
             ['renewal_deadline', 'segment', null, 'Active Scholars', 'maria.santos@email.com', 'Reminder: scholarship renewal deadline approaching', 'Hi Maria, submit your 1st semester clearance before August 25.', '2026-08-25', 'sent', '2026-08-09 14:15:00'],
@@ -437,7 +453,7 @@ function seedDataIfEmpty(PDO $pdo): void {
 
     // Check if records is empty
     $stmtRec = $pdo->query("SELECT COUNT(*) FROM records");
-    if ($stmtRec->fetchColumn() == 0) {
+    if (!$demoSeeded && $stmtRec->fetchColumn() == 0) {
         $records = [
             [4, '20230004', 'Angelica Reyes', 'Academic Merit', 'approved', '1st Semester', '2025-2026', '2026-08-01', 'Approved with High Distinction'],
             [5, '20230005', 'Kevin Bautista', 'Athletic', 'rejected', '1st Semester', '2025-2026', '2026-08-02', 'Disqualified due to low GWA']
@@ -450,7 +466,7 @@ function seedDataIfEmpty(PDO $pdo): void {
 
     // Check if renewal_retention is empty
     $stmtRen = $pdo->query("SELECT COUNT(*) FROM renewal_retention");
-    if ($stmtRen->fetchColumn() == 0) {
+    if (!$demoSeeded && $stmtRen->fetchColumn() == 0) {
         $renewalData = [
             ['20230001', 'Juan Dela Cruz', 1.43, 0, 1, 'eligible', '2025-2026', 'First Semester', 'Academic Merit', 'Meets all retention requirements'],
             ['20230002', 'Maria Santos', 1.65, 0, 1, 'eligible', '2025-2026', 'First Semester', 'Academic Merit', 'Good standing'],
@@ -504,7 +520,7 @@ function seedDataIfEmpty(PDO $pdo): void {
 
     // Check if imported_files is empty
     $stmtImp = $pdo->query("SELECT COUNT(*) FROM imported_files");
-    if ($stmtImp->fetchColumn() == 0) {
+    if (!$demoSeeded && $stmtImp->fetchColumn() == 0) {
         $sampleFiles = [
             ['grades', '2025-SY1_Academic_Grades.csv', 45056, 42, 'Registrar Staff', 'Active', '2026-08-12 11:20:00'],
             ['grades', 'BSIT_2ndYear_Midterm_Grades.xlsx', 62400, 38, 'Registrar Staff', 'Active', '2026-08-14 09:15:00'],
@@ -515,6 +531,10 @@ function seedDataIfEmpty(PDO $pdo): void {
         foreach ($sampleFiles as $imp) {
             $insertImp->execute($imp);
         }
+    }
+
+    if (!$demoSeeded) {
+        $pdo->exec("INSERT OR REPLACE INTO settings (setting_key, setting_value) VALUES ('demo_data_seeded', '1')");
     }
 }
 

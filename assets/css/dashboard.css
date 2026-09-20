@@ -117,14 +117,20 @@
 /* CHART SECTION */
 .charts-wrapper {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-    gap: 20px;
+    /* Two fixed columns spanning the full card (auto-fit left empty tracks on
+       wide screens, so the charts only used half the width). */
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+    gap: 24px;
     background: #ffffff;
     padding: 24px;
     border-radius: 12px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.04);
     border: 1px solid rgba(0,0,0,0.04);
     margin-bottom: 30px;
+}
+
+@media (max-width: 900px) {
+    .charts-wrapper { grid-template-columns: minmax(0, 1fr); }
 }
 
 .chart-block {
@@ -187,10 +193,14 @@
 
 /* Scholarship Distribution summary + chart */
 .dist-summary {
+    grid-column: 1 / -1;
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-    margin-bottom: 16px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+}
+
+@media (max-width: 700px) {
+    .dist-summary { grid-template-columns: 1fr; }
 }
 
 .dist-stat {
@@ -200,8 +210,6 @@
     padding: 10px 12px;
     min-width: 0;
 }
-
-.dist-stat-wide { grid-column: 1 / -1; }
 
 .dist-stat-label {
     display: block;
@@ -226,7 +234,17 @@
     overflow-wrap: anywhere;
 }
 
-.dist-chart-wrap {
+/* Both charts share the same fixed plot height so they line up side by side. */
+.chart-block {
+    min-width: 0;
+}
+
+.chart-scroll {
+    width: 100%;
+}
+
+.chart-canvas-wrap {
     position: relative;
     width: 100%;
+    height: 320px;
 }

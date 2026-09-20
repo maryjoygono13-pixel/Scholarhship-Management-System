@@ -47,6 +47,7 @@ interface EvaluationApplicant {
   semester: string;
   type: string;
   gwa: number;
+  semesterGwa: { first: number | null; second: number | null; summer: number | null };
   gwaReq: number;
   failingGrades: number;
   units: number;

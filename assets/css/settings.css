@@ -100,3 +100,9 @@
 .btn-save:hover {
     background: var(--green-800, #1b6336);
 }
+
+.settings-alert.error {
+    background: #fdecea;
+    color: #8a1c1c;
+    border: 1px solid #f5c2c0;
+}

@@ -1,12 +1,10 @@
-function normalizeSemesterValue(val: string | undefined | null): string {
-  const v = (val || "").toLowerCase();
-  return (v.includes("2") || v.includes("second")) ? "2nd Semester" : "1st Semester";
-}
 document.addEventListener("DOMContentLoaded", () => {
   const tableBody = document.getElementById("tableBody");
   const searchInput = document.querySelector<HTMLInputElement>(".search-wrap input");
   const filterType = document.getElementById("filterType") as HTMLSelectElement | null;
   const filterStatus = document.getElementById("filterStatus") as HTMLSelectElement | null;
+  const filterSemester = document.getElementById("filterSemester") as HTMLSelectElement | null;
+  const filterSy = document.getElementById("filterSy") as HTMLSelectElement | null;
   const exportBtn = document.getElementById("exportRecordsBtn");
 
   const recFormOverlay = document.getElementById("recFormOverlay");
@@ -20,8 +18,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const recName = document.getElementById("recName") as HTMLInputElement | null;
   const recType = document.getElementById("recType") as HTMLSelectElement | null;
   const recStatus = document.getElementById("recStatus") as HTMLSelectElement | null;
-  const recSemester = document.getElementById("recSemester") as HTMLInputElement | null;
-  const recSy = document.getElementById("recSy") as HTMLInputElement | null;
   const recRemarks = document.getElementById("recRemarks") as HTMLTextAreaElement | null;
 
   const recViewOverlay = document.getElementById("recViewOverlay");
@@ -58,7 +54,36 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  // "1st Semester" / "First Semester" / "2nd" / "Summer Term" -> "1st" | "2nd" | "summer"
+  function semesterKey(value: string | undefined | null): string {
+    const v = (value || "").toLowerCase();
+    if (v.includes("summer")) return "summer";
+    return (v.includes("2") || v.includes("second")) ? "2nd" : "1st";
+  }
+
+  // Where this record's scholar stands in Renewal & Retention for the same term.
+  function renewalTagHtml(r: any): string {
+    const labels: Record<string, string> = {
+      "pending": "In Renewal",
+      "eligible": "Renewed",
+      "at-risk": "Flagged",
+      "terminated": "Terminated",
+    };
+    const label = r.renewalStatus ? labels[r.renewalStatus] : "";
+    return label ? ' <span class="sent-tag" title="Renewal &amp; Retention status for this term: ' + r.renewalStatus + '">' + label + '</span>' : "";
+  }
+
+  function populateSchoolYearFilter(): void {
+    if (!filterSy) return;
+    const current = filterSy.value;
+    const years = Array.from(new Set(recordsData.map((r: any) => r.sy))).filter(Boolean).sort().reverse() as string[];
+    filterSy.innerHTML = '<option value="all">All School Years</option>' +
+      years.map((y) => '<option value="' + y + '">' + y + '</option>').join("");
+    filterSy.value = years.includes(current) ? current : "all";
+  }
+
   function populateFilterTypes(): void {
+    populateSchoolYearFilter();
     if (!filterType) return;
     const types = Array.from(new Set(recordsData.map((r: any) => r.scholarshipType))).filter(Boolean);
     filterType.innerHTML = '<option value="all">All Scholarship Types</option>';
@@ -85,12 +110,16 @@ document.addEventListener("DOMContentLoaded", () => {
     const query = searchInput ? searchInput.value.toLowerCase().trim() : "";
     const typeVal = filterType ? filterType.value.toLowerCase() : "all";
     const statusVal = filterStatus ? filterStatus.value.toLowerCase() : "all";
+    const semVal = filterSemester ? filterSemester.value : "all";
+    const syVal = filterSy ? filterSy.value : "all";
 
     return recordsData.filter((r: any) => {
       const matchQuery = r.name.toLowerCase().includes(query) || r.studentId.toLowerCase().includes(query);
       const matchType = typeVal === "all" || r.scholarshipType.toLowerCase() === typeVal;
       const matchStatus = statusVal === "all" || statusVal === "all status" || r.status.toLowerCase() === statusVal;
-      return matchQuery && matchType && matchStatus;
+      const matchSem = semVal === "all" || semesterKey(r.semester) === semVal;
+      const matchSy = syVal === "all" || r.sy === syVal;
+      return matchQuery && matchType && matchStatus && matchSem && matchSy;
     });
   }
 
@@ -155,7 +184,7 @@ document.addEventListener("DOMContentLoaded", () => {
         <td>${r.name}</td>
         <td>${typeAcronym(r.scholarshipType)}</td>
         <td><span class="status-badge ${badgeClass}">${r.status}</span></td>
-        <td>${r.semester}</td>
+        <td>${r.semester}${renewalTagHtml(r)}</td>
         <td><span class="font-mono">${r.sy}</span></td>
         <td><span class="font-mono">${dateOnly(r.dateEvaluated)}</span></td>
         <td class="actions-cell">
@@ -190,7 +219,7 @@ document.addEventListener("DOMContentLoaded", () => {
     return '<span class="font-mono" style="font-weight:600; margin-right:8px;">' + Number(grade).toFixed(2) + '</span>' +
       '<span class="badge ' + (passed ? 'badge-approved' : 'badge-rejected') + '">' + (passed ? 'Passed' : 'Failed') + '</span>';
   }
-  function buildSemesterSubjectBlock(subjects: { code: string; name: string }[], label: string, grades?: Record<string, number>): string {
+  function buildSemesterSubjectBlock(subjects: { code: string; name: string }[], label: string, grades?: Record<string, number>, gwa?: number | null): string {
     if (!subjects.length) return "";
     const g = grades || {};
     const rows = subjects
@@ -198,7 +227,7 @@ document.addEventListener("DOMContentLoaded", () => {
       .join("");
     return (
       '<div style="margin-bottom:14px;">' +
-      '<div style="font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:0.03em; color:#134e2a; margin-bottom:6px;">' + esc(label) + '</div>' +
+      '<div style="font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:0.03em; color:#134e2a; margin-bottom:6px; display:flex; justify-content:space-between;"><span>' + esc(label) + '</span><span class="font-mono" style="text-transform:none;">GWA ' + (gwa == null ? "\u2014" : Number(gwa).toFixed(2)) + '</span></div>' +
       '<div style="border:1px solid #e2e8f0; border-radius:10px; overflow:hidden;">' +
       '<table class="applicants-table" style="font-size:13px; margin:0; table-layout:fixed; width:100%;">' +
       '<thead><tr><th style="width:18%;">Code</th><th style="width:57%;">Subject Description</th><th style="width:25%;">Status</th></tr></thead>' +
@@ -258,7 +287,7 @@ document.addEventListener("DOMContentLoaded", () => {
         '<div class="section"><h3>Academic Summary</h3>' +
         (hasAcademic
           ? '<div class="summary-grid">' +
-            '<div class="summary-card"><div class="big font-mono" style="color:' + (gwaPass ? passColor : failColor) + '">' + Number(r.gwa).toFixed(2) + '</div><div class="lbl">GWA</div><div class="sub" style="color:' + (gwaPass ? passColor : failColor) + '">' + (gwaPass ? "PASSED" : "FAILED") + '</div></div>' +
+            '<div class="summary-card"><div class="big font-mono" style="color:' + (gwaPass ? passColor : failColor) + '">' + Number(r.gwa).toFixed(2) + '</div><div class="lbl">' + esc(r.semester) + ' GWA</div><div class="sub" style="color:' + (gwaPass ? passColor : failColor) + '">' + (gwaPass ? "PASSED" : "FAILED") + '</div></div>' +
             '<div class="summary-card"><div class="big font-mono">' + esc(r.failingGrades) + '</div><div class="lbl">Failing Grades</div><div class="sub" style="color:#6b7280">' + (failPass ? "None" : "Review") + '</div></div>' +
             '<div class="summary-card"><div class="big font-mono">' + esc(r.units) + '</div><div class="lbl">Units Earned</div><div class="sub" style="color:#6b7280">Units</div></div>' +
             '</div>'
@@ -291,15 +320,17 @@ document.addEventListener("DOMContentLoaded", () => {
       const bySem = (window as any).getCurriculumSubjectsBySemester
         ? (window as any).getCurriculumSubjectsBySemester(cleanProgramName(r.program, r.yearLevel), r.major || "", r.yearLevel || "")
         : { firstSem: [], secondSem: [] };
-      const isSecondSem = (r.semester || "1st Semester") === "2nd Semester";
+      // 2nd Semester and Summer Term both show the 2nd-semester subjects below the 1st.
+      const semLower = String(r.semester || "").toLowerCase();
+      const isSecondSem = semLower.includes("2") || semLower.includes("second") || semLower.includes("summer");
 
       let breakdownHtml: string;
       if (!bySem.firstSem.length && !bySem.secondSem.length) {
         breakdownHtml = '<p class="empty-note">No detailed subject-by-subject grade breakdown is recorded for this record.</p>';
       } else {
-        breakdownHtml = buildSemesterSubjectBlock(bySem.firstSem, "1st Semester", r.grades);
+        breakdownHtml = buildSemesterSubjectBlock(bySem.firstSem, "1st Semester", r.grades, r.semesterGwa && r.semesterGwa.first);
         if (isSecondSem) {
-          breakdownHtml += buildSemesterSubjectBlock(bySem.secondSem, "2nd Semester", r.grades);
+          breakdownHtml += buildSemesterSubjectBlock(bySem.secondSem, "2nd Semester", r.grades, r.semesterGwa && r.semesterGwa.second);
         }
       }
 
@@ -387,8 +418,6 @@ document.addEventListener("DOMContentLoaded", () => {
     if (recName) recName.value = editItem.fullName || editItem.name;
     if (recType) recType.value = editItem.scholarshipType;
     if (recStatus) recStatus.value = editItem.status;
-    if (recSemester) recSemester.value = normalizeSemesterValue(editItem.semester);
-    if (recSy) recSy.value = editItem.sy;
     if (recRemarks) recRemarks.value = editItem.remarks || '';
     recFormOverlay.classList.add("open");
   }
@@ -479,6 +508,8 @@ document.addEventListener("DOMContentLoaded", () => {
   if (searchInput) searchInput.addEventListener("input", resetRecordsPageAndRender);
   if (filterType) filterType.addEventListener("change", resetRecordsPageAndRender);
   if (filterStatus) filterStatus.addEventListener("change", resetRecordsPageAndRender);
+  if (filterSemester) filterSemester.addEventListener("change", resetRecordsPageAndRender);
+  if (filterSy) filterSy.addEventListener("change", resetRecordsPageAndRender);
 
   function csvEscape(value: any): string {
     const str = value == null ? "" : String(value);
