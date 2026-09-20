@@ -338,3 +338,167 @@
   padding: 3px 10px;
   border-radius: 999px;
 }
+
+/* ---------- Bulk Add Sub-types ---------- */
+.subtype-bulk-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.subtype-bulk-name {
+  flex: 1;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  outline: none;
+  font-size: 13.5px;
+}
+
+.subtype-bulk-gwa {
+  width: 110px;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  outline: none;
+  font-size: 13.5px;
+}
+
+.subtype-bulk-name.error,
+.subtype-bulk-gwa.error {
+  border-color: #dc2626;
+  box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.12);
+}
+
+.subtype-bulk-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border: none;
+  background: transparent;
+  color: #9ca3af;
+  cursor: pointer;
+  border-radius: 8px;
+}
+
+.subtype-bulk-remove:hover {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+/* ---------- Manage Types Filters + Table ---------- */
+.manage-types-filters {
+  display: flex;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.manage-types-filters .select-wrap select {
+  height: 36px;
+  padding: 0 32px 0 12px;
+  font-size: 12.5px;
+}
+
+/* Fixed-height viewport for the table so switching filters — even down to
+   zero results — never changes the modal's size. */
+.manage-types-table-wrap {
+  flex: 1;
+  min-height: 360px;
+  max-height: 360px;
+  overflow-y: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+}
+
+.manage-types-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.manage-types-table th {
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #6b7280;
+  padding: 10px 12px;
+  border-bottom: 1px solid #e5e7eb;
+  position: sticky;
+  top: 0;
+  background: #fff;
+}
+
+.manage-types-table th.actions-head { text-align: right; }
+
+.manage-types-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #f3f4f6;
+  vertical-align: middle;
+}
+
+.manage-types-table .mt-edit-name,
+.manage-types-table .mt-edit-gwa {
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid #238f54;
+  border-radius: 6px;
+  outline: none;
+  font-size: 13px;
+}
+
+.pill-select-all {
+  border: none;
+  background: transparent;
+  color: #134e2a;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+
+.pill-select-all:hover { background: #e8f5e9; }
+
+.status-badge.badge-none { background: #f3f4f6; color: #6b7280; }
+
+/* Inline sub-type editing inside the main table */
+.scholarships-table .mt-edit-name,
+.scholarships-table .mt-edit-gwa {
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid #238f54;
+  border-radius: 6px;
+  outline: none;
+  font-size: 13px;
+}
+
+/* Keep the card a steady size when filters return few or no rows. */
+.table-card .table-wrap { min-height: 420px; }
+
+/* Fixed table + toolbar geometry so filtering never resizes anything. */
+.scholarships-table { table-layout: fixed; }
+.scholarships-table th:nth-child(1) { width: 30%; }
+.scholarships-table th:nth-child(2) { width: 24%; }
+.scholarships-table th:nth-child(3) { width: 8%; }
+.scholarships-table th:nth-child(4) { width: 12%; min-width: 0 !important; }
+.scholarships-table th:nth-child(5) { width: 12%; }
+.scholarships-table th:nth-child(6) { width: 14%; }
+.scholarships-table td { overflow-wrap: anywhere; }
+
+.table-header-toolbar .toolbar { flex-wrap: nowrap; }
+.table-header-toolbar .select-wrap { flex: 0 0 200px; width: 200px; }
+.table-header-toolbar .select-wrap select {
+  width: 100%;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.table-header-toolbar .btn-primary { flex-shrink: 0; white-space: nowrap; }
+.table-header-toolbar .search-wrap { min-width: 140px; }

@@ -227,6 +227,17 @@ function createSystemNotification(
             'Academic Merit'
         );
 
+        // Comes from the selected scholarship sub-type's own required GWA
+        // (see api/scholarship_types.php) — falls back to 1.75 only if the
+        // form didn't send one (e.g. an older client).
+        $gwaReq = (float) ($_POST['gwaReq'] ?? $_POST['gwa_req'] ?? 1.75);
+        if ($gwaReq <= 0) {
+            $gwaReq = 1.75;
+        }
+        // The scholarship's own sub-type requirement always wins over whatever
+        // the form sent.
+        $gwaReq = resolveGwaRequirement($pdo, $scholarshipType, $gwaReq);
+
         $essay = trim($_POST['essay'] ?? '');
 
         $status = trim($_POST['status'] ?? 'pending');
@@ -459,6 +470,7 @@ function createSystemNotification(
                 semester = ?,
                 gpa = ?,
                 scholarship_type = ?,
+                gwa_req = ?,
                 essay = ?,
                 updated_at = CURRENT_TIMESTAMP
             ";
@@ -484,6 +496,7 @@ function createSystemNotification(
                 $semester,
                 $gpa,
                 $scholarshipType,
+                $gwaReq,
                 $essay
             ];
             /*
@@ -769,7 +782,7 @@ function createSystemNotification(
             $scholarshipType,    // 19
             $status,             // 20
             $gpa,                // 21 - gwa
-            1.75,                // 22 - gwa_req
+            $gwaReq,             // 22 - gwa_req
             0,                   // 23 - failing_grades
             21,                  // 24 - units
             1,                   // 25 - enrolled

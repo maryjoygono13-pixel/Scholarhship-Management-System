@@ -383,3 +383,83 @@
 }
 
 .btn-next:hover { background: #1b6336; }
+/* ---------- Inbox (received messages) ---------- */
+.notif-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 18px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.notif-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border: none;
+  background: transparent;
+  font-size: 14px;
+  font-weight: 600;
+  color: #6b7280;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+
+.notif-tab:hover { color: #111827; }
+.notif-tab.active { color: #134e2a; border-bottom-color: #134e2a; }
+
+.tab-badge {
+  min-width: 20px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: #dc2626;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.inbox-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.inbox-search { flex: 1; min-width: 200px; }
+
+.inbox-search input,
+.inbox-toolbar select {
+  height: 40px;
+  padding: 0 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #fff;
+  font-size: 13.5px;
+  outline: none;
+}
+
+.inbox-search input { width: 100%; }
+.inbox-toolbar .btn-primary { margin-left: 0; }
+
+.inbox-table { table-layout: fixed; }
+.inbox-table td { vertical-align: middle; overflow: hidden; }
+.inbox-from, .inbox-subject { font-size: 13.5px; color: #111827; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.inbox-sub { font-size: 12px; color: #6b7280; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
+
+.inbox-row.unread .inbox-from,
+.inbox-row.unread .inbox-subject { font-weight: 700; }
+
+.inbox-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: transparent;
+}
+.inbox-row.unread .inbox-dot { background: #238f54; }
+
+.inbox-view-from { font-size: 13.5px; color: #374151; margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px solid #e5e7eb; }
+.inbox-view-message { font-size: 14px; color: #111827; line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }

@@ -400,6 +400,232 @@ if (sendBtn) {
   });
 }
 
+/* ================= Inbox (received messages) ================= */
+interface InboxMessage {
+  id: number;
+  senderName: string;
+  senderEmail: string;
+  studentId: string;
+  subject: string;
+  message: string;
+  source: string;
+  isRead: boolean;
+  receivedAt: string;
+}
+
+const inboxTabs = document.querySelectorAll<HTMLButtonElement>(".notif-tab");
+const inboxPanel = document.getElementById("inboxPanel");
+const sentPanel = document.getElementById("sentPanel");
+const inboxTabBadge = document.getElementById("inboxTabBadge");
+const inboxTableBody = document.getElementById("inboxTableBody");
+const inboxTableWrap = document.getElementById("inboxTableWrap");
+const inboxEmptyState = document.getElementById("inboxEmptyState");
+const inboxSearch = document.getElementById("inboxSearch") as HTMLInputElement | null;
+const inboxFilter = document.getElementById("inboxFilter") as HTMLSelectElement | null;
+const inboxMarkAllBtn = document.getElementById("inboxMarkAllBtn");
+const inboxLogBtn = document.getElementById("inboxLogBtn");
+
+const inboxViewOverlay = document.getElementById("inboxViewOverlay");
+const inboxViewSubject = document.getElementById("inboxViewSubject");
+const inboxViewMeta = document.getElementById("inboxViewMeta");
+const inboxViewFrom = document.getElementById("inboxViewFrom");
+const inboxViewMessage = document.getElementById("inboxViewMessage");
+const inboxViewReplyBtn = document.getElementById("inboxViewReplyBtn") as HTMLAnchorElement | null;
+const inboxViewUnreadBtn = document.getElementById("inboxViewUnreadBtn");
+const inboxViewDeleteBtn = document.getElementById("inboxViewDeleteBtn");
+
+const inboxLogOverlay = document.getElementById("inboxLogOverlay");
+const inboxLogName = document.getElementById("inboxLogName") as HTMLInputElement | null;
+const inboxLogEmail = document.getElementById("inboxLogEmail") as HTMLInputElement | null;
+const inboxLogStudentId = document.getElementById("inboxLogStudentId") as HTMLInputElement | null;
+const inboxLogSubject = document.getElementById("inboxLogSubject") as HTMLInputElement | null;
+const inboxLogMessage = document.getElementById("inboxLogMessage") as HTMLTextAreaElement | null;
+
+let inboxMessages: InboxMessage[] = [];
+let inboxOpenId: number | null = null;
+let inboxSearchTimer: number | undefined;
+
+function inboxEscape(str: any): string {
+  const d = document.createElement("div");
+  d.textContent = str == null ? "" : String(str);
+  return d.innerHTML;
+}
+
+function setNotifTab(tab: string): void {
+  inboxTabs.forEach((b) => b.classList.toggle("active", b.dataset.tab === tab));
+  if (inboxPanel) inboxPanel.hidden = tab !== "inbox";
+  if (sentPanel) sentPanel.hidden = tab !== "sent";
+}
+
+async function inboxPost(body: Record<string, string>): Promise<any> {
+  const res = await fetch("api/inbox.php", { method: "POST", body: new URLSearchParams(body) });
+  return res.json();
+}
+
+async function loadInbox(): Promise<void> {
+  try {
+    const params = new URLSearchParams();
+    if (inboxFilter && inboxFilter.value) params.set("filter", inboxFilter.value);
+    if (inboxSearch && inboxSearch.value.trim()) params.set("q", inboxSearch.value.trim());
+    const res = await fetch("api/inbox.php?" + params.toString());
+    const json = await res.json();
+    if (!json.success) return;
+    inboxMessages = json.data || [];
+    if (inboxTabBadge) {
+      inboxTabBadge.textContent = String(json.unread);
+      inboxTabBadge.hidden = !json.unread;
+    }
+    renderInbox();
+  } catch (e) {
+    console.error("Failed to load inbox:", e);
+  }
+}
+
+function renderInbox(): void {
+  if (!inboxTableBody) return;
+  inboxTableBody.innerHTML = "";
+
+  const has = inboxMessages.length > 0;
+  if (inboxTableWrap) inboxTableWrap.classList.toggle("hide", !has);
+  if (inboxEmptyState) inboxEmptyState.classList.toggle("show", !has);
+  if (!has) return;
+
+  inboxMessages.forEach((m) => {
+    const tr = document.createElement("tr");
+    tr.className = "inbox-row" + (m.isRead ? "" : " unread");
+    const preview = m.message.replace(/\s+/g, " ").slice(0, 110);
+    tr.innerHTML = `
+      <td><span class="inbox-dot" title="${m.isRead ? "Read" : "Unread"}"></span></td>
+      <td>
+        <div class="inbox-from">${inboxEscape(m.senderName || m.senderEmail)}</div>
+        <div class="inbox-sub">${inboxEscape(m.senderName ? m.senderEmail : "")}</div>
+      </td>
+      <td>
+        <div class="inbox-subject">${inboxEscape(m.subject)}</div>
+        <div class="inbox-sub">${inboxEscape(preview)}${m.message.length > 110 ? "…" : ""}</div>
+      </td>
+      <td>${inboxEscape(formatDate(m.receivedAt))}</td>
+      <td class="actions-cell" style="text-align:right;">
+        <button type="button" class="btn-icon-action" data-inbox-toggle title="${m.isRead ? "Mark as unread" : "Mark as read"}"><i data-lucide="${m.isRead ? "mail" : "mail-open"}"></i></button>
+        <button type="button" class="btn-icon-action delete" data-inbox-delete title="Delete"><i data-lucide="trash-2"></i></button>
+      </td>
+    `;
+    tr.addEventListener("click", () => openInboxMessage(m.id));
+
+    const toggle = tr.querySelector("[data-inbox-toggle]");
+    if (toggle) toggle.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      await inboxPost({ action: m.isRead ? "mark_unread" : "mark_read", id: String(m.id) });
+      await loadInbox();
+    });
+    const del = tr.querySelector("[data-inbox-delete]");
+    if (del) del.addEventListener("click", (e) => { e.stopPropagation(); deleteInboxMessage(m.id); });
+
+    inboxTableBody.appendChild(tr);
+  });
+
+  if (typeof lucide !== "undefined") lucide.createIcons();
+}
+
+async function openInboxMessage(id: number): Promise<void> {
+  const m = inboxMessages.find((x) => x.id === id);
+  if (!m || !inboxViewOverlay) return;
+  inboxOpenId = id;
+
+  if (inboxViewSubject) inboxViewSubject.textContent = m.subject;
+  if (inboxViewMeta) inboxViewMeta.textContent = "Received " + formatDate(m.receivedAt);
+  if (inboxViewFrom) {
+    inboxViewFrom.innerHTML =
+      `<strong>${inboxEscape(m.senderName || m.senderEmail)}</strong>` +
+      (m.senderEmail ? ` &lt;${inboxEscape(m.senderEmail)}&gt;` : "") +
+      (m.studentId ? ` &middot; ID ${inboxEscape(m.studentId)}` : "");
+  }
+  if (inboxViewMessage) inboxViewMessage.textContent = m.message;
+  if (inboxViewReplyBtn) {
+    inboxViewReplyBtn.hidden = !m.senderEmail;
+    inboxViewReplyBtn.href = "mailto:" + m.senderEmail + "?subject=" + encodeURIComponent("Re: " + m.subject);
+  }
+  inboxViewOverlay.classList.add("open");
+
+  if (!m.isRead) {
+    await inboxPost({ action: "mark_read", id: String(id) });
+    m.isRead = true;
+    await loadInbox();
+  }
+}
+
+function closeInboxView(): void {
+  if (inboxViewOverlay) inboxViewOverlay.classList.remove("open");
+  inboxOpenId = null;
+}
+
+async function deleteInboxMessage(id: number): Promise<void> {
+  if (!confirm("Delete this message? This cannot be undone.")) return;
+  const json = await inboxPost({ action: "delete", id: String(id) });
+  if (!json.success) { alert(json.message || "Failed to delete message."); return; }
+  closeInboxView();
+  await loadInbox();
+}
+
+function openInboxLog(): void {
+  [inboxLogName, inboxLogEmail, inboxLogStudentId, inboxLogSubject].forEach((i) => { if (i) i.value = ""; });
+  if (inboxLogMessage) inboxLogMessage.value = "";
+  if (inboxLogOverlay) inboxLogOverlay.classList.add("open");
+  if (inboxLogName) inboxLogName.focus();
+}
+
+function closeInboxLog(): void {
+  if (inboxLogOverlay) inboxLogOverlay.classList.remove("open");
+}
+
+async function saveInboxLog(): Promise<void> {
+  const json = await inboxPost({
+    action: "create",
+    sender_name: inboxLogName ? inboxLogName.value : "",
+    sender_email: inboxLogEmail ? inboxLogEmail.value : "",
+    student_id: inboxLogStudentId ? inboxLogStudentId.value : "",
+    subject: inboxLogSubject ? inboxLogSubject.value : "",
+    message: inboxLogMessage ? inboxLogMessage.value : "",
+    source: "manual",
+  });
+  if (!json.success) { alert(json.message || "Failed to save message."); return; }
+  closeInboxLog();
+  await loadInbox();
+}
+
+inboxTabs.forEach((b) => b.addEventListener("click", () => setNotifTab(b.dataset.tab || "inbox")));
+if (inboxSearch) inboxSearch.addEventListener("input", () => {
+  window.clearTimeout(inboxSearchTimer);
+  inboxSearchTimer = window.setTimeout(loadInbox, 250);
+});
+if (inboxFilter) inboxFilter.addEventListener("change", loadInbox);
+if (inboxMarkAllBtn) inboxMarkAllBtn.addEventListener("click", async () => { await inboxPost({ action: "mark_all_read" }); await loadInbox(); });
+if (inboxLogBtn) inboxLogBtn.addEventListener("click", openInboxLog);
+const inboxViewCloseBtn = document.getElementById("inboxViewCloseBtn");
+if (inboxViewCloseBtn) inboxViewCloseBtn.addEventListener("click", closeInboxView);
+if (inboxViewOverlay) inboxViewOverlay.addEventListener("click", (e) => { if (e.target === inboxViewOverlay) closeInboxView(); });
+if (inboxViewUnreadBtn) inboxViewUnreadBtn.addEventListener("click", async () => {
+  if (inboxOpenId === null) return;
+  await inboxPost({ action: "mark_unread", id: String(inboxOpenId) });
+  closeInboxView();
+  await loadInbox();
+});
+if (inboxViewDeleteBtn) inboxViewDeleteBtn.addEventListener("click", () => { if (inboxOpenId !== null) deleteInboxMessage(inboxOpenId); });
+const inboxLogCloseBtn = document.getElementById("inboxLogCloseBtn");
+const inboxLogCancelBtn = document.getElementById("inboxLogCancelBtn");
+const inboxLogSaveBtn = document.getElementById("inboxLogSaveBtn");
+if (inboxLogCloseBtn) inboxLogCloseBtn.addEventListener("click", closeInboxLog);
+if (inboxLogCancelBtn) inboxLogCancelBtn.addEventListener("click", closeInboxLog);
+if (inboxLogSaveBtn) inboxLogSaveBtn.addEventListener("click", saveInboxLog);
+
+// Inbox is the first thing shown on this page.
+setNotifTab("inbox");
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", loadInbox);
+} else {
+  loadInbox();
+}
+
 /* ================= Init ================= */
 refreshNotifications();
 (window as any).updateNavCounts();

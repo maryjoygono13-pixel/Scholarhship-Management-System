@@ -1249,10 +1249,26 @@ window.editApplicant =
                     app.gpa || "";
 
 
-            if (fType)
-                fType.value =
-                    app.scholarshipType || "";
+            if (fType) {
+                const wantedType = app.scholarshipType || "";
+                if (wantedType && !Array.from(fType.options).some((o) => o.value === wantedType)) {
+                    // Legacy value that predates the current Type/Sub-type
+                    // taxonomy — add it so editing doesn't silently blank the field.
+                    const legacyOpt = document.createElement("option");
+                    legacyOpt.value = wantedType;
+                    legacyOpt.textContent = wantedType + " (legacy)";
+                    fType.appendChild(legacyOpt);
+                }
+                fType.value = wantedType;
+            }
 
+            // Setting .value above doesn't fire "change", so the GWA hidden
+            // field (normally synced on select) needs to be seeded from the
+            // applicant's own already-saved requirement — otherwise saving
+            // without touching this dropdown would silently reset it back
+            // to the 1.75 default.
+            const gwaReqInput = document.getElementById("applicantGwaReq");
+            if (gwaReqInput) gwaReqInput.value = app.gwaReq != null ? String(app.gwaReq) : "";
 
             if (fEssay)
                 fEssay.value =
@@ -1855,10 +1871,68 @@ function closeModal() {
 
 
 /* ============================================================
+   SCHOLARSHIP TYPE DROPDOWN — fed by the Scholarships taxonomy
+============================================================ */
+
+async function loadScholarshipTypeOptions() {
+    const select = document.getElementById("applicantScholarshipType");
+    const gwaReqInput = document.getElementById("applicantGwaReq");
+    if (!select) return;
+
+    try {
+        const apiPath = (typeof window !== "undefined" && window.API_BASE) ? window.API_BASE : "api";
+        const res = await fetch(`${apiPath}/scholarship_types.php`);
+        const json = await res.json();
+        if (!json.success) return;
+
+        const currentValue = select.value;
+        select.innerHTML = '<option value="">Select type</option>';
+
+        (json.data || []).forEach((type) => {
+            if (Array.isArray(type.subtypes) && type.subtypes.length > 0) {
+                const group = document.createElement("optgroup");
+                group.label = type.name;
+                type.subtypes.forEach((sub) => {
+                    const opt = document.createElement("option");
+                    opt.value = sub.name;
+                    opt.textContent = sub.name;
+                    opt.dataset.gwa = String(sub.gwaRequirement);
+                    group.appendChild(opt);
+                });
+                select.appendChild(group);
+            } else {
+                // No sub-types defined yet for this type — still let staff
+                // pick the broad category itself, with a sensible default GWA.
+                const opt = document.createElement("option");
+                opt.value = type.name;
+                opt.textContent = type.name;
+                opt.dataset.gwa = "1.75";
+                select.appendChild(opt);
+            }
+        });
+
+        if (currentValue) select.value = currentValue;
+    } catch (e) {
+        console.error("Failed to load scholarship types:", e);
+    }
+
+    if (!select.dataset.gwaBound) {
+        select.dataset.gwaBound = "1";
+        select.addEventListener("change", () => {
+            const selectedOption = select.options[select.selectedIndex];
+            const gwa = selectedOption ? selectedOption.dataset.gwa : "";
+            if (gwaReqInput) gwaReqInput.value = gwa || "";
+        });
+    }
+}
+
+/* ============================================================
    INITIALIZE PAGE
 ============================================================ */
 
 function initApplicantsPage() {
+
+    loadScholarshipTypeOptions();
 
     const applicantForm =
         getEl("applicantForm");

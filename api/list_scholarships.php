@@ -23,6 +23,12 @@ try {
         if ($id > 0) {
             $stmt = $pdo->prepare("UPDATE scholarships SET name = ?, code = ?, description = ?, type = ?, subtype = ?, gwa_requirement = ?, slots = ?, slots_available = ?, coverage = ?, status = ? WHERE id = ?");
             $stmt->execute([$name, $code, $description, $type, $subtype, $gwaReq, $slots, $slots, $coverage, $status, $id]);
+            // The sub-type's required GWA is what Evaluation/Renewal enforce,
+            // so editing it from the program keeps the two in sync.
+            if ($subtype !== '') {
+                $pdo->prepare("UPDATE scholarship_subtypes SET gwa_requirement = ? WHERE name = ? AND type_id = (SELECT id FROM scholarship_types WHERE name = ?)")
+                    ->execute([$gwaReq, $subtype, $type]);
+            }
             logActivity($pdo, 'Scholarship Updated', 'Scholarships', $name . ' (' . $code . ') was updated.', $id);
             sendJson(['success' => true, 'id' => $id, 'message' => 'Scholarship updated successfully.']);
         } else {

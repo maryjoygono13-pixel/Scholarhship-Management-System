@@ -52,7 +52,7 @@ try {
             }
         }
 
-        $data = array_map(function ($r) use ($gradesMap) {
+        $data = array_map(function ($r) use ($gradesMap, $pdo) {
             return [
                 'id' => (string)$r['id'],
 
@@ -67,7 +67,7 @@ try {
                 'type' => $r['scholarship_type'],
 
                 'gwa' => (float)$r['gwa'],
-                'gwaReq' => (float)$r['gwa_req'],
+                'gwaReq' => resolveGwaRequirement($pdo, (string)$r['scholarship_type'], (float)$r['gwa_req']),
 
                 'failingGrades' => (int)$r['failing_grades'],
                 'units' => (int)$r['units'],
@@ -114,6 +114,20 @@ try {
 
         $status = $payload['status'] ?? null;
         $remarks = $payload['remarks'] ?? null;
+
+        // An applicant can only be approved if their GWA meets the requirement
+        // of the scholarship type/sub-type they applied for.
+        if ($status !== null && strtolower($status) === 'approved') {
+            $chk = $pdo->prepare("SELECT gwa, gwa_req, scholarship_type FROM applicants WHERE id = ?");
+            $chk->execute([$id]);
+            $cand = $chk->fetch();
+            if ($cand) {
+                $required = resolveGwaRequirement($pdo, (string)$cand['scholarship_type'], (float)$cand['gwa_req']);
+                if ((float)$cand['gwa'] > $required) {
+                    sendError('Cannot approve: GWA ' . number_format((float)$cand['gwa'], 2) . ' does not meet the required ' . number_format($required, 2) . ' for ' . $cand['scholarship_type'] . '.', 422);
+                }
+            }
+        }
 
         $updates = [];
         $params = [];

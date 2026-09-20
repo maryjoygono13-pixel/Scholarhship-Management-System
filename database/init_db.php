@@ -48,10 +48,17 @@ function initDatabase(): PDO {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         type_id INTEGER NOT NULL,
         name TEXT NOT NULL,
+        gwa_requirement REAL NOT NULL DEFAULT 1.75,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(type_id, name),
         FOREIGN KEY (type_id) REFERENCES scholarship_types(id)
     )");
+
+    $subtypeCols = $pdo->query("PRAGMA table_info(scholarship_subtypes)")->fetchAll(PDO::FETCH_ASSOC);
+    $subtypeColNames = array_column($subtypeCols, 'name');
+    if (!in_array('gwa_requirement', $subtypeColNames)) {
+        $pdo->exec("ALTER TABLE scholarship_subtypes ADD COLUMN gwa_requirement REAL NOT NULL DEFAULT 1.75");
+    }
 
     $defaultTypes = [
         'MERIT-BASED Academic Scholarship',
@@ -72,14 +79,21 @@ function initDatabase(): PDO {
     $chedTypeId = $pdo->query("SELECT id FROM scholarship_types WHERE name = 'CHED Scholarship'")->fetchColumn();
     if ($chedTypeId) {
         $chedSubtypes = [
-            'CMSP (CHED Merit Scholarship Program)',
-            'TDP (Tulong Dunong Program)',
-            'TES (Tertiary Education Subsidy)',
-            'COSCHO (Scholarship for Coconut Farmers and Their Families)',
+            'CMSP (CHED Merit Scholarship Program)' => 1.50,
+            'TDP (Tulong Dunong Program)' => 2.25,
+            'TES (Tertiary Education Subsidy)' => 2.00,
+            'COSCHO (Scholarship for Coconut Farmers and Their Families)' => 2.50,
         ];
-        $insertSubtype = $pdo->prepare("INSERT OR IGNORE INTO scholarship_subtypes (type_id, name) VALUES (?, ?)");
-        foreach ($chedSubtypes as $subtypeName) {
-            $insertSubtype->execute([$chedTypeId, $subtypeName]);
+        $insertSubtype = $pdo->prepare("INSERT OR IGNORE INTO scholarship_subtypes (type_id, name, gwa_requirement) VALUES (?, ?, ?)");
+        $backfillSubtypeGwa = $pdo->prepare("UPDATE scholarship_subtypes SET gwa_requirement = ? WHERE type_id = ? AND name = ? AND gwa_requirement = 1.75");
+        foreach ($chedSubtypes as $subtypeName => $subtypeGwa) {
+            $insertSubtype->execute([$chedTypeId, $subtypeName, $subtypeGwa]);
+            // One-time backfill for rows created before this column existed
+            // (they got the column's default of 1.75). Harmless no-op once
+            // the real value has already been set.
+            if ($subtypeGwa != 1.75) {
+                $backfillSubtypeGwa->execute([$subtypeGwa, $chedTypeId, $subtypeName]);
+            }
         }
 
         // One-time backfill: the 4 scholarships already seeded under the old
@@ -225,6 +239,18 @@ function initDatabase(): PDO {
         sent_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )");
 
+    // Inbox: messages received from scholars / applicants
+    $pdo->exec("CREATE TABLE IF NOT EXISTS inbox_messages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        sender_name TEXT NOT NULL DEFAULT '',
+        sender_email TEXT NOT NULL DEFAULT '',
+        student_id TEXT DEFAULT '',
+        subject TEXT NOT NULL DEFAULT '',
+        message TEXT NOT NULL,
+        source TEXT NOT NULL DEFAULT 'manual',
+        is_read INTEGER NOT NULL DEFAULT 0,
+        received_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )");
     // 5. Records Table
     $pdo->exec("CREATE TABLE IF NOT EXISTS records (
         id INTEGER PRIMARY KEY AUTOINCREMENT,

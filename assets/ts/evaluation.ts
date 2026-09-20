@@ -472,6 +472,10 @@ function normalizeEval(record: any): EvaluationApplicant {
         const decision = btn.getAttribute("data-decide");
         if (!decision) return;
         const remarksEl = panel.querySelector<HTMLTextAreaElement>("#remarksInput");
+        if (decision === "approved" && a.gwa > a.gwaReq) {
+          showToast("Cannot approve: GWA " + Number(a.gwa).toFixed(2) + " does not meet the required " + Number(a.gwaReq).toFixed(2) + " for " + a.type + ".");
+          return;
+        }
         a.status = decision;
         a.remarks = remarksEl ? remarksEl.value : a.remarks || "";
         await saveApplicant(a);

@@ -8,6 +8,54 @@ include __DIR__ . '/../includes/header.php';
 
 <div class="page">
 
+    <div class="notif-tabs" id="notifTabs" role="tablist">
+      <button type="button" class="notif-tab active" data-tab="inbox" role="tab">
+        Inbox <span class="tab-badge" id="inboxTabBadge" hidden>0</span>
+      </button>
+      <button type="button" class="notif-tab" data-tab="sent" role="tab">Sent log</button>
+    </div>
+
+    <!-- ================= INBOX (received messages) ================= -->
+    <div id="inboxPanel">
+      <div class="inbox-toolbar">
+        <div class="inbox-search">
+          <input type="text" id="inboxSearch" placeholder="Search sender, subject or message...">
+        </div>
+        <select id="inboxFilter">
+          <option value="">All messages</option>
+          <option value="unread">Unread only</option>
+        </select>
+        <button type="button" class="btn-secondary" id="inboxMarkAllBtn">Mark all as read</button>
+        <button type="button" class="btn-primary" id="inboxLogBtn">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+          Log received message
+        </button>
+      </div>
+
+      <div class="table-wrap" id="inboxTableWrap">
+        <table class="notification-table inbox-table">
+          <thead>
+            <tr>
+              <th style="width:28px;"></th>
+              <th style="width:24%;">From</th>
+              <th>Message</th>
+              <th style="width:16%;">Received</th>
+              <th style="width:110px; text-align:right;">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="inboxTableBody"></tbody>
+        </table>
+      </div>
+
+      <div class="empty-state" id="inboxEmptyState">
+        <p>No messages received yet.</p>
+        <span>Messages from scholars and applicants will show up here. Use "Log received message" to record one.</span>
+      </div>
+    </div>
+
+    <!-- ================= SENT LOG ================= -->
+    <div id="sentPanel" hidden>
+
     <div class="stat-grid">
       <div class="stat-card">
         <div class="label">Sent today</div>
@@ -61,6 +109,52 @@ include __DIR__ . '/../includes/header.php';
       </div>
 
       <div class="pagination-bar" id="notificationPagination"></div>
+    </div>
+  </div>
+
+  <!-- View Inbox Message Modal -->
+  <div class="custom-modal-overlay" id="inboxViewOverlay">
+    <div class="custom-modal-card">
+      <div class="custom-modal-header">
+        <div>
+          <h3 id="inboxViewSubject">Message</h3>
+          <p id="inboxViewMeta"></p>
+        </div>
+        <button type="button" class="custom-modal-close" id="inboxViewCloseBtn"><i data-lucide="x"></i></button>
+      </div>
+      <div class="custom-modal-body">
+        <div class="inbox-view-from" id="inboxViewFrom"></div>
+        <div class="inbox-view-message" id="inboxViewMessage"></div>
+      </div>
+      <div class="custom-modal-footer">
+        <button type="button" class="btn-danger" id="inboxViewDeleteBtn">Delete</button>
+        <button type="button" class="btn-secondary" id="inboxViewUnreadBtn">Mark as unread</button>
+        <a class="btn-primary" id="inboxViewReplyBtn" href="#" style="text-decoration:none;">Reply by email</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Log Received Message Modal -->
+  <div class="custom-modal-overlay" id="inboxLogOverlay">
+    <div class="custom-modal-card">
+      <div class="custom-modal-header">
+        <div>
+          <h3>Log received message</h3>
+          <p>Record a message a scholar or applicant sent to the office.</p>
+        </div>
+        <button type="button" class="custom-modal-close" id="inboxLogCloseBtn"><i data-lucide="x"></i></button>
+      </div>
+      <div class="custom-modal-body" style="display:flex; flex-direction:column; gap:12px;">
+        <div class="field"><label>From (name) <span style="color:red;">*</span></label><input type="text" id="inboxLogName" placeholder="e.g. Maria Santos"></div>
+        <div class="field"><label>Email</label><input type="email" id="inboxLogEmail" placeholder="name@example.com"></div>
+        <div class="field"><label>Student ID</label><input type="text" id="inboxLogStudentId" placeholder="Optional"></div>
+        <div class="field"><label>Subject</label><input type="text" id="inboxLogSubject"></div>
+        <div class="field"><label>Message <span style="color:red;">*</span></label><textarea id="inboxLogMessage" rows="5"></textarea></div>
+      </div>
+      <div class="custom-modal-footer">
+        <button type="button" class="btn-secondary" id="inboxLogCancelBtn">Cancel</button>
+        <button type="button" class="btn-primary" id="inboxLogSaveBtn">Save message</button>
+      </div>
     </div>
   </div>
 

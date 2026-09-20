@@ -82,7 +82,7 @@ document.addEventListener("DOMContentLoaded", () => {
       tr.innerHTML = `
         <td><strong class="font-mono">${r.studentId}</strong></td>
         <td>${r.name}</td>
-        <td><span class="font-mono">${r.gwa.toFixed(2)}</span></td>
+        <td><span class="font-mono" style="color:${r.meetsGwa === false ? '#be123c' : 'inherit'};">${r.gwa.toFixed(2)}</span><div style="font-size:11px; color:#6b7280;">Req. ≤ ${Number(r.gwaRequirement).toFixed(2)}</div></td>
         <td>${r.failingGrades > 0 ? `<span class="font-mono" style="color:red;">${r.failingGrades} Failing</span>` : "Passed All"}</td>
         <td>${r.enrolled ? "Enrolled" : "Not Enrolled"}</td>
         <td><span class="font-mono">${r.semester || "1st Semester"}</span></td>
@@ -164,6 +164,10 @@ document.addEventListener("DOMContentLoaded", () => {
             <span class="detail-value mono font-mono">${selectedRecord.gwa.toFixed(2)}</span>
           </div>
           <div class="detail-item">
+            <span class="detail-label">Required GWA</span>
+            <span class="detail-value font-mono" style="color:${selectedRecord.meetsGwa === false ? '#be123c' : '#15803d'};">≤ ${Number(selectedRecord.gwaRequirement).toFixed(2)} — ${selectedRecord.meetsGwa === false ? 'Not met' : 'Met'}</span>
+          </div>
+          <div class="detail-item">
             <span class="detail-label">Failing Grades</span>
             <span class="detail-value font-mono ${selectedRecord.failingGrades > 0 ? 'metric fail' : 'metric pass'}">${selectedRecord.failingGrades}</span>
           </div>
@@ -204,6 +208,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
   async function updateStatus(action: string): Promise<void> {
     if (!selectedRecord) return;
+    if (action === "renew" && selectedRecord.meetsGwa === false) {
+      alert(`Cannot renew: GWA ${selectedRecord.gwa.toFixed(2)} does not meet the required ${Number(selectedRecord.gwaRequirement).toFixed(2)} for ${selectedRecord.scholarshipType}.`);
+      return;
+    }
     const remarks = prompt(`Enter remarks for ${action.toUpperCase()}:`, selectedRecord.remarks || "");
     const formData = new FormData();
     formData.append("id", String(selectedRecord.id));
@@ -216,6 +224,8 @@ document.addEventListener("DOMContentLoaded", () => {
       if (json.success) {
         closeModal();
         loadLedger();
+      } else {
+        alert(json.message || "Failed to update status.");
       }
     } catch (e) {
       alert("Failed to update status.");

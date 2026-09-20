@@ -36,6 +36,20 @@ try {
             sendError('Invalid action request.');
         }
 
+        // Renewal is only allowed when the scholar's current GWA still meets
+        // the requirement of their scholarship type/sub-type.
+        if ($action === 'renew') {
+            $chk = $pdo->prepare("SELECT gwa, scholarship_type FROM renewal_retention WHERE id = ?");
+            $chk->execute([$id]);
+            $cand = $chk->fetch();
+            if ($cand) {
+                $required = resolveGwaRequirement($pdo, (string)$cand['scholarship_type']);
+                if ((float)$cand['gwa'] > $required) {
+                    sendError('Cannot renew: GWA ' . number_format((float)$cand['gwa'], 2) . ' does not meet the required ' . number_format($required, 2) . ' for ' . $cand['scholarship_type'] . '.', 422);
+                }
+            }
+        }
+
         $newStatus = $action === 'renew' ? 'eligible' : ($action === 'flag' ? 'at-risk' : 'terminated');
         $stmt = $pdo->prepare("UPDATE renewal_retention SET status = ?, remarks = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
         $stmt->execute([$newStatus, $remarks ?: "Status updated to $newStatus", $id]);
@@ -91,8 +105,11 @@ try {
     $stmt->execute($params);
     $rows = $stmt->fetchAll();
 
-    $data = array_map(function($r) {
+    $data = array_map(function($r) use ($pdo) {
+        $required = resolveGwaRequirement($pdo, (string)$r['scholarship_type']);
         return [
+            'gwaRequirement' => $required,
+            'meetsGwa' => (float)$r['gwa'] <= $required,
             'id' => (int)$r['id'],
             'studentId' => $r['student_id'],
             'student_id' => $r['student_id'],

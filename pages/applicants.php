@@ -428,13 +428,10 @@
               <div class="grid-2">
                 <div class="field">
                   <label>Scholarship type <span class="req">*</span></label>
-                  <select data-field="scholarshipType" name="scholarship_type" required>
+                  <select id="applicantScholarshipType" data-field="scholarshipType" name="scholarship_type" required>
                     <option value="">Select type</option>
-                    <option value="CMSP">CMSP (CHED Merit Scholarship Program)</option>
-                    <option value="TDP">TDP (Tulong Dunong Program)</option>
-                    <option value="TES">TES (Tertiary Education Subsidy)</option>
-                    <option value="COSCHO">COSCHO (Scholarship for Coconut Farmers and Their Families)</option>
                   </select>
+                  <input type="hidden" id="applicantGwaReq" data-field="gwaReq" name="gwa_req">
                 </div>
 
                 <div class="field full-width">

@@ -17,7 +17,14 @@ include __DIR__ . '/../includes/header.php';
 
             <div class="select-wrap">
                 <select id="filterType">
-                    <option>All Scholarship Types</option>
+                    <option value="all">All Types</option>
+                </select>
+                <i data-lucide="chevron-down"></i>
+            </div>
+
+            <div class="select-wrap">
+                <select id="filterSubtype">
+                    <option value="all">All Sub-types</option>
                 </select>
                 <i data-lucide="chevron-down"></i>
             </div>
@@ -26,6 +33,7 @@ include __DIR__ . '/../includes/header.php';
             <i data-lucide="plus"></i>
             Add Scholarship
         </button>
+        </div>
     </div>
 
     <div class="table-card">
@@ -35,6 +43,7 @@ include __DIR__ . '/../includes/header.php';
                     <tr>
                         <th>Scholarship Name</th>
                         <th>Type</th>
+                        <th style="white-space:nowrap;">GWA</th>
                         <th style="white-space:nowrap; min-width:120px;">Slots</th>
                         <th>Status</th>
                         <th style="text-align:right;">Actions</th>
@@ -76,14 +85,16 @@ include __DIR__ . '/../includes/header.php';
                     </div>
                 </div>
                 <div class="field" id="schSubtypeField" hidden>
-                    <label style="font-size:13px; font-weight:600; color:#374151;">Sub-type</label>
+                    <label style="font-size:13px; font-weight:600; color:#374151; display:flex; align-items:center; justify-content:space-between;">
+                        <span>Sub-type <span id="schSubtypeHint" style="font-weight:400; color:#6b7280;">(pick one or more)</span></span>
+                        <button type="button" class="pill-select-all" id="schSubtypeSelectAll">Select all</button>
+                    </label>
                     <input type="hidden" id="schSubtype" name="subtype">
                     <div class="pill-picker" id="schSubtypePicker">
                         <div class="pill-picker-add" id="schSubtypeAddWrap">
-                            <button type="button" class="pill-add-btn" id="schSubtypeAddBtn" title="Add a new sub-type" aria-label="Add a new sub-type">
+                            <button type="button" class="pill-add-btn" id="schSubtypeAddBtn" title="Add sub-types" aria-label="Add sub-types">
                                 <i data-lucide="plus"></i>
                             </button>
-                            <input type="text" class="pill-add-input" id="schSubtypeAddInput" placeholder="New sub-type name, then Enter" hidden>
                         </div>
                     </div>
                 </div>
@@ -112,6 +123,30 @@ include __DIR__ . '/../includes/header.php';
                 <button type="submit" class="btn-primary">Save Program</button>
             </div>
         </form>
+    </div>
+</div>
+
+<!-- Bulk Add Sub-types Modal -->
+<div class="custom-modal-overlay" id="subtypeBulkOverlay">
+    <div class="custom-modal-card">
+        <div class="custom-modal-header">
+            <div>
+                <h3>Add Sub-types</h3>
+                <p id="subtypeBulkTypeLabel">Under: &mdash;</p>
+            </div>
+            <button type="button" class="custom-modal-close" id="subtypeBulkCloseBtn"><i data-lucide="x"></i></button>
+        </div>
+        <div class="custom-modal-body" style="display:flex; flex-direction:column; gap:10px;">
+            <div id="subtypeBulkRows"></div>
+            <button type="button" class="btn-secondary" id="subtypeBulkAddRowBtn" style="align-self:flex-start;">
+                <i data-lucide="plus"></i>
+                Add Another Sub-type
+            </button>
+        </div>
+        <div class="custom-modal-footer">
+            <button type="button" class="btn-secondary" id="subtypeBulkCancelBtn">Cancel</button>
+            <button type="button" class="btn-primary" id="subtypeBulkSaveBtn">Save Sub-types</button>
+        </div>
     </div>
 </div>
 

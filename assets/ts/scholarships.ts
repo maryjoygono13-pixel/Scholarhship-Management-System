@@ -2,6 +2,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const tableBody = document.getElementById("tableBody");
   const searchInput = document.querySelector<HTMLInputElement>(".search-wrap input");
   const filterType = document.getElementById("filterType") as HTMLSelectElement | null;
+  const filterSubtype = document.getElementById("filterSubtype") as HTMLSelectElement | null;
   const filterStatus = document.getElementById("filterStatus") as HTMLSelectElement | null;
   const addBtn = document.getElementById("addScholarshipBtn");
 
@@ -34,11 +35,15 @@ document.addEventListener("DOMContentLoaded", () => {
   let scholarships: any[] = [];
   let deletingSchId: number | null = null;
 
-  interface ScholarshipSubtype { id: number; name: string; }
+  interface ScholarshipSubtype { id: number; name: string; gwaRequirement: number; }
   interface ScholarshipType { id: number; name: string; subtypes: ScholarshipSubtype[]; }
 
   let scholarshipTypes: ScholarshipType[] = [];
   let selectedTypeId: number | null = null;
+  // Add mode lets several sub-types be picked at once (one program is
+  // created per pick); edit mode keeps the single-pick behaviour.
+  let pickedSubtypes: string[] = [];
+  const isAddMode = (): boolean => !(schId && schId.value);
 
   async function loadScholarshipTypes(): Promise<void> {
     try {
@@ -80,6 +85,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function selectType(id: number, name: string): void {
     selectedTypeId = id;
+    pickedSubtypes = [];
     if (schType) schType.value = name;
     if (schSubtype) schSubtype.value = "";
     renderTypePicker(name);
@@ -115,7 +121,8 @@ document.addEventListener("DOMContentLoaded", () => {
     subtypes.forEach((s) => {
       const pill = document.createElement("button");
       pill.type = "button";
-      pill.className = "pill" + (s.name === selectedName ? " active" : "");
+      const isActive = isAddMode() ? pickedSubtypes.includes(s.name) : s.name === selectedName;
+      pill.className = "pill" + (isActive ? " active" : "");
       pill.textContent = s.name;
       pill.addEventListener("click", () => selectSubtype(s.name));
       picker.insertBefore(pill, addWrap);
@@ -129,13 +136,58 @@ document.addEventListener("DOMContentLoaded", () => {
       picker.insertBefore(pill, addWrap);
     }
 
+    const selectAllBtn = document.getElementById("schSubtypeSelectAll") as HTMLButtonElement | null;
+    const hint = document.getElementById("schSubtypeHint");
+    if (selectAllBtn) {
+      selectAllBtn.hidden = !isAddMode() || subtypes.length < 2;
+      selectAllBtn.textContent = subtypes.length && pickedSubtypes.length === subtypes.length ? "Clear all" : "Select all";
+    }
+    if (hint) hint.hidden = !isAddMode();
+
     if (typeof lucide !== "undefined") lucide.createIcons();
   }
 
+  function applyPickedGwa(): void {
+    const type = scholarshipTypes.find((t) => t.id === selectedTypeId);
+    if (!schGwa) return;
+    if (pickedSubtypes.length > 1) {
+      schGwa.value = "";
+      schGwa.placeholder = "Each sub-type uses its own GWA";
+      schGwa.disabled = true;
+      return;
+    }
+    schGwa.disabled = false;
+    schGwa.placeholder = "e.g. 1.75";
+    const only = pickedSubtypes[0] || (schSubtype ? schSubtype.value : "");
+    const subtype = type ? type.subtypes.find((s) => s.name === only) : undefined;
+    if (subtype) schGwa.value = String(subtype.gwaRequirement);
+  }
+
   function selectSubtype(name: string): void {
-    if (schSubtype) schSubtype.value = name;
+    if (isAddMode()) {
+      pickedSubtypes = pickedSubtypes.includes(name)
+        ? pickedSubtypes.filter((n) => n !== name)
+        : pickedSubtypes.concat(name);
+      if (schSubtype) schSubtype.value = pickedSubtypes[0] || "";
+    } else if (schSubtype) {
+      schSubtype.value = name;
+    }
     renderSubtypePicker(name);
     updateIdentityPreview();
+
+    // Each sub-type carries its own required GWA — picking one applies it
+    // straight to the scholarship's GWA Requirement field.
+    applyPickedGwa();
+  }
+
+  function toggleAllSubtypes(): void {
+    const type = scholarshipTypes.find((t) => t.id === selectedTypeId);
+    const all = type ? type.subtypes.map((s) => s.name) : [];
+    pickedSubtypes = pickedSubtypes.length === all.length ? [] : all;
+    if (schSubtype) schSubtype.value = pickedSubtypes[0] || "";
+    renderSubtypePicker();
+    updateIdentityPreview();
+    applyPickedGwa();
   }
 
   /*
@@ -174,6 +226,12 @@ document.addEventListener("DOMContentLoaded", () => {
     const { name, code } = computeIdentity(typeVal, subtypeVal);
     if (schName) schName.value = name;
     if (schCode) schCode.value = code;
+
+    if (isAddMode() && pickedSubtypes.length > 1) {
+      if (previewName) previewName.textContent = pickedSubtypes.length + " scholarships: " + pickedSubtypes.join(", ");
+      if (previewCode) previewCode.textContent = pickedSubtypes.length + " programs";
+      return;
+    }
 
     if (previewName) previewName.textContent = name || "Select a type to continue";
     if (previewCode) previewCode.textContent = code;
@@ -228,62 +286,383 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function populateFilterTypes(): void {
+
     if (!filterType) return;
-    const types = Array.from(new Set(scholarships.map((s: any) => s.type))).filter(Boolean);
-    filterType.innerHTML = '<option value="all">All Scholarship Types</option>';
-    types.forEach(t => {
+
+    const previousValue = filterType.value;
+
+    filterType.innerHTML = '<option value="all">All Types</option>';
+
+    // Every canonical type, plus any type still used by an older
+    // program that isn't in the canonical list.
+    const names = scholarshipTypes.map((t) => t.name);
+    scholarships.forEach((s) => {
+      if (s.type && !names.includes(s.type)) names.push(s.type);
+    });
+
+    names.forEach((n) => {
       const opt = document.createElement("option");
-      opt.value = t;
-      opt.textContent = t;
+      opt.value = n;
+      opt.textContent = n;
       filterType.appendChild(opt);
     });
+
+    filterType.value = names.includes(previousValue) ? previousValue : "all";
+
+    populateFilterSubtypes();
   }
 
-  function renderScholarships(): void {
-    if (!tableBody) return;
-    const query = searchInput ? searchInput.value.toLowerCase().trim() : "";
-    const typeVal = filterType ? filterType.value.toLowerCase() : "all";
-    const statusVal = filterStatus ? filterStatus.value.toLowerCase() : "all";
 
-    const filtered = scholarships.filter((s: any) => {
-      const matchQuery = s.name.toLowerCase().includes(query) || s.code.toLowerCase().includes(query);
-      const matchType = typeVal === "all" || s.type.toLowerCase() === typeVal;
-      const matchStatus = statusVal === "all" || statusVal === "all status" || s.status.toLowerCase() === statusVal;
-      return matchQuery && matchType && matchStatus;
+  /* =========================================================
+   POPULATE SUB-TYPE FILTER (scoped to the chosen type)
+  ========================================================= */
+
+  function populateFilterSubtypes(): void {
+
+    if (!filterSubtype) return;
+
+    const previousValue = filterSubtype.value;
+    const typeVal = filterType ? filterType.value : "all";
+
+    filterSubtype.innerHTML = '<option value="all">All Sub-types</option>';
+
+    const names: string[] = [];
+    scholarshipTypes.forEach((t) => {
+      if (typeVal !== "all" && t.name !== typeVal) return;
+      (t.subtypes || []).forEach((st) => {
+        if (!names.includes(st.name)) names.push(st.name);
+      });
+    });
+    scholarships.forEach((s) => {
+      if (!s.subtype) return;
+      if (typeVal !== "all" && s.type !== typeVal) return;
+      if (!names.includes(s.subtype)) names.push(s.subtype);
     });
 
+    names.forEach((n) => {
+      const opt = document.createElement("option");
+      opt.value = n;
+      opt.textContent = n;
+      filterSubtype.appendChild(opt);
+    });
+
+    filterSubtype.value = names.includes(previousValue) ? previousValue : "all";
+  }
+
+
+  /* =========================================================
+   TABLE ROWS
+   Every sub-type is listed, whether or not a scholarship
+   program has been created for it yet.
+  ========================================================= */
+
+  function buildTableRows(): any[] {
+
+    const rows: any[] = [];
+    const usedIds = new Set<any>();
+
+    scholarshipTypes.forEach((t) => {
+      (t.subtypes || []).forEach((st) => {
+        const programs = scholarships.filter(
+          (s) => s.type === t.name && s.subtype === st.name
+        );
+
+        if (programs.length) {
+          programs.forEach((p) => {
+            usedIds.add(p.id);
+            rows.push({ kind: "program", s: p, sub: st });
+          });
+        } else {
+          rows.push({ kind: "subtype", type: t, sub: st });
+        }
+      });
+    });
+
+    // Programs without a matching sub-type (older data, type-only).
+    scholarships.forEach((s) => {
+      if (!usedIds.has(s.id)) rows.push({ kind: "program", s, sub: null });
+    });
+
+    return rows;
+  }
+
+
+  /* =========================================================
+   RENDER SCHOLARSHIPS
+  ========================================================= */
+
+  function renderScholarships(): void {
+
+    if (!tableBody) return;
+
+    const query = searchInput
+      ? searchInput.value.toLowerCase().trim()
+      : "";
+
+    const typeVal = filterType ? filterType.value : "all";
+    const subtypeVal = filterSubtype ? filterSubtype.value : "all";
+
+    const filtered = buildTableRows().filter((row) => {
+
+      const typeName = row.kind === "program" ? row.s.type : row.type.name;
+      const subName = row.kind === "program" ? row.s.subtype : row.sub.name;
+      const name = row.kind === "program" ? row.s.name : row.sub.name;
+      const code = row.kind === "program" ? row.s.code : "";
+
+      const haystack = [name, code, typeName, subName]
+        .map((v) => String(v || "").toLowerCase());
+
+      const matchQuery = !query || haystack.some((v) => v.includes(query));
+      const matchType = typeVal === "all" || typeName === typeVal;
+      const matchSubtype = subtypeVal === "all" || subName === subtypeVal;
+
+      return matchQuery && matchType && matchSubtype;
+    });
+
+
     tableBody.innerHTML = "";
+
+
     if (filtered.length === 0) {
-      tableBody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding: 24px; color: #6b7280;">No scholarships found.</td></tr>`;
+
+      tableBody.innerHTML = `
+        <tr>
+          <td colspan="6"
+            style="
+              text-align:center;
+              padding:24px;
+              color:#6b7280;
+            ">
+            No scholarships found.
+          </td>
+        </tr>
+      `;
+
       return;
     }
 
-    filtered.forEach((s: any) => {
-      const tr = document.createElement("tr");
-      const badgeClass = s.status === "active" ? "badge-active" : "badge-inactive";
-      tr.innerHTML = `
-        <td>
-          <strong>${formatNameWithCode(s.name, s.code)}</strong>
-          <div style="font-size:12px; color:#6b7280;">${s.coverage || s.description || 'Standard Benefit Coverage'}</div>
-        </td>
-        <td>${s.type}${s.subtype ? '<div style="font-size:12px; color:#6b7280;">' + s.subtype + '</div>' : ''}</td>
-        <td style="white-space:nowrap !important; min-width:120px;"><span class="font-mono" style="white-space:nowrap !important; display:inline-block;">${s.slotsAvailable}&nbsp;/&nbsp;${s.slots}</span></td>
-        <td><span class="status-badge ${badgeClass}">${s.status}</span></td>
-        <td class="actions-cell">
-          <button type="button" class="btn-icon-action edit" title="Edit Program" onclick="editScholarship(event, ${s.id})">
-            <i data-lucide="pencil"></i>
-          </button>
-          <button type="button" class="btn-icon-action delete" title="Delete Program" onclick="confirmDeleteScholarship(event, ${s.id})">
-            <i data-lucide="trash-2"></i>
-          </button>
-        </td>
-      `;
 
-      tr.addEventListener("click", () => openViewModal(s));
+    filtered.forEach((row) => {
+
+      const tr = document.createElement("tr");
+
+      if (row.kind === "subtype") {
+        renderSubtypeRow(tr, row);
+      } else {
+        renderProgramRow(tr, row);
+      }
+
       tableBody.appendChild(tr);
+
     });
 
+
+    if (typeof lucide !== "undefined") {
+      lucide.createIcons();
+    }
+
+  }
+
+
+  function renderProgramRow(tr: HTMLTableRowElement, row: any): void {
+
+    const s = row.s;
+
+    const status = String(s.status || "").toLowerCase();
+    const badgeClass = status === "active" ? "badge-active" : "badge-inactive";
+
+    let displayName = s.name || "";
+
+    if (
+      s.code &&
+      !displayName.toLowerCase().includes(String(s.code).toLowerCase())
+    ) {
+      displayName = `${displayName} (${s.code})`;
+    }
+
+    // The sub-type's requirement is what Evaluation/Renewal enforce.
+    const gwa = Number(row.sub ? row.sub.gwaRequirement : s.gwaRequirement);
+
+    tr.innerHTML = `
+      <td>
+        <div class="name-cell">
+          <span class="name">${escapeHtml(displayName)}</span>
+          <span class="subtext">${escapeHtml(s.coverage || s.description || "Standard Benefit Coverage")}</span>
+        </div>
+      </td>
+
+      <td>
+        ${escapeHtml(s.type || "")}
+        ${s.subtype ? `<div style="font-size:12px; color:#6b7280;">${escapeHtml(s.subtype)}</div>` : ""}
+      </td>
+
+      <td><span class="font-mono">${isNaN(gwa) ? "—" : gwa.toFixed(2)}</span></td>
+
+      <td>
+        <span class="font-mono">
+          ${s.slotsAvailable ?? 0}
+          &nbsp;/&nbsp;
+          ${s.slots ?? 0}
+        </span>
+      </td>
+
+      <td>
+        <span class="status-badge ${badgeClass}">${escapeHtml(s.status || "")}</span>
+      </td>
+
+      <td class="actions-cell">
+        <button type="button" class="btn-icon-action edit" title="Edit Program" onclick="editScholarship(event, ${s.id})">
+          <i data-lucide="pencil"></i>
+        </button>
+        <button type="button" class="btn-icon-action delete" title="Delete Program" onclick="confirmDeleteScholarship(event, ${s.id})">
+          <i data-lucide="trash-2"></i>
+        </button>
+      </td>
+    `;
+
+    tr.addEventListener("click", () => openViewModal(s));
+  }
+
+
+  function renderSubtypeRow(tr: HTMLTableRowElement, row: any): void {
+
+    const t = row.type;
+    const st = row.sub;
+
+    tr.classList.add("subtype-row");
+    tr.setAttribute("data-subtype-row", String(st.id));
+
+    tr.innerHTML = `
+      <td>
+        <div class="name-cell">
+          <span class="name st-name">${escapeHtml(st.name)}</span>
+          <span class="subtext">No program created yet</span>
+        </div>
+      </td>
+
+      <td>${escapeHtml(t.name)}</td>
+
+      <td class="st-gwa font-mono">${Number(st.gwaRequirement).toFixed(2)}</td>
+
+      <td><span class="font-mono">—</span></td>
+
+      <td><span class="status-badge badge-none">Not set up</span></td>
+
+      <td class="actions-cell st-actions">
+        <button type="button" class="btn-icon-action" data-st-create title="Create program for this sub-type">
+          <i data-lucide="plus"></i>
+        </button>
+        <button type="button" class="btn-icon-action edit" data-st-edit title="Edit sub-type">
+          <i data-lucide="pencil"></i>
+        </button>
+        <button type="button" class="btn-icon-action delete" data-st-delete title="Delete sub-type">
+          <i data-lucide="trash-2"></i>
+        </button>
+      </td>
+    `;
+
+    const on = (sel: string, fn: () => void) => {
+      const btn = tr.querySelector(sel);
+      if (btn) btn.addEventListener("click", (e: Event) => { e.stopPropagation(); fn(); });
+    };
+
+    on("[data-st-create]", () => createProgramForSubtype(t, st.name));
+    on("[data-st-edit]", () => startEditSubtypeRow(tr, st));
+    on("[data-st-delete]", () => deleteSubtype(st.id));
+  }
+
+  function createProgramForSubtype(type: ScholarshipType, subtypeName: string): void {
+    openFormModal(null);
+    selectType(type.id, type.name);
+    selectSubtype(subtypeName);
+  }
+
+
+  /* =========================================================
+   SUB-TYPE INLINE EDIT / DELETE (rows without a program)
+  ========================================================= */
+
+  function escapeHtml(str: any): string {
+    const d = document.createElement("div");
+    d.textContent = str == null ? "" : String(str);
+    return d.innerHTML;
+  }
+
+  function startEditSubtypeRow(tr: HTMLElement, st: ScholarshipSubtype): void {
+
+    const nameEl = tr.querySelector(".st-name");
+    const gwaCell = tr.querySelector(".st-gwa");
+    const actionsCell = tr.querySelector(".st-actions");
+    if (!nameEl || !gwaCell || !actionsCell) return;
+
+    nameEl.innerHTML = '<input type="text" class="mt-edit-name" value="' + escapeHtml(st.name) + '" style="width:100%;">';
+    gwaCell.innerHTML = '<input type="number" step="0.01" min="0.01" class="mt-edit-gwa" value="' + escapeHtml(Number(st.gwaRequirement).toFixed(2)) + '" style="width:90px;">';
+    actionsCell.innerHTML =
+      '<button type="button" class="btn-icon-action" data-st-save title="Save"><i data-lucide="check"></i></button>' +
+      '<button type="button" class="btn-icon-action delete" data-st-cancel title="Cancel"><i data-lucide="x"></i></button>';
+
+    const stop = (e: Event) => e.stopPropagation();
+    tr.querySelectorAll("input").forEach((i) => i.addEventListener("click", stop));
+    actionsCell.querySelector("[data-st-save]")!.addEventListener("click", (e: Event) => { stop(e); saveSubtypeRow(st.id, tr); });
+    actionsCell.querySelector("[data-st-cancel]")!.addEventListener("click", (e: Event) => { stop(e); renderScholarships(); });
+
     if (typeof lucide !== "undefined") lucide.createIcons();
+  }
+
+  async function saveSubtypeRow(id: number, tr: HTMLElement): Promise<void> {
+
+    const nameInput = tr.querySelector(".mt-edit-name") as HTMLInputElement | null;
+    const gwaInput = tr.querySelector(".mt-edit-gwa") as HTMLInputElement | null;
+    const name = nameInput ? nameInput.value.trim() : "";
+    const gwa = gwaInput ? gwaInput.value.trim() : "";
+
+    if (!name || !gwa || Number(gwa) <= 0) {
+      alert("Please enter a name and a valid GWA greater than 0.");
+      return;
+    }
+
+    try {
+      const apiPath = "api";
+      const res = await fetch(`${apiPath}/scholarship_types.php`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "update_subtype", id, name, gwa_requirement: gwa }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        await loadScholarshipTypes();
+        populateFilterTypes();
+        renderScholarships();
+      } else {
+        alert(json.message || "Failed to update sub-type.");
+      }
+    } catch (e) {
+      alert("Server error.");
+    }
+  }
+
+  async function deleteSubtype(id: number): Promise<void> {
+
+    if (!confirm("Delete this sub-type? This cannot be undone.")) return;
+
+    try {
+      const apiPath = "api";
+      const res = await fetch(`${apiPath}/scholarship_types.php`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "delete_subtype", id }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        await loadScholarshipTypes();
+        populateFilterTypes();
+        renderScholarships();
+      } else {
+        alert(json.message || "Failed to delete sub-type.");
+      }
+    } catch (e) {
+      alert("Server error.");
+    }
   }
 
   function openViewModal(s: any): void {
@@ -336,6 +715,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const matchedType = scholarshipTypes.find((t) => t.name === editItem.type);
       selectedTypeId = matchedType ? matchedType.id : null;
+      pickedSubtypes = [];
+      if (schGwa) { schGwa.disabled = false; schGwa.placeholder = "e.g. 1.75"; }
       if (schType) schType.value = editItem.type || '';
       if (schSubtype) schSubtype.value = editItem.subtype || '';
       renderTypePicker(editItem.type);
@@ -346,6 +727,8 @@ document.addEventListener("DOMContentLoaded", () => {
       if (schForm) schForm.reset();
       if (schId) schId.value = "";
       selectedTypeId = null;
+      pickedSubtypes = [];
+      if (schGwa) { schGwa.disabled = false; schGwa.placeholder = "e.g. 1.75"; }
       if (schType) schType.value = "";
       if (schSubtype) schSubtype.value = "";
       renderTypePicker();
@@ -392,6 +775,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (json.success) {
         if (!scholarshipTypes.some((t) => t.id === json.id)) {
           scholarshipTypes.push({ id: json.id, name: json.name, subtypes: [] });
+          populateFilterTypes();
         }
         selectType(json.id, json.name);
       } else {
@@ -402,37 +786,193 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  setupPillAdd("schSubtypeAddBtn", "schSubtypeAddInput", async (value) => {
+  /* =========================================================
+     BULK ADD SUB-TYPES (with required GWA per sub-type)
+  ========================================================= */
+
+  let subtypeBulkRowCount = 0;
+
+  function addSubtypeBulkRow(): void {
+    const rows = document.getElementById("subtypeBulkRows");
+    if (!rows) return;
+    const row = document.createElement("div");
+    row.className = "subtype-bulk-row";
+    row.innerHTML =
+      '<input type="text" class="subtype-bulk-name" placeholder="Sub-type name">' +
+      '<input type="number" step="0.01" min="0.01" class="subtype-bulk-gwa" placeholder="GWA e.g. 1.75">' +
+      '<button type="button" class="subtype-bulk-remove" title="Remove row"><i data-lucide="x"></i></button>';
+    rows.appendChild(row);
+
+    const removeBtn = row.querySelector<HTMLElement>(".subtype-bulk-remove");
+    if (removeBtn) removeBtn.addEventListener("click", () => row.remove());
+
+    subtypeBulkRowCount++;
+    if (typeof lucide !== "undefined") lucide.createIcons();
+  }
+
+  function openSubtypeBulkModal(): void {
     if (!selectedTypeId) {
       alert("Select a Type first.");
       return;
     }
+    const overlay = document.getElementById("subtypeBulkOverlay");
+    const rows = document.getElementById("subtypeBulkRows");
+    const label = document.getElementById("subtypeBulkTypeLabel");
+    if (!overlay || !rows) return;
+
+    rows.innerHTML = "";
+    subtypeBulkRowCount = 0;
+    addSubtypeBulkRow();
+    addSubtypeBulkRow();
+    addSubtypeBulkRow();
+
+    const type = scholarshipTypes.find((t) => t.id === selectedTypeId);
+    if (label) label.textContent = "Under: " + (type ? type.name : "");
+    overlay.classList.add("open");
+  }
+
+  function closeSubtypeBulkModal(): void {
+    const overlay = document.getElementById("subtypeBulkOverlay");
+    if (overlay) overlay.classList.remove("open");
+  }
+
+  async function saveSubtypeBulk(): Promise<void> {
+    if (!selectedTypeId) return;
+
+    const rowEls = document.querySelectorAll<HTMLElement>("#subtypeBulkRows .subtype-bulk-row");
+    const items: { name: string; gwa_requirement: string }[] = [];
+    let hasError = false;
+
+    rowEls.forEach((row) => {
+      const nameInput = row.querySelector<HTMLInputElement>(".subtype-bulk-name");
+      const gwaInput = row.querySelector<HTMLInputElement>(".subtype-bulk-gwa");
+      if (nameInput) nameInput.classList.remove("error");
+      if (gwaInput) gwaInput.classList.remove("error");
+
+      const name = nameInput ? nameInput.value.trim() : "";
+      const gwa = gwaInput ? gwaInput.value.trim() : "";
+      if (!name && !gwa) return; // skip a fully empty row
+
+      if (!name || !gwa || Number(gwa) <= 0) {
+        hasError = true;
+        if (nameInput && !name) nameInput.classList.add("error");
+        if (gwaInput && (!gwa || Number(gwa) <= 0)) gwaInput.classList.add("error");
+        return;
+      }
+      items.push({ name, gwa_requirement: gwa });
+    });
+
+    if (hasError) {
+      alert("Please fill in both a name and a valid GWA (greater than 0) for every sub-type row.");
+      return;
+    }
+    if (items.length === 0) {
+      alert("Add at least one sub-type.");
+      return;
+    }
+
     try {
       const res = await fetch("api/scholarship_types.php", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "add_subtype", type_id: selectedTypeId, name: value }),
+        body: JSON.stringify({ action: "add_subtypes_batch", type_id: selectedTypeId, subtypes: items }),
       });
       const json = await res.json();
       if (json.success) {
         const type = scholarshipTypes.find((t) => t.id === selectedTypeId);
-        if (type && !type.subtypes.some((s) => s.id === json.id)) {
-          type.subtypes.push({ id: json.id, name: json.name });
-        }
-        selectSubtype(json.name);
+        let lastName = "";
+        (json.subtypes || []).forEach((s: any) => {
+          if (type && !type.subtypes.some((existing) => existing.id === s.id)) {
+            type.subtypes.push({ id: s.id, name: s.name, gwaRequirement: s.gwaRequirement });
+          }
+          lastName = s.name;
+        });
+        closeSubtypeBulkModal();
+        if (isAddMode()) {
+          // Pick everything that was just added.
+          (json.subtypes || []).forEach((s: any) => { if (!pickedSubtypes.includes(s.name)) pickedSubtypes.push(s.name); });
+          if (schSubtype) schSubtype.value = pickedSubtypes[0] || "";
+          renderSubtypePicker();
+          updateIdentityPreview();
+          applyPickedGwa();
+        } else if (lastName) selectSubtype(lastName);
+        else renderSubtypePicker();
+        // New sub-types show up in the table right away.
+        populateFilterTypes();
+        renderScholarships();
       } else {
-        alert(json.message || "Failed to add sub-type.");
+        alert(json.message || "Failed to save sub-types.");
       }
     } catch (e) {
       alert("Server error.");
     }
-  });
+  }
+
+  const subtypeSelectAllBtn = document.getElementById("schSubtypeSelectAll");
+  if (subtypeSelectAllBtn) subtypeSelectAllBtn.addEventListener("click", toggleAllSubtypes);
+
+  const subtypeAddBtn = document.getElementById("schSubtypeAddBtn");
+  if (subtypeAddBtn) subtypeAddBtn.addEventListener("click", openSubtypeBulkModal);
+
+  const subtypeBulkAddRowBtn = document.getElementById("subtypeBulkAddRowBtn");
+  if (subtypeBulkAddRowBtn) subtypeBulkAddRowBtn.addEventListener("click", addSubtypeBulkRow);
+
+  const subtypeBulkCancelBtn = document.getElementById("subtypeBulkCancelBtn");
+  if (subtypeBulkCancelBtn) subtypeBulkCancelBtn.addEventListener("click", closeSubtypeBulkModal);
+
+  const subtypeBulkCloseBtn = document.getElementById("subtypeBulkCloseBtn");
+  if (subtypeBulkCloseBtn) subtypeBulkCloseBtn.addEventListener("click", closeSubtypeBulkModal);
+
+  const subtypeBulkSaveBtn = document.getElementById("subtypeBulkSaveBtn");
+  if (subtypeBulkSaveBtn) subtypeBulkSaveBtn.addEventListener("click", saveSubtypeBulk);
+
+  async function saveMultipleScholarships(): Promise<void> {
+    if (!schForm) return;
+    const type = scholarshipTypes.find((t) => t.id === selectedTypeId);
+    const typeName = schType ? schType.value : "";
+    let created = 0;
+    const skipped: string[] = [];
+    const failed: string[] = [];
+
+    for (const subName of pickedSubtypes) {
+      if (scholarships.some((s: any) => s.type === typeName && s.subtype === subName)) { skipped.push(subName); continue; }
+
+      const sub = type ? type.subtypes.find((s) => s.name === subName) : undefined;
+      const { name, code } = computeIdentity(typeName, subName);
+      const fd = new FormData(schForm);
+      fd.set("name", name);
+      fd.set("code", code);
+      fd.set("subtype", subName);
+      fd.set("gwa_requirement", sub ? String(sub.gwaRequirement) : "1.75");
+
+      try {
+        const res = await fetch("api/list_scholarships.php", { method: "POST", body: fd });
+        const json = await res.json();
+        if (json.success) created++; else failed.push(subName);
+      } catch (e) {
+        failed.push(subName);
+      }
+    }
+
+    closeFormModal();
+    await loadScholarships();
+
+    const notes: string[] = [];
+    if (skipped.length) notes.push("Skipped (already added): " + skipped.join(", "));
+    if (failed.length) notes.push("Failed: " + failed.join(", "));
+    alert(created + " scholarship" + (created === 1 ? "" : "s") + " added." + (notes.length ? "\n\n" + notes.join("\n") : ""));
+  }
 
   if (schForm) {
     schForm.addEventListener("submit", async (e) => {
       e.preventDefault();
       if (!schType || !schType.value) {
         alert("Please select a scholarship Type.");
+        return;
+      }
+      // Several sub-types picked in Add mode: create one program per pick.
+      if (isAddMode() && pickedSubtypes.length > 1) {
+        await saveMultipleScholarships();
         return;
       }
       const formData = new FormData(schForm);
@@ -480,9 +1020,19 @@ document.addEventListener("DOMContentLoaded", () => {
   if (schDeleteCancelBtn) schDeleteCancelBtn.addEventListener("click", closeDeleteModal);
 
   if (searchInput) searchInput.addEventListener("input", renderScholarships);
-  if (filterType) filterType.addEventListener("change", renderScholarships);
+  if (filterType) {
+    filterType.addEventListener("change", () => {
+      if (filterSubtype) filterSubtype.value = "all";
+      populateFilterSubtypes();
+      renderScholarships();
+    });
+  }
+  if (filterSubtype) filterSubtype.addEventListener("change", renderScholarships);
   if (filterStatus) filterStatus.addEventListener("change", renderScholarships);
 
-  loadScholarshipTypes().then(() => renderTypePicker());
-  loadScholarships();
+  // Types first, so every sub-type row can be listed with the programs.
+  loadScholarshipTypes().then(() => {
+    renderTypePicker();
+    return loadScholarships();
+  });
 });

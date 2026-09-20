@@ -6,6 +6,7 @@ $page_js = "dashboard.js";
 include __DIR__ . '/../includes/header.php';
 
 require_once __DIR__ . '/../config/db_helper.php';
+require_once __DIR__ . '/../includes/scholarship_distribution.php';
 
 function timeAgo(string $datetime): string {
     $ts = strtotime($datetime);
@@ -97,6 +98,10 @@ try {
     $monthly_labels = array_values(array_map(fn($m) => $m['label'], $monthly_buckets));
     $monthly_counts = array_values(array_map(fn($m) => $m['count'], $monthly_buckets));
 
+    // Scholarship Distribution — approved scholars per scholarship type, live
+    // from the records table (see includes/scholarship_distribution.php).
+    $distribution = getScholarshipDistribution($pdo);
+
 } catch (Exception $e) {
     $total_applicants = 0;
     $under_evaluation = 0;
@@ -105,6 +110,7 @@ try {
     $recent_activity = [];
     $monthly_labels = [];
     $monthly_counts = [];
+    $distribution = ['types' => [], 'totalApproved' => 0, 'totalTypes' => 0, 'mostPopular' => null];
 }
 ?>
 <script>
@@ -112,6 +118,7 @@ try {
         labels: <?= json_encode($monthly_labels) ?>,
         counts: <?= json_encode($monthly_counts) ?>
     };
+    window.scholarshipDistributionData = <?= json_encode($distribution) ?>;
 </script>
 
 <div class="main-content">
@@ -162,7 +169,23 @@ try {
     <div class="charts-wrapper">
         <div class="chart-block">
             <div class="chart-title">Scholarship Distribution</div>
-            <canvas id="scholarshipChart" role="img" aria-label="Bar chart of scholarship distribution by type."></canvas>
+            <div class="dist-summary">
+                <div class="dist-stat">
+                    <span class="dist-stat-label">Total Approved Scholars</span>
+                    <strong class="dist-stat-value" id="distTotalApproved"><?= number_format($distribution['totalApproved']) ?></strong>
+                </div>
+                <div class="dist-stat">
+                    <span class="dist-stat-label">Total Scholarship Types</span>
+                    <strong class="dist-stat-value" id="distTotalTypes"><?= number_format($distribution['totalTypes']) ?></strong>
+                </div>
+                <div class="dist-stat dist-stat-wide">
+                    <span class="dist-stat-label">Most Populated Scholarship Type</span>
+                    <strong class="dist-stat-value dist-stat-text" id="distMostPopular"><?= $distribution['mostPopular'] ? htmlspecialchars($distribution['mostPopular']['type']) . ' (' . (int)$distribution['mostPopular']['count'] . ')' : '—' ?></strong>
+                </div>
+            </div>
+            <div class="dist-chart-wrap" id="distChartWrap">
+                <canvas id="scholarshipChart" role="img" aria-label="Horizontal bar chart of approved scholars by scholarship type."></canvas>
+            </div>
         </div>
 
         <div class="chart-block">
