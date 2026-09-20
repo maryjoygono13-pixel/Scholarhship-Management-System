@@ -1,7 +1,17 @@
 <?php
 if (session_status() === PHP_SESSION_NONE) {
-    session_start();
 
+    $isHttps = !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off';
+
+    session_set_cookie_params([
+        'lifetime' => 0,
+        'path' => '/',
+        'secure' => $isHttps,
+        'httponly' => true,
+        'samesite' => 'Lax'
+    ]);
+
+    session_start();
     /*
      * PHP's default session handler holds an exclusive lock on the
      * session file for as long as the request is running. Since
@@ -29,9 +39,12 @@ define('SITE_BASE', $scriptDir);
 define('SITE_URL', $protocol . '://' . $host . SITE_BASE);
 
 function checkAuth() {
-    if (empty($_SESSION['user_logged_in'])) {
+    if (
+        empty($_SESSION['user_logged_in']) ||
+        empty($_SESSION['user_role']) ||
+        strtolower($_SESSION['user_role']) !== 'registrar'
+    ) {
         header("Location: " . SITE_BASE . "/login");
         exit();
     }
 }
-

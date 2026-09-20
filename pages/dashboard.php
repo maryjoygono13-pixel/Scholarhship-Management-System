@@ -167,30 +167,36 @@ try {
 
     <!-- Charts -->
     <div class="charts-wrapper">
+        <div class="dist-summary">
+            <div class="dist-stat">
+                <span class="dist-stat-label">Total Approved Scholars</span>
+                <strong class="dist-stat-value" id="distTotalApproved"><?= number_format($distribution['totalApproved']) ?></strong>
+            </div>
+            <div class="dist-stat">
+                <span class="dist-stat-label">Total Scholarship Types</span>
+                <strong class="dist-stat-value" id="distTotalTypes"><?= number_format($distribution['totalTypes']) ?></strong>
+            </div>
+            <div class="dist-stat dist-stat-wide">
+                <span class="dist-stat-label">Most Populated Scholarship Type</span>
+                <strong class="dist-stat-value dist-stat-text" id="distMostPopular"><?= $distribution['mostPopular'] ? htmlspecialchars($distribution['mostPopular']['type']) . ' (' . (int)$distribution['mostPopular']['count'] . ')' : '—' ?></strong>
+            </div>
+        </div>
         <div class="chart-block">
             <div class="chart-title">Scholarship Distribution</div>
-            <div class="dist-summary">
-                <div class="dist-stat">
-                    <span class="dist-stat-label">Total Approved Scholars</span>
-                    <strong class="dist-stat-value" id="distTotalApproved"><?= number_format($distribution['totalApproved']) ?></strong>
+            <div class="chart-area">
+                <div class="dist-chart-wrap" id="distChartWrap">
+                    <canvas id="scholarshipChart" role="img" aria-label="Horizontal bar chart of approved scholars by scholarship type."></canvas>
                 </div>
-                <div class="dist-stat">
-                    <span class="dist-stat-label">Total Scholarship Types</span>
-                    <strong class="dist-stat-value" id="distTotalTypes"><?= number_format($distribution['totalTypes']) ?></strong>
-                </div>
-                <div class="dist-stat dist-stat-wide">
-                    <span class="dist-stat-label">Most Populated Scholarship Type</span>
-                    <strong class="dist-stat-value dist-stat-text" id="distMostPopular"><?= $distribution['mostPopular'] ? htmlspecialchars($distribution['mostPopular']['type']) . ' (' . (int)$distribution['mostPopular']['count'] . ')' : '—' ?></strong>
-                </div>
-            </div>
-            <div class="dist-chart-wrap" id="distChartWrap">
-                <canvas id="scholarshipChart" role="img" aria-label="Horizontal bar chart of approved scholars by scholarship type."></canvas>
             </div>
         </div>
 
         <div class="chart-block">
             <div class="chart-title">Monthly Applications</div>
-            <canvas id="monthlyChart" role="img" aria-label="Bar chart of monthly applications."></canvas>
+            <div class="chart-area">
+                <div class="monthly-chart-wrap">
+                    <canvas id="monthlyChart" role="img" aria-label="Bar chart of monthly applications."></canvas>
+                </div>
+            </div>
         </div>
     </div>
 

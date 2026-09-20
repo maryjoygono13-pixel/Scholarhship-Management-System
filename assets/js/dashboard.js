@@ -19,6 +19,25 @@ document.addEventListener("DOMContentLoaded", () => {
             lines.push(current);
         return lines;
     }
+    // Both charts share this plot height so the two cards line up.
+    const CHART_AREA_HEIGHT = 320;
+    // Both charts use the same axis sizes, so their bars start and end in line.
+    const Y_AXIS_WIDTH = 40;
+    const X_AXIS_HEIGHT = 56;
+    const COLUMN_MIN_WIDTH = 58;
+    const chartLayout = { padding: { top: 22, right: 8, bottom: 0, left: 0 } };
+    const fitYAxis = (scale) => { scale.width = Y_AXIS_WIDTH; };
+    const fitXAxis = (scale) => { scale.height = X_AXIS_HEIGHT; };
+
+    // "Community Service or Leadership Scholarship" -> "Community Service Leadership":
+    // generic filler words are dropped for the axis (the tooltip keeps the full name).
+    function shortTypeName(name) {
+        const paren = name.match(/\(([^)]+)\)/);
+        if (paren) return paren[1].trim();
+        const filler = /^(scholarships?|programs?|types?|of|and|or|the|&)$/i;
+        const kept = name.split(/\s+/).filter((w) => w && !filler.test(w));
+        return kept.length ? kept.join(" ") : name;
+    }
     const chartColors = ["#238f54", "#2ea263", "#3ab774", "#1b6336", "#42c082", "#5fd39a"];
     /* =========================================================
        MONTHLY APPLICATIONS
@@ -41,7 +60,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const labels = Object.keys(dataObj);
         const values = Object.values(dataObj);
         new Chart(ctx, {
-            type: "bar",
+            type: "bar", plugins: [barValueLabels],
             data: {
                 labels: labels.map((l) => wrapLabel(l)),
                 datasets: [{
@@ -53,7 +72,7 @@ document.addEventListener("DOMContentLoaded", () => {
             },
             options: {
                 responsive: true,
-                maintainAspectRatio: true,
+                maintainAspectRatio: false, layout: chartLayout,
                 plugins: {
                     legend: { display: false },
                     tooltip: {
@@ -63,15 +82,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     }
                 },
                 scales: {
-                    y: {
-                        beginAtZero: true,
-                        ticks: { precision: 0, color: "#6b7280" },
-                        grid: { color: "rgba(0,0,0,0.04)" }
-                    },
-                    x: {
-                        ticks: { color: "#6b7280" },
-                        grid: { display: false }
-                    }
+                    y: { beginAtZero: true, ticks: { precision: 0, color: "#6b7280" }, grid: { color: "rgba(0,0,0,0.04)" }, afterFit: fitYAxis }, x: { ticks: { color: "#6b7280", autoSkip: false, maxRotation: 0 }, grid: { display: false }, afterFit: fitXAxis }
                 }
             }
         });
@@ -96,9 +107,10 @@ document.addEventListener("DOMContentLoaded", () => {
             ctx.save();
             ctx.font = "600 12px sans-serif";
             ctx.fillStyle = "#374151";
-            ctx.textBaseline = "middle";
+            ctx.textBaseline = "bottom";
+      ctx.textAlign = "center";
             meta.data.forEach((bar, i) => {
-                ctx.fillText(String(values[i]), bar.x + 8, bar.y);
+                ctx.fillText(String(values[i]), bar.x, bar.y - 4);
             });
             ctx.restore();
         }
@@ -115,12 +127,12 @@ document.addEventListener("DOMContentLoaded", () => {
         setText("distMostPopular", data.mostPopular ? `${data.mostPopular.type} (${data.mostPopular.count})` : "—");
         if (!distCanvas)
             return;
-        const labels = items.map((i) => wrapLabel(i.type, 30));
+        const labels = items.map((i) => wrapLabel(shortTypeName(i.type).replace(/-(?=\w)/g, "- "), 10));
         const values = items.map((i) => i.count);
         const colors = items.map((_, i) => chartColors[i % chartColors.length]);
         // One row per type: the chart grows with the number of types.
         if (distWrap)
-            distWrap.style.height = Math.max(220, items.length * 46 + 50) + "px";
+            distWrap.style.minWidth = items.length * COLUMN_MIN_WIDTH + "px";
         if (distChart) {
             distChart.data.labels = labels;
             distChart.data.datasets[0].data = values;
@@ -141,10 +153,9 @@ document.addEventListener("DOMContentLoaded", () => {
                     }]
             },
             options: {
-                indexAxis: "y",
                 responsive: true,
                 maintainAspectRatio: false,
-                layout: { padding: { right: 32 } },
+                layout: chartLayout,
                 plugins: {
                     legend: { display: false },
                     tooltip: {
@@ -153,20 +164,12 @@ document.addEventListener("DOMContentLoaded", () => {
                         cornerRadius: 6,
                         callbacks: {
                             title: (ctx) => items[ctx[0].dataIndex] ? items[ctx[0].dataIndex].type : "",
-                            label: (ctx) => `Total Approved Scholars: ${ctx.parsed.x}`
+                            label: (ctx) => `Total Approved Scholars: ${ctx.parsed.y}`
                         }
                     }
                 },
                 scales: {
-                    x: {
-                        beginAtZero: true,
-                        ticks: { precision: 0, color: "#6b7280" },
-                        grid: { color: "rgba(0,0,0,0.04)" }
-                    },
-                    y: {
-                        ticks: { color: "#374151" },
-                        grid: { display: false }
-                    }
+                    x: { ticks: { color: "#374151", font: { size: 10 }, maxRotation: 0, minRotation: 0, autoSkip: false }, grid: { display: false }, afterFit: fitXAxis }, y: { beginAtZero: true, ticks: { precision: 0, color: "#6b7280" }, grid: { color: "rgba(0,0,0,0.04)" }, afterFit: fitYAxis }
                 }
             },
             plugins: [barValueLabels]

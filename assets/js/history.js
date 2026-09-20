@@ -46,7 +46,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function formatDateTime(value) {
         if (!value) return "";
-        const iso = value.includes("T") ? value : value.replace(" ", "T");
+        // Timestamps are stored in UTC (SQLite CURRENT_TIMESTAMP, no zone marker);
+        // tag them so the browser converts to the viewer's local time.
+        const iso = value.includes("T") ? value : value.replace(" ", "T") + "Z";
         const d = new Date(iso);
         if (isNaN(d.getTime())) return esc(value);
         return d.toLocaleString(undefined, {
@@ -66,6 +68,9 @@ document.addEventListener("DOMContentLoaded", () => {
         if (date) params.set("date", date);
         if (action && action !== "all") params.set("action", action);
         if (module && module !== "all") params.set("module", module);
+
+        // Minutes east of UTC, so the server can work out the viewer's "today".
+        params.set("tz", String(-new Date().getTimezoneOffset()));
 
         Object.keys(extra || {}).forEach(k => params.set(k, extra[k]));
         return params;

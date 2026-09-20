@@ -525,6 +525,12 @@ function createSystemNotification(
             $updateStmt = $pdo->prepare($updateSql);
             $updateStmt->execute($updateParams);
 
+            // Records are the source of truth for the dashboard's Scholarship
+            // Distribution, so a changed type / ID carries over to this
+            // applicant's records right away.
+            $pdo->prepare("UPDATE records SET scholarship_type = ?, student_id = ? WHERE applicant_id = ?")
+                ->execute([$scholarshipType, $studentId, $id]);
+
             $fullName =
                 trim(
                     $firstName . ' ' .
