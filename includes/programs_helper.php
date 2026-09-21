@@ -38,16 +38,14 @@ function normalizeProgramKey(string $raw): string {
 }
 
 /*
- * The acronym of whatever program was written ("BS Nursing · 2nd Year" -> "BSN"). A program this
- * school doesn't offer (old sample data) keeps its own name, minus a trailing year level, so it
- * still shows up in filters. Blank when no program is known.
+ * The acronym of whatever program was written ("BS Nursing · 2nd Year" -> "BSN"). Blank when it
+ * isn't one of the programs the school offers (old sample data such as "BS Criminology").
  */
 function programAcronym(?string $raw): string {
     $raw = trim((string)$raw);
     if ($raw === '') return '';
     $canonical = resolveProgramName($raw);
-    if ($canonical !== null) return PROGRAM_ACRONYMS[$canonical] ?? $canonical;
-    return trim(preg_replace('/\s*·.*$/u', '', $raw));
+    return $canonical !== null ? (PROGRAM_ACRONYMS[$canonical] ?? '') : '';
 }
 
 // The canonical program name for whatever was written, or null when it isn't a real program.

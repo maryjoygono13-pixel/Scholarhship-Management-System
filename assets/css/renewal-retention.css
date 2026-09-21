@@ -1,126 +1,127 @@
 * { box-sizing: border-box; }
 
-
-
+/* Same width as the Records page. */
 .page {
-   max-width: 1000px;
-    margin: 0 auto;
-  }
-
-
-.summary-row {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 12px;
-  margin-bottom: 20px;
+  max-width: 1120px;
+  margin: 0 auto;
 }
 
-@media (max-width: 720px) {
-  .summary-row {
-    grid-template-columns: repeat(2, 1fr);
-  }
+/* ---------------- Summary cards ---------------- */
+.summary-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+@media (max-width: 900px) {
+  .summary-row { grid-template-columns: repeat(2, 1fr); }
 }
 
 .summary-card {
   background: #fff;
   border: 1px solid var(--slate-200, #e2e8f0);
   border-radius: 12px;
-  padding: 16px 18px;
+  padding: 16px 20px;
 }
 
 .summary-card .label {
   color: #6b7280;
-  font-size: 14px;
+  font-size: 13.5px;
   font-weight: 500;
 }
 
 .summary-card .value {
-  font-size: 24px;
+  font-size: 26px;
   font-weight: 700;
+  line-height: 1.1;
   color: #238f54;
-  margin-top: 4px;
+  margin-top: 6px;
 }
 
 .summary-card.pending .value { color: #b45309; }
 .summary-card.eligible .value { color: #238f54; }
-.summary-card.at-risk .value { color: #dc2626; }
 .summary-card.terminated .value { color: #dc2626; }
 
-/* ---------------- Toolbar ---------------- */
-.toolbar { display: flex; gap: 12px; margin-bottom: 18px; align-items: center; }
-
-.toolbar input[type="search"],
-.toolbar select {
-  font-size: 14px;
-  font-weight: 400;
-  padding: 9px 12px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: #ffff;
-  color: var(--ink-900);
-}
-
-.toolbar input[type="search"] { flex: 1; max-width: 320px;   }
-
-.btn-export {
-  display: inline-flex;
+/* ---------------- Toolbar ----------------
+   The search box, dropdowns and their sizes come from the shared .table-header-toolbar in
+   style.css (the same as Records); only the Export button placement is set here. */
+.table-header-toolbar .toolbar-actions {
+  display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 8px;
+  gap: 10px;
   margin-left: auto;
-  align-self: stretch;   /* same height as the filter dropdowns */
-  flex-shrink: 0;
-  white-space: nowrap;
-  box-sizing: border-box;
-  padding: 0 16px;
-  border: 1px solid transparent;
-  border-radius: 6px;
-  background: var(--green-900, #134e2a);
-  color: #fff;
-  font-family: inherit;
-  font-size: 14px;
-  font-weight: 500;
-  line-height: 1;
-  cursor: pointer;
-  transition: 0.3s;
 }
 
-.btn-export:hover { background: var(--green-800, #1b6336); }
+.table-header-toolbar .toolbar-actions .btn-export {
+  height: 40px;
+  white-space: nowrap;
+}
 
-.btn-export svg, .btn-export i { width: 16px; height: 16px; }
+
+/* ---------------- Filter row ----------------
+   Filters and Export share one row. The filter group takes the free space and wraps inside
+   itself if it has to, so Export stays at the top right instead of dropping onto its own line. */
+.table-header-toolbar {
+  flex-wrap: nowrap;
+  align-items: flex-start;
+}
+
+.table-header-toolbar .toolbar {
+  flex: 1 1 auto;
+  min-width: 0;
+  gap: 10px;
+}
+
+.table-header-toolbar .toolbar-actions { flex: none; }
+
+.table-header-toolbar .search-wrap {
+  flex: 0 0 200px;
+  max-width: 200px;
+}
+
+.table-header-toolbar .search-wrap input { width: 100%; }
+
+.table-header-toolbar select { padding: 0 32px 0 12px; }
 
 /* ---------------- Table ---------------- */
-.ledger {
-  width: 100%;
-  border-collapse: collapse;
-  background:#ffff;
-  border: 1px solid var(--line);
+.table-card {
+  background: #fff;
+  border: 1px solid var(--slate-200, #e2e8f0);
   border-radius: 12px;
   overflow: hidden;
 }
 
+.table-wrap { overflow-x: auto; }
+
+.ledger {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+  font-size: 13.5px;
+}
+
 .ledger th {
   text-align: left;
-  font-family: var(--font-mono);
   font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
-  letter-spacing: 0.07em;
-  color: var(--ink-600);
-  background: var(--paper-100);
+  color: var(--slate-500, #64748b);
   padding: 12px 16px;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--slate-200, #e2e8f0);
+  white-space: nowrap;
 }
 
 .ledger td {
-  padding: 13px 16px;
-  border-bottom: 1px solid var(--line);
-  font-size: 0.92rem;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--slate-100, #f1f5f9);
+  color: var(--slate-700, #334155);
   vertical-align: middle;
 }
 
 .ledger tr:last-child td { border-bottom: none; }
 .ledger tbody tr { cursor: pointer; }
-.ledger tbody tr:hover { background: rgba(184,145,46,0.06); }
 
 .student-name { font-weight: 600; }
 .student-id { font-family: var(--font-mono); font-size: 0.78rem; color: var(--ink-600); }
@@ -128,7 +129,6 @@
 .metric { font-family: var(--font-mono); font-size: 0.85rem; }
 .metric.fail { color: var(--status-terminated); font-weight: 600; }
 .metric.pass { color: var(--status-eligible); }
-
 /* ---------------- Seal badges ---------------- */
 .seal {
   display: inline-flex;

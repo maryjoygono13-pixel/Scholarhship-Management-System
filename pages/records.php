@@ -5,6 +5,8 @@ $page_css = "records.css";
 $page_js = "records.js";
 $extra_js = ["curriculum-data.js"];
 
+require_once __DIR__ . '/../includes/programs_helper.php';
+
 include __DIR__ . '/../includes/header.php';
 ?>
 
@@ -25,6 +27,9 @@ include __DIR__ . '/../includes/header.php';
             <div class="select-wrap">
                 <select id="filterProgram">
                     <option value="all">Programs</option>
+                    <?php foreach (PROGRAM_ACRONYMS as $programAcronym): ?>
+                    <option value="<?= $programAcronym ?>"><?= $programAcronym ?></option>
+                    <?php endforeach; ?>
                 </select>
                 <i data-lucide="chevron-down"></i>
             </div>
@@ -56,7 +61,7 @@ include __DIR__ . '/../includes/header.php';
         <div class="toolbar-actions">
             <button class="btn-primary btn-export" id="exportRecordsBtn">
                 <i data-lucide="download"></i>
-                Export Records
+                Export
             </button>
         </div>
     </div>

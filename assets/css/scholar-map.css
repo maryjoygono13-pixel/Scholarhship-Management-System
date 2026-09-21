@@ -171,15 +171,3 @@
     display: inline-block;
     flex-shrink: 0;
 }
-
-/* Students that can't be pinned yet (no town on file): a strip across the top of the card */
-.map-unlocated {
-    flex: none;
-    margin: 0;
-    padding: 8px 14px;
-    background: #fff7ed;
-    border-bottom: 1px solid #fed7aa;
-    color: #9a3412;
-    font-size: 13px;
-    line-height: 1.4;
-}

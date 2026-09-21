@@ -186,17 +186,6 @@ async function loadStudentLocations(map) {
             throw new Error("Invalid response format.");
         }
 
-        // Students with no location yet (their town isn't set): listed above the map instead of pinned somewhere made up.
-        const note = document.getElementById("mapUnlocated");
-        if (note) {
-            const missing = Array.isArray(result.unlocated) ? result.unlocated : [];
-            note.hidden = missing.length === 0;
-            note.textContent = missing.length
-                ? missing.length + " student" + (missing.length === 1 ? "" : "s") + " not shown: no location yet (set their Municipality on the Applicants page) — " + missing.map((s) => s.name).join(", ")
-                : "";
-            map.invalidateSize();
-        }
-
         // Clear existing markers
         scholarMarkers.forEach(item => {
             if (map.hasLayer(item.marker)) {

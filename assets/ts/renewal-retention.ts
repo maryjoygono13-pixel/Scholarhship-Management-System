@@ -79,7 +79,6 @@ document.addEventListener("DOMContentLoaded", () => {
     };
     fill(schoolYearFilter, "School Year", ledgerData.map((r: any) => r.schoolYear));
     fill(scholarshipFilter, "Scholarship Type", ledgerData.map((r: any) => r.scholarshipType));
-    fill(programFilter, "Program", ledgerData.map((r: any) => r.programCode));
   }
 
   function renderLedger(): void {

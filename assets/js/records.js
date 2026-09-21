@@ -77,19 +77,8 @@ document.addEventListener("DOMContentLoaded", () => {
             years.map((y) => '<option value="' + y + '">' + y + '</option>').join("");
         filterSy.value = years.includes(current) ? current : "all";
     }
-    // Program choices (acronyms) come from the records themselves.
-    function populateProgramFilter() {
-        if (!filterProgram)
-            return;
-        const current = filterProgram.value;
-        const codes = Array.from(new Set(recordsData.map((r) => r.programCode))).filter(Boolean).sort();
-        filterProgram.innerHTML = '<option value="all">Programs</option>' +
-            codes.map((c) => '<option value="' + c + '">' + c + '</option>').join("");
-        filterProgram.value = codes.includes(current) ? current : "all";
-    }
     function populateFilterTypes() {
         populateSchoolYearFilter();
-    populateProgramFilter();
         if (!filterType)
             return;
         const types = Array.from(new Set(recordsData.map((r) => r.scholarshipType))).filter(Boolean);

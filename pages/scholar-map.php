@@ -12,8 +12,6 @@
     <div class="page">
         <div class="map-card">
 
-            <div id="mapUnlocated" class="map-unlocated" hidden></div>
-
             <div class="map-stage">
 
             <div class="map-controls">

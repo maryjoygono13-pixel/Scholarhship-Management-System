@@ -5,9 +5,10 @@ $current_page = 'renewal-retention';
 $page_title = "Renewal & Retention";
 $page_css = "renewal-retention.css";
 $page_js = "renewal-retention.js";
+require_once __DIR__ . '/../includes/programs_helper.php';
 include __DIR__ . '/../includes/header.php';
 ?>
- <main class="page">
+<div class="page">
 
     <div class="summary-row" id="summaryRow">
       <div class="summary-card pending">
@@ -28,69 +29,88 @@ include __DIR__ . '/../includes/header.php';
       </div>
     </div>
 
-    <div class="toolbar">
-      <input type="search" id="searchBox" placeholder="Search by name or student ID…">
-      <div class="select-wrap">
-        <select id="SchoolYearFilter">
-          <option value="">School Year</option>
-        </select>
+    <div class="table-header-toolbar">
+      <div class="toolbar">
+        <div class="search-wrap">
+          <input type="text" id="searchBox" placeholder="Search applicant...">
+          <i data-lucide="search"></i>
+        </div>
+
+        <div class="select-wrap">
+          <select id="SchoolYearFilter">
+            <option value="">School Years</option>
+          </select>
+          <i data-lucide="chevron-down"></i>
+        </div>
+
+        <div class="select-wrap">
+          <select id="semesterFilter">
+            <option value="">Semesters</option>
+            <option value="1st Semester">1st Semester</option>
+            <option value="2nd Semester">2nd Semester</option>
+            <option value="Summer Term">Summer Term</option>
+          </select>
+          <i data-lucide="chevron-down"></i>
+        </div>
+
+        <div class="select-wrap">
+          <select id="scholarshipFilter">
+            <option value="">Scholarship Types</option>
+          </select>
+          <i data-lucide="chevron-down"></i>
+        </div>
+
+        <div class="select-wrap">
+          <select id="programFilter">
+            <option value="">Programs</option>
+            <?php foreach (PROGRAM_ACRONYMS as $programAcronym): ?>
+            <option value="<?= $programAcronym ?>"><?= $programAcronym ?></option>
+            <?php endforeach; ?>
+          </select>
+          <i data-lucide="chevron-down"></i>
+        </div>
+
+        <div class="select-wrap">
+          <select id="statusFilter">
+            <option value="">Statuses</option>
+            <option value="pending">Pending</option>
+            <option value="eligible">Renewed</option>
+            <option value="terminated">Terminated</option>
+          </select>
+          <i data-lucide="chevron-down"></i>
+        </div>
       </div>
 
-      <div class="select-wrap">
-        <select id="semesterFilter">
-          <option value="">Semesters</option>
-          <option value="1st Semester">1st Semester</option>
-          <option value="2nd Semester">2nd Semester</option>
-          <option value="Summer Term">Summer Term</option>
-        </select>
+      <div class="toolbar-actions">
+        <button type="button" class="btn-primary btn-export" id="exportRenewalBtn">
+          <i data-lucide="download"></i>
+          Export
+        </button>
       </div>
-
-      <div class="select-wrap">
-        <select id="scholarshipFilter">
-          <option value="">Scholarship Type</option>
-        </select>
-      </div>
-
-      <div class="select-wrap">
-        <select id="programFilter">
-          <option value="">Program</option>
-        </select>
-      </div>
-
-      <div class="select-wrap">
-        <select id="statusFilter">
-          <option value="">Statuses</option>
-          <option value="pending">Pending</option>
-          <option value="eligible">Renewed</option>
-          <option value="terminated">Terminated</option>
-        </select>
-      </div>
-
-      <button type="button" class="btn-export" id="exportRenewalBtn">
-        <i data-lucide="download"></i>
-        Export
-      </button>
     </div>
 
-    <table class="ledger" id="ledgerTable">
-      <thead>
-        <tr>
-          <th>Student ID</th>
-          <th>Name</th>
-          <th>Scholarship</th>
-          <th>GWA</th>
-          <th>Grades</th>
-          <th>Enrollment</th>
-          <th>Semester</th>
-          <th>Status</th>
-          <th style="text-align:right;">Actions</th>
-        </tr>
-      </thead>
-      <tbody id="ledgerBody"></tbody>
-    </table>
+    <div class="table-card">
+      <div class="table-wrap">
+        <table class="ledger" id="ledgerTable">
+          <thead>
+            <tr>
+              <th>Student ID</th>
+              <th>Name</th>
+              <th>Scholarship</th>
+              <th>GWA</th>
+              <th>Grades</th>
+              <th>Enrollment</th>
+              <th>Semester</th>
+              <th>Status</th>
+              <th style="text-align:right;">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="ledgerBody"></tbody>
+        </table>
+      </div>
+    </div>
 
     <div class="pagination-bar" id="renewalPagination"></div>
-  </main>
 </div>
 
 <!-- Evaluation detail modal -->
