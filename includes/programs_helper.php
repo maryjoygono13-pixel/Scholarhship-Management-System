@@ -18,12 +18,36 @@ const KNOWN_PROGRAMS = [
     'Bachelor of Secondary Education' => ['bsed', 'secondary education', 'bs secondary education'],
 ];
 
+// How each program is written as an acronym (the Program filters on Records and Renewal & Retention).
+const PROGRAM_ACRONYMS = [
+    'BS Accountancy' => 'BSA',
+    'BS Business Administration' => 'BSBA',
+    'BS Information Technology' => 'BSIT',
+    'BS Nursing' => 'BSN',
+    'BA Political Science' => 'BAPolSci',
+    'Bachelor of Elementary Education' => 'BEEd',
+    'Bachelor of Secondary Education' => 'BSEd',
+];
+
 // "BS Nursing · 2nd Year", "Bachelor of Science in Nursing (BSN)", "  bs   nursing " -> comparable form
 function normalizeProgramKey(string $raw): string {
     $v = preg_replace('/\s*·.*$/u', '', $raw);          // drop a trailing " · 2nd Year"
     $v = preg_replace('/\s*\([^)]*\)\s*$/', '', $v);    // drop a trailing "(BSN)"
     $v = preg_replace('/\s+/', ' ', trim($v));
     return strtolower($v);
+}
+
+/*
+ * The acronym of whatever program was written ("BS Nursing · 2nd Year" -> "BSN"). A program this
+ * school doesn't offer (old sample data) keeps its own name, minus a trailing year level, so it
+ * still shows up in filters. Blank when no program is known.
+ */
+function programAcronym(?string $raw): string {
+    $raw = trim((string)$raw);
+    if ($raw === '') return '';
+    $canonical = resolveProgramName($raw);
+    if ($canonical !== null) return PROGRAM_ACRONYMS[$canonical] ?? $canonical;
+    return trim(preg_replace('/\s*·.*$/u', '', $raw));
 }
 
 // The canonical program name for whatever was written, or null when it isn't a real program.

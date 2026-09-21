@@ -188,8 +188,28 @@ function createSystemNotification(
                 $age = null;
             }
         }
-        $address = trim($_POST['address'] ?? '');
-
+        /*
+         * Where the student lives: a Municipality picked from the list plus a Barangay, not free text.
+         * The map position comes from the municipality (and nudges by barangay). A plain `address`
+         * (older client) is still understood: the town is found inside it.
+         */
+        $municipality = trim($_POST['municipality'] ?? '');
+        $barangay = trim($_POST['barangay'] ?? '');
+        $rawAddress = trim($_POST['address'] ?? '');
+        if ($municipality === '' && $rawAddress !== '') {
+            $split = splitAddress($rawAddress);
+            $municipality = $split['municipality'];
+            if ($barangay === '') $barangay = $split['barangay'];
+        }
+        $town = resolveMunicipality($municipality);
+        if ($town !== null) {
+            $municipality = $town;
+            $address = composeAddress($barangay, $town);
+        } else {
+            // "Other (not listed)": kept as typed, and there is no map position for it.
+            $municipality = $municipality === 'Other' ? 'Other' : $municipality;
+            $address = $rawAddress !== '' ? $rawAddress : $barangay;
+        }
         $school = trim($_POST['school'] ?? '');
 
         // The school year is never typed on the form: a new applicant gets the Academic Year set in
@@ -253,6 +273,7 @@ function createSystemNotification(
             empty($email) ||
             empty($gender) ||
             empty($birthdate) ||
+            $municipality === '' ||
             empty($program) ||
             empty($yearLevel)
         ) {
@@ -264,13 +285,30 @@ function createSystemNotification(
         if (empty($scholarshipType)) {
             sendError('Please select a scholarship type.');
         }
+
+        /*
+        * A student terminated from a scholarship (Renewal & Retention) can't apply for that
+        * same scholarship again, but may apply for a different one. Editing an existing
+        * application only counts as applying when its scholarship type is being changed.
+        */
+        $isApplyingForType = true;
+        if ($id > 0) {
+            $currentTypeStmt = $pdo->prepare("SELECT scholarship_type FROM applicants WHERE id = ?");
+            $currentTypeStmt->execute([$id]);
+            $currentType = (string)$currentTypeStmt->fetchColumn();
+            $isApplyingForType = scholarshipTypeKey($pdo, $currentType) !== scholarshipTypeKey($pdo, $scholarshipType);
+        }
+        if ($isApplyingForType && findScholarshipTermination($pdo, $studentId, $scholarshipType)) {
+            sendError(terminationBlockMessage($scholarshipType), 422);
+        }
         /*
         * ============================================================
         * GET COORDINATES
         * ============================================================
         */
 
-        [$latitude, $longitude] = getCoordinates($address);
+        // No position (rather than a made-up default) when the town isn't in the list.
+        [$latitude, $longitude] = locationCoordinates($municipality, $barangay) ?? [null, null];
 
         /*
         * ============================================================
@@ -287,8 +325,8 @@ function createSystemNotification(
         }
 
         $transcriptFile = '';
-        $recommendationFile = '';
-        $validIdFile = '';
+        $coeFile = '';
+        $goodMoralFile = '';
 
         function saveUploadedFile($fieldName, $uploadDir)
         {
@@ -355,17 +393,17 @@ function createSystemNotification(
                 ? 'transcript'
                 : null;
 
-        $recommendationField =
-            isset($_FILES['recommendation'])
-                ? 'recommendation'
+        $coeField =
+            isset($_FILES['coe'])
+                ? 'coe'
                 : null;
 
-        $validIdField =
-            isset($_FILES['validId'])
-                ? 'validId'
+        $goodMoralField =
+            isset($_FILES['goodMoral'])
+                ? 'goodMoral'
                 : (
-                    isset($_FILES['valid_id'])
-                        ? 'valid_id'
+                    isset($_FILES['good_moral'])
+                        ? 'good_moral'
                         : null
                 );
 
@@ -377,18 +415,18 @@ function createSystemNotification(
                 );
         }
 
-        if ($recommendationField) {
-            $recommendationFile =
+        if ($coeField) {
+            $coeFile =
                 saveUploadedFile(
-                    $recommendationField,
+                    $coeField,
                     $uploadDir
                 );
         }
 
-        if ($validIdField) {
-            $validIdFile =
+        if ($goodMoralField) {
+            $goodMoralFile =
                 saveUploadedFile(
-                    $validIdField,
+                    $goodMoralField,
                     $uploadDir
                 );
         }
@@ -457,6 +495,8 @@ function createSystemNotification(
                 birthdate = ?,
                 age = ?,
                 address = ?,
+                municipality = ?,
+                barangay = ?,
                 latitude = ?,
                 longitude = ?,
                 school = ?,
@@ -480,6 +520,8 @@ function createSystemNotification(
                 $birthdate,
                 $age,
                 $address,
+                $municipality,
+                $barangay,
                 $latitude,
                 $longitude,
                 $school,
@@ -499,14 +541,14 @@ function createSystemNotification(
                 $updateParams[] = $transcriptFile;
             }
 
-            if ($recommendationFile !== '') {
-                $updateSql .= ", recommendation_file = ?";
-                $updateParams[] = $recommendationFile;
+            if ($coeFile !== '') {
+                $updateSql .= ", coe_file = ?";
+                $updateParams[] = $coeFile;
             }
 
-            if ($validIdFile !== '') {
-                $updateSql .= ", valid_id_file = ?";
-                $updateParams[] = $validIdFile;
+            if ($goodMoralFile !== '') {
+                $updateSql .= ", good_moral_file = ?";
+                $updateParams[] = $goodMoralFile;
             }
 
             $updateSql .= " WHERE id = ?";
@@ -722,6 +764,8 @@ function createSystemNotification(
             birthdate,
             age,
             address,
+            municipality,
+            barangay,
             latitude,
             longitude,
             school,
@@ -741,8 +785,8 @@ function createSystemNotification(
             docs_complete,
             essay,
             transcript_file,
-            recommendation_file,
-            valid_id_file
+            coe_file,
+            good_moral_file
         )
             VALUES (
                 ?, ?, ?, ?, ?,
@@ -750,7 +794,8 @@ function createSystemNotification(
                 ?, ?, ?, ?, ?,
                 ?, ?, ?, ?, ?,
                 ?, ?, ?, ?, ?,
-                ?, ?, ?, ?, ?, ?
+                ?, ?, ?, ?, ?,
+                ?, ?, ?
             )
         ";
 
@@ -767,6 +812,8 @@ function createSystemNotification(
             $birthdate,          // 8
             $age,                // 9
             $address,            // 10
+            $municipality,      // 10a
+            $barangay,          // 10b
             $latitude,           // 11
             $longitude,          // 12
             $school,             // 13
@@ -786,8 +833,8 @@ function createSystemNotification(
             1,                   // 26 - docs_complete
             $essay,              // 27
             $transcriptFile,     // 28
-            $recommendationFile, // 29
-            $validIdFile         // 30
+            $coeFile, // 29
+            $goodMoralFile         // 30
         ];
 
         $insertStmt->execute($insertParams);

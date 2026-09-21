@@ -142,6 +142,8 @@ try {
             'phone' => $r['phone'] ?? '',
 
             'address' => $r['address'] ?? '',
+            'municipality' => $r['municipality'] ?? '',
+            'barangay' => $r['barangay'] ?? '',
 
 
             /* --------------------------------------------------

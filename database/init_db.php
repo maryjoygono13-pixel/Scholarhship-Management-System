@@ -34,6 +34,15 @@ function initDatabase(): PDO {
     if (!in_array('subtype', $scholarshipsColNames)) {
         $pdo->exec("ALTER TABLE scholarships ADD COLUMN subtype TEXT DEFAULT ''");
     }
+    // Where a student lives, picked from a list (see includes/locations.php) instead of free text.
+    $applicantCols = array_column($pdo->query("PRAGMA table_info(applicants)")->fetchAll(PDO::FETCH_ASSOC), 'name');
+    if (!in_array('municipality', $applicantCols, true)) {
+        $pdo->exec("ALTER TABLE applicants ADD COLUMN municipality TEXT DEFAULT ''");
+    }
+    if (!in_array('barangay', $applicantCols, true)) {
+        $pdo->exec("ALTER TABLE applicants ADD COLUMN barangay TEXT DEFAULT ''");
+    }
+
     // Some scholarships (e.g. MERIT-BASED Academic, for students who reach the GWA) have no
     // cap on how many students can hold them.
     if (!in_array('unlimited_slots', $scholarshipsColNames)) {
@@ -149,8 +158,8 @@ function initDatabase(): PDO {
         remarks TEXT DEFAULT '',
         essay TEXT DEFAULT '',
         transcript_file TEXT DEFAULT '',
-        recommendation_file TEXT DEFAULT '',
-        valid_id_file TEXT DEFAULT '',
+        coe_file TEXT DEFAULT '',
+        good_moral_file TEXT DEFAULT '',
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )");
@@ -165,6 +174,15 @@ function initDatabase(): PDO {
     ")->fetchAll(PDO::FETCH_ASSOC);
 
     $columnNames = array_column($columns, 'name');
+
+    // The application's supporting documents are now Transcript of Records, Certificate of
+    // Enrollment (COE) and Certificate of Good Moral Character, matching the Evaluation page.
+    // Databases made before that still have the old Recommendation Letter / Valid ID columns.
+    foreach (['recommendation_file' => 'coe_file', 'valid_id_file' => 'good_moral_file'] as $old => $new) {
+        if (in_array($old, $columnNames, true) && !in_array($new, $columnNames, true)) {
+            $pdo->exec("ALTER TABLE applicants RENAME COLUMN $old TO $new");
+        }
+    }
 
     // Middle Name
     if (!in_array('middle_name', $columnNames, true)) {
@@ -287,6 +305,24 @@ function initDatabase(): PDO {
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )");
 
+    // Whether the applicant was approved or rejected in Evaluation when they entered this ledger.
+    $renewalCols = array_column($pdo->query("PRAGMA table_info(renewal_retention)")->fetchAll(PDO::FETCH_ASSOC), 'name');
+    if (!in_array('origin', $renewalCols, true)) {
+        $pdo->exec("ALTER TABLE renewal_retention ADD COLUMN origin TEXT NOT NULL DEFAULT 'approved'");
+    }
+
+    // A scholar terminated from a scholarship can't apply for that same scholarship again
+    // (they may still apply for a different one). See includes/renewal_helper.php.
+    $pdo->exec("CREATE TABLE IF NOT EXISTS scholarship_terminations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        student_id TEXT NOT NULL,
+        scholarship_type TEXT NOT NULL,
+        renewal_id INTEGER,
+        reason TEXT DEFAULT '',
+        terminated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )");
+    $pdo->exec("CREATE INDEX IF NOT EXISTS idx_terminations_student ON scholarship_terminations (student_id, scholarship_type)");
+
     // 7. Student Grades Table (per-subject grades, keyed by student + subject + semester)
     $pdo->exec("CREATE TABLE IF NOT EXISTS student_grades (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -391,7 +427,9 @@ function initDatabase(): PDO {
     $pdo->exec("INSERT OR IGNORE INTO settings (setting_key, setting_value) VALUES ('history_enabled', '1')");
     // Active term: everything (Applicants, Records, Renewal & Retention) follows these.
     $pdo->exec("INSERT OR IGNORE INTO settings (setting_key, setting_value) VALUES ('active_semester', '1st Semester')");
-    $pdo->exec("INSERT OR IGNORE INTO settings (setting_key, setting_value) VALUES ('active_school_year', '2025-2026')");
+    // New installs start on the academic year of today's date (June to May).
+    $startYear = (int)date('n') >= 6 ? (int)date('Y') : (int)date('Y') - 1;
+    $pdo->exec("INSERT OR IGNORE INTO settings (setting_key, setting_value) VALUES ('active_school_year', '" . $startYear . '-' . ($startYear + 1) . "')");
 
     // Seed Data if empty
     seedDataIfEmpty($pdo);

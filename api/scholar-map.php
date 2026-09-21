@@ -76,7 +76,8 @@ try {
         if (!empty($deleted['item_data'])) {
             $data = json_decode($deleted['item_data'], true);
             if (is_array($data)) {
-                if (!empty($data['student_id'])) {
+                // A trashed record only hides that record; the student stays on the map through their other records.
+                if (!empty($data['student_id']) && $deleted['item_type'] !== 'record') {
                     $deletedStudentIds[] = trim((string)$data['student_id']);
                 }
                 if ($deleted['item_type'] === 'record' && !empty($data['id'])) {
@@ -89,9 +90,18 @@ try {
     $deletedStudentIds = array_unique($deletedStudentIds);
     $deletedRecordIds = array_unique($deletedRecordIds);
 
+    // A student ID in the trash only hides the student while nobody with that ID is still live.
+    // Otherwise an old trashed applicant/scholar (or one re-imported later) hides the new live student.
+    if ($deletedStudentIds) {
+        $liveIds = $pdo->query("SELECT student_id FROM applicants WHERE student_id IS NOT NULL AND student_id <> ''")
+            ->fetchAll(PDO::FETCH_COLUMN);
+        $liveIds = array_map(static fn($v) => trim((string)$v), $liveIds);
+        $deletedStudentIds = array_values(array_diff($deletedStudentIds, $liveIds));
+    }
+
     /* =========================================================
-       2. FETCH APPROVED RECORDS
-       ONLY students from the records table that have status = 'approved'
+       2. FETCH APPROVED AND REJECTED RECORDS
+       Every student who was decided on in Records shows on the map; the newest record decides the status
     ========================================================= */
     $stmtRecords = $pdo->query("
         SELECT
@@ -106,13 +116,15 @@ try {
             date_evaluated,
             remarks
         FROM records
-        WHERE LOWER(TRIM(status)) = 'approved'
+        WHERE LOWER(TRIM(status)) IN ('approved', 'rejected', 'pending')
         ORDER BY id DESC
     ");
 
     $approvedRecords = $stmtRecords->fetchAll(PDO::FETCH_ASSOC);
 
+
     $list = [];
+    $unlocated = [];   // students who have no location yet
     $seenStudents = [];
 
     foreach ($approvedRecords as $rec) {
@@ -214,15 +226,24 @@ try {
         $lng = !empty($app['longitude']) ? (float)$app['longitude'] : (!empty($sch['longitude']) ? (float)$sch['longitude'] : null);
         $address = $app['address'] ?? $sch['address'] ?? '';
 
-        if (($lat === null || $lng === null || $lat == 0 || $lng == 0) && !empty($address)) {
-            $coords = getCoordinates($address);
-            $lat = $coords[0];
-            $lng = $coords[1];
-        }
-
+        // No stored position: work it out from the student's town (and barangay), or from the town
+        // inside an older typed address.
         if ($lat === null || $lng === null || $lat == 0 || $lng == 0) {
-            $lat = 10.1333;
-            $lng = 124.8333;
+            $town = trim((string)($app['municipality'] ?? ''));
+            $brgy = trim((string)($app['barangay'] ?? ''));
+            if ($town === '' && $address !== '') {
+                $split = splitAddress($address);
+                $town = $split['municipality'];
+                if ($brgy === '') $brgy = $split['barangay'];
+            }
+            $coords = $town !== '' ? locationCoordinates($town, $brgy) : null;
+            if ($coords !== null) {
+                [$lat, $lng] = $coords;
+            } else {
+                // Unknown place: no pin (it used to default to Maasin, which piled everyone up there).
+                $lat = null;
+                $lng = null;
+            }
         }
 
         $gwa = (float)($app['gwa'] ?? $app['gpa'] ?? $sch['gwa'] ?? 1.50);
@@ -235,19 +256,24 @@ try {
             'department' => $dept,
             'yearLevel' => $yearLevel,
             'gwa' => $gwa,
-            'status' => 'approved',
+            // 'pending' = approved, awaiting the renewal check (see api/decide.php)
+            'status' => strtolower(trim((string)$rec['status'])) === 'rejected' ? 'rejected' : 'approved',
             'scholarshipType' => $rec['scholarship_type'] ?? '',
             'schoolYear' => $rec['sy'] ?? '2025-2026',
             'address' => $address,
-            'latitude' => (float)$lat,
-            'longitude' => (float)$lng,
+            'latitude' => $lat !== null ? (float)$lat : null,
+            'longitude' => $lng !== null ? (float)$lng : null,
             'source' => 'record'
         ];
+        if ($lat === null || $lng === null) {
+            $unlocated[] = ['studentId' => $studentId, 'name' => $name];
+        }
     }
 
     sendJson([
         'success' => true,
-        'data' => $list
+        'data' => $list,
+        'unlocated' => $unlocated
     ]);
 
 } catch (Exception $e) {

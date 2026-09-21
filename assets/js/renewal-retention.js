@@ -1,4 +1,12 @@
 "use strict";
+// What a renewal row's status is called on screen ("eligible" in the database means renewed).
+function renewalStatusLabel(r) {
+  const s = String(r.status || "").toLowerCase();
+  if (s === "eligible") return "Renewed";
+  if (s === "terminated") return "Terminated";
+  return "Pending";
+}
+
 function normalizeSemesterValue(val) {
     const v = (val || "").toLowerCase();
     if (v.includes("summer"))
@@ -15,6 +23,9 @@ document.addEventListener("DOMContentLoaded", () => {
     const searchBox = document.getElementById("searchBox");
     const statusFilter = document.getElementById("statusFilter");
     const semesterFilter = document.getElementById("semesterFilter");
+    const schoolYearFilter = document.getElementById("SchoolYearFilter");
+    const scholarshipFilter = document.getElementById("scholarshipFilter");
+    const programFilter = document.getElementById("programFilter");
     const modalOverlay = document.getElementById("modalOverlay");
     const modalClose = document.getElementById("modalClose");
     const modalName = document.getElementById("modalName");
@@ -23,7 +34,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const modalRemarksText = document.getElementById("modalRemarksText");
     const modalSeal = document.getElementById("modalSeal");
     const renewBtn = document.getElementById("renewBtn");
-    const flagBtn = document.getElementById("flagBtn");
+    const terminateBtn = document.getElementById("terminateBtn");
     const renDeleteOverlay = document.getElementById("renDeleteOverlay");
     const renDeleteCloseBtn = document.getElementById("renDeleteCloseBtn");
     const renDeleteCancelBtn = document.getElementById("renDeleteCancelBtn");
@@ -41,6 +52,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const json = await res.json();
             if (json.success) {
                 ledgerData = json.data;
+                fillLedgerFilters();
                 if (json.summary) {
                     if (countPending)
                         countPending.textContent = String(json.summary.pending ?? 0);
@@ -60,21 +72,41 @@ document.addEventListener("DOMContentLoaded", () => {
             console.error("Failed to load renewal ledger:", e);
         }
     }
+    // School Year and Scholarship Type choices come from the ledger itself.
+    function fillLedgerFilters() {
+        const fill = (sel, placeholder, values) => {
+            if (!sel)
+                return;
+            const current = sel.value;
+            const unique = Array.from(new Set(values.filter((v) => v))).sort();
+            sel.innerHTML = `<option value="">${placeholder}</option>` + unique.map((v) => `<option value="${v}">${v}</option>`).join("");
+            sel.value = unique.includes(current) ? current : "";
+        };
+        fill(schoolYearFilter, "School Year", ledgerData.map((r) => r.schoolYear));
+        fill(scholarshipFilter, "Scholarship Type", ledgerData.map((r) => r.scholarshipType));
+        fill(programFilter, "Program", ledgerData.map((r) => r.programCode));
+    }
     function renderLedger() {
         if (!ledgerBody)
             return;
         const query = searchBox ? searchBox.value.toLowerCase().trim() : "";
         const statusVal = statusFilter ? statusFilter.value.toLowerCase() : "";
         const semVal = semesterFilter ? semesterFilter.value : "";
+    const syVal = schoolYearFilter ? schoolYearFilter.value : "";
+    const typeVal = scholarshipFilter ? scholarshipFilter.value : "";
+    const progVal = programFilter ? programFilter.value : "";
         const filtered = ledgerData.filter((r) => {
             const matchQuery = r.name.toLowerCase().includes(query) || r.studentId.toLowerCase().includes(query);
             const matchStatus = !statusVal || r.status.toLowerCase() === statusVal;
             const matchSem = !semVal || normalizeSemesterValue(r.semester) === semVal;
-            return matchQuery && matchStatus && matchSem;
+      const matchSy = !syVal || r.schoolYear === syVal;
+      const matchType = !typeVal || r.scholarshipType === typeVal;
+      const matchProg = !progVal || r.programCode === progVal;
+            return matchQuery && matchStatus && matchSem && matchSy && matchType && matchProg;
         });
         ledgerBody.innerHTML = "";
         if (filtered.length === 0) {
-            ledgerBody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:24px; color:#6b7280;">No scholars found.</td></tr>`;
+            ledgerBody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding:24px; color:#6b7280;">No scholars found.</td></tr>`;
             renderRenewalPagination(0);
             return;
         }
@@ -88,11 +120,12 @@ document.addEventListener("DOMContentLoaded", () => {
             tr.innerHTML = `
         <td><strong class="font-mono">${r.studentId}</strong></td>
         <td>${r.name}</td>
+        <td>${r.scholarshipType}</td>
         <td><span class="font-mono" style="color:${r.meetsGwa === false ? '#be123c' : 'inherit'};">${r.gwa.toFixed(2)}</span><div style="font-size:11px; color:#6b7280;">Req. ≤ ${Number(r.gwaRequirement).toFixed(2)}</div></td>
         <td>${r.failingGrades > 0 ? `<span class="font-mono" style="color:red;">${r.failingGrades} Failing</span>` : "Passed All"}</td>
         <td>${r.enrolled ? "Enrolled" : "Not Enrolled"}</td>
         <td><span class="font-mono">${r.semester || "1st Semester"}</span></td>
-        <td><span class="status-badge ${statusBadge}">${r.status}</span></td>
+        <td><span class="status-badge ${statusBadge}">${renewalStatusLabel(r)}</span>${r.locked ? '<div style="font-size:11px; color:#6b7280; margin-top:2px;">Locked · view only</div>' : ""}</td>
         <td class="actions-cell">
           <button type="button" class="btn-icon-action edit" title="Edit / Review Scholar" onclick="editRenewal(event, ${r.id})">
             <i data-lucide="pencil"></i>
@@ -148,7 +181,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (modalId)
             modalId.textContent = `Student ID: ${selectedRecord.studentId}`;
         if (modalSeal) {
-            modalSeal.textContent = selectedRecord.status.toUpperCase();
+            modalSeal.textContent = renewalStatusLabel(selectedRecord).toUpperCase();
             const badgeCls = selectedRecord.status === 'eligible' ? 'badge-approved' : (selectedRecord.status === 'at-risk' || selectedRecord.status === 'pending' ? 'badge-pending' : 'badge-rejected');
             modalSeal.className = `status-badge ${badgeCls}`;
         }
@@ -184,7 +217,23 @@ document.addEventListener("DOMContentLoaded", () => {
         </div>
       `;
         }
-        modalOverlay.classList.add("open");
+            const lockNote = document.getElementById("modalLockNote");
+    if (lockNote) {
+      const r = selectedRecord;
+      let note = "";
+      if (r.locked) note = "Locked: view only. This entry can be renewed or terminated once the Active Semester moves past " + r.semester + " (Settings > Portal Configuration).";
+      else if (r.status === "eligible") note = "Already renewed.";
+      else if (r.status === "terminated") note = "Already terminated.";
+      else if (r.origin === "rejected") note = "Rejected in Evaluation: this entry can only be terminated (closed). The applicant can still apply again.";
+      else if (!(r.gwa > 0)) note = "No grades are recorded for " + r.semester + " yet. Import the academic records in Data Management to decide.";
+      else if (r.canRenew) note = "GWA meets the requirement: this scholar can be renewed.";
+      else if (r.canTerminate) note = "GWA does not meet the requirement: this scholar can be terminated and will not be able to apply for " + r.scholarshipType + " again.";
+      lockNote.textContent = note;
+      lockNote.style.display = note ? "block" : "none";
+    }
+    if (renewBtn) renewBtn.toggleAttribute("disabled", !selectedRecord.canRenew);
+    if (terminateBtn) terminateBtn.toggleAttribute("disabled", !selectedRecord.canTerminate);
+    modalOverlay.classList.add("open");
     };
     function closeModal() {
         if (modalOverlay)
@@ -219,7 +268,11 @@ document.addEventListener("DOMContentLoaded", () => {
             alert(`Cannot renew: GWA ${selectedRecord.gwa.toFixed(2)} does not meet the required ${Number(selectedRecord.gwaRequirement).toFixed(2)} for ${selectedRecord.scholarshipType}.`);
             return;
         }
-        const remarks = prompt(`Enter remarks for ${action.toUpperCase()}:`, selectedRecord.remarks || "");
+            if (action === "terminate" && selectedRecord.origin !== "rejected" &&
+        !confirm("Terminate " + selectedRecord.name + " from " + selectedRecord.scholarshipType + "?\n\nThey will not be able to apply for this scholarship again (a different scholarship is still allowed).")) {
+      return;
+    }
+    const remarks = prompt(`Enter remarks for ${action.toUpperCase()}:`, selectedRecord.remarks || "");
         const formData = new FormData();
         formData.append("id", String(selectedRecord.id));
         formData.append("action", action);
@@ -229,6 +282,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const res = await fetch(`${apiPath}/list_renewal.php`, { method: "POST", body: formData });
             const json = await res.json();
             if (json.success) {
+                if (json.message && action === "terminate") alert(json.message);
                 closeModal();
                 loadLedger();
             }
@@ -265,8 +319,7 @@ document.addEventListener("DOMContentLoaded", () => {
         modalClose.addEventListener("click", closeModal);
     if (renewBtn)
         renewBtn.addEventListener("click", () => updateStatus("renew"));
-    if (flagBtn)
-        flagBtn.addEventListener("click", () => updateStatus("flag"));
+    if (terminateBtn) terminateBtn.addEventListener("click", () => updateStatus("terminate"));
     if (renDeleteCloseBtn)
         renDeleteCloseBtn.addEventListener("click", closeDeleteModal);
     if (renDeleteCancelBtn)
@@ -279,8 +332,10 @@ document.addEventListener("DOMContentLoaded", () => {
         searchBox.addEventListener("input", resetRenewalPageAndRender);
     if (statusFilter)
         statusFilter.addEventListener("change", resetRenewalPageAndRender);
-    if (semesterFilter)
-        semesterFilter.addEventListener("change", resetRenewalPageAndRender);
+    if (semesterFilter) semesterFilter.addEventListener("change", resetRenewalPageAndRender);
+  if (schoolYearFilter) schoolYearFilter.addEventListener("change", resetRenewalPageAndRender);
+  if (scholarshipFilter) scholarshipFilter.addEventListener("change", resetRenewalPageAndRender);
+  if (programFilter) programFilter.addEventListener("change", resetRenewalPageAndRender);
 
     function csvEscape(value) {
         const str = value == null ? "" : String(value);

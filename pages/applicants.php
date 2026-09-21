@@ -7,6 +7,7 @@
     $page_js = "applicants.js";
 
     include __DIR__ . '/../includes/header.php';
+    require_once __DIR__ . '/../includes/locations.php';
 
     ?>
 
@@ -192,14 +193,32 @@
                 </div>
 
                 <div class="field">
-                  <label>Home address <span class="req">*</span></label>
+                  <label>Municipality / City <span class="req">*</span></label>
+                  <select name="municipality" data-field="municipality" required>
+                    <option value="">Select municipality</option>
+                    <?php foreach (['Southern Leyte', 'Leyte'] as $province): ?>
+                      <optgroup label="<?= htmlspecialchars($province) ?>">
+                        <?php foreach (MUNICIPALITIES as $townName => $townInfo): if ($townInfo[2] !== $province) continue; ?>
+                          <option value="<?= htmlspecialchars($townName) ?>"><?= htmlspecialchars($townName) ?></option>
+                        <?php endforeach; ?>
+                      </optgroup>
+                    <?php endforeach; ?>
+                    <option value="Other">Other (not listed)</option>
+                  </select>
+                </div>
+
+                <div class="field">
+                  <label>Barangay <span class="req">*</span></label>
                   <input
                     type="text"
-                    name="address"
-                    placeholder="Street, Barangay, City, Province"
-                    data-field="address"
+                    name="barangay"
+                    placeholder="e.g. Tawid (or the full address if the town is &quot;Other&quot;)"
+                    data-field="barangay"
+                    list="barangayList"
+                    autocomplete="off"
                     required
                   >
+                  <datalist id="barangayList"></datalist>
                 </div>
 
               </div>
@@ -390,12 +409,12 @@
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="M12 12v9M9 15l3-3 3 3"/></svg>
                   </span>
                   <div class="upload-text">
-                    <p class="name">Recommendation Letter <span class="req">*</span></p>
-                    <p class="hint" data-hint="recommendation">PDF, JPG, or PNG · max 5MB</p>
+                    <p class="name">Certificate of Enrollment (COE) <span class="req">*</span></p>
+                    <p class="hint" data-hint="coe">PDF, JPG, or PNG · max 5MB</p>
                   </div>
                 </div>
-                <span class="upload-action" data-action="recommendation">Upload</span>
-                <input type="file" name="recommendation" data-field="recommendation">
+                <span class="upload-action" data-action="coe">Upload</span>
+                <input type="file" name="coe" data-field="coe">
               </label>
 
               <label class="upload-row">
@@ -404,12 +423,12 @@
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="M12 12v9M9 15l3-3 3 3"/></svg>
                   </span>
                   <div class="upload-text">
-                    <p class="name">Valid ID <span class="req">*</span></p>
-                    <p class="hint" data-hint="validId">PDF, JPG, or PNG · max 5MB</p>
+                    <p class="name">Certificate of Good Moral Character <span class="req">*</span></p>
+                    <p class="hint" data-hint="goodMoral">PDF, JPG, or PNG · max 5MB</p>
                   </div>
                 </div>
-                <span class="upload-action" data-action="validId">Upload</span>
-                <input type="file" name="valid_id" data-field="validId">
+                <span class="upload-action" data-action="goodMoral">Upload</span>
+                <input type="file" name="good_moral" data-field="goodMoral">
               </label>
             </div>
 
@@ -501,4 +520,25 @@
       </div>
     </div>
 
+  <script>
+    // Barangay suggestions: the barangays of the chosen municipality (typing is still free).
+    (function () {
+      var byTown = <?= json_encode(barangayNamesByTown(), JSON_UNESCAPED_UNICODE) ?>;
+      var town = document.querySelector('[data-field="municipality"]');
+      var input = document.querySelector('[data-field="barangay"]');
+      var list = document.getElementById('barangayList');
+      if (!town || !input || !list) return;
+      function fill() {
+        list.innerHTML = '';
+        (byTown[town.value] || []).forEach(function (name) {
+          var o = document.createElement('option');
+          o.value = name;
+          list.appendChild(o);
+        });
+      }
+      town.addEventListener('change', fill);
+      input.addEventListener('focus', fill);
+      fill();
+    })();
+  </script>
   <?php include __DIR__ . '/../includes/footer.php'; ?>

@@ -11,6 +11,17 @@ try {
     }
 
     $pdo = getDB();
+
+    // A student terminated from this scholarship can't be approved for it again.
+    if ($decision === 'approved') {
+        $chk = $pdo->prepare("SELECT student_id, scholarship_type FROM applicants WHERE id = ?");
+        $chk->execute([$id]);
+        $cand = $chk->fetch();
+        if ($cand && findScholarshipTermination($pdo, (string)$cand['student_id'], (string)$cand['scholarship_type'])) {
+            sendError(terminationBlockMessage((string)$cand['scholarship_type']), 422);
+        }
+    }
+
     $stmt = $pdo->prepare("UPDATE applicants SET status = ?, remarks = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
     $stmt->execute([$decision, $remarks, $id]);
 
@@ -27,19 +38,18 @@ try {
             $app['student_id'],
             trim($app['first_name'] . ' ' . $app['last_name']),
             $app['scholarship_type'],
-            $decision === 'approved' ? 'pending' : $decision,   // approved = pending until renewed
+            $decision,   // the record carries the same status as the decision
             normalizeSemesterName($app['semester'] ?? getActiveSemester($pdo)),
             trim((string)($app['school_year'] ?? '')) !== '' ? trim($app['school_year']) : getActiveSchoolYear($pdo),
             $remarks ?: ($decision === 'approved' ? 'Approved by committee' : 'Rejected by committee')
         ]);
 
-        if ($decision === 'approved') {
-            $newRecord = $pdo->prepare("SELECT * FROM records WHERE id = ?");
-            $newRecord->execute([(int)$pdo->lastInsertId()]);
-            $recordRow = $newRecord->fetch(PDO::FETCH_ASSOC);
-            if ($recordRow) {
-                sendRecordToRenewal($pdo, $recordRow);
-            }
+        // Approved and rejected alike go to Renewal & Retention as pending (locked until the next semester).
+        $newRecord = $pdo->prepare("SELECT * FROM records WHERE id = ?");
+        $newRecord->execute([(int)$pdo->lastInsertId()]);
+        $recordRow = $newRecord->fetch(PDO::FETCH_ASSOC);
+        if ($recordRow) {
+            sendRecordToRenewal($pdo, $recordRow, 'pending', null, $decision);
         }
     }
 

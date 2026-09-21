@@ -20,6 +20,15 @@
                     <select id="filterType"><option value="all">Scholarship Types</option></select>
                     <i data-lucide="chevron-down"></i>
                 </div>
+                <div class="select-wrap">
+                    <select id="filterStatus">
+                        <option value="all">All Statuses</option>
+                        <option value="review">For Review</option>
+                        <option value="interview">For Interview</option>
+                        <option value="non-compliant">Non-Compliant</option>
+                    </select>
+                    <i data-lucide="chevron-down"></i>
+                </div>
 
             <div class="header-actions">
                 <input type="file" id="gradeFile" hidden accept=".csv,.xlsx,.xls">

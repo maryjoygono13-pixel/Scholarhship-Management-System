@@ -5,7 +5,7 @@ function restoreApplicantRow(PDO $pdo, array $data): void {
     $stmtRestore = $pdo->prepare("INSERT OR REPLACE INTO applicants (
         id, student_id, first_name, last_name, email, phone, birthdate, address, latitude, longitude,
         school, program, year_level, gpa, scholarship_type, status, gwa, gwa_req, failing_grades,
-        units, enrolled, docs_complete, remarks, essay, transcript_file, recommendation_file, valid_id_file,
+        units, enrolled, docs_complete, remarks, essay, transcript_file, coe_file, good_moral_file,
         created_at, updated_at
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
@@ -35,8 +35,8 @@ function restoreApplicantRow(PDO $pdo, array $data): void {
         $data['remarks'] ?? '',
         $data['essay'] ?? '',
         $data['transcript_file'] ?? '',
-        $data['recommendation_file'] ?? '',
-        $data['valid_id_file'] ?? '',
+        $data['coe_file'] ?? $data['recommendation_file'] ?? '',
+        $data['good_moral_file'] ?? $data['valid_id_file'] ?? '',
         $data['created_at'] ?? date('Y-m-d H:i:s'),
         date('Y-m-d H:i:s')
     ]);

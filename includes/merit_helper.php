@@ -8,6 +8,14 @@
  *
  * The scholarship itself (its GWA requirement, active or not) is the one set up on the
  * Scholarships page under the type "MERIT-BASED Academic Scholarship".
+ *
+ * Standing is decided by each semester's GWA:
+ *   - at or better than the requirement (1.50): a scholar for that semester, and on into the
+ *     following semesters and year levels for as long as they keep it;
+ *   - worse than the requirement but better than MERIT_LOCKOUT_GWA (2.00): not a scholar for
+ *     that semester, but back in as soon as a later semester reaches the requirement again;
+ *   - MERIT_LOCKOUT_GWA (2.00) or worse in any semester: out of Scholars for the rest of that
+ *     school year, even if a later semester reaches the requirement, until the next school year.
  */
 
 require_once __DIR__ . '/grades_helper.php';
@@ -15,6 +23,38 @@ require_once __DIR__ . '/name_helper.php';
 require_once __DIR__ . '/programs_helper.php';
 
 const MERIT_SCHOLARSHIP_TYPE = 'MERIT-BASED Academic Scholarship';
+
+// A semester GWA this bad (or worse) locks a Merit scholar out for the rest of the school year.
+const MERIT_LOCKOUT_GWA = 2.00;
+
+// Whether a scholarship type is the MERIT-BASED Academic one (also its older name "Academic Merit").
+function isMeritScholarshipType(string $type): bool {
+    $t = strtolower(trim($type));
+    return $t === strtolower(MERIT_SCHOLARSHIP_TYPE) || $t === 'academic merit';
+}
+
+/*
+ * The semester that locks this student out of Merit for `$schoolYear`: a semester of that school
+ * year whose GWA is MERIT_LOCKOUT_GWA or worse. Returns ['semester' => ..., 'gwa' => ...] or null.
+ * Grades with no school year recorded count toward the given (active) school year.
+ */
+function meritLockout(PDO $pdo, string $studentId, string $schoolYear): ?array {
+    $stmt = $pdo->prepare("SELECT semester, school_year, grade FROM student_grades WHERE student_id = ?");
+    $stmt->execute([trim($studentId)]);
+    $acc = [];
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        $sy = trim((string)$row['school_year']);
+        if ($sy !== '' && $sy !== trim($schoolYear)) continue;
+        $sem = normalizeSemesterName($row['semester']);
+        $acc[$sem]['sum'] = ($acc[$sem]['sum'] ?? 0) + (float)$row['grade'];
+        $acc[$sem]['n'] = ($acc[$sem]['n'] ?? 0) + 1;
+    }
+    foreach ($acc as $sem => $a) {
+        $gwa = round($a['sum'] / $a['n'], 2);
+        if ($gwa >= MERIT_LOCKOUT_GWA) return ['semester' => $sem, 'gwa' => $gwa];
+    }
+    return null;
+}
 
 // The Merit scholarship program from the Scholarships page, or null if there isn't an active one.
 function getMeritScholarship(PDO $pdo): ?array {
@@ -88,6 +128,8 @@ function syncMeritScholars(PDO $pdo): int {
             if (isset($stats[$sid][$sem])) { $gwa = $stats[$sid][$sem]['gwa']; break; }
         }
         if ($gwa === null || $gwa <= 0 || $gwa > $required) continue;
+        // 2.00 or worse in any semester of this school year: not a scholar until the next one.
+        if (meritLockout($pdo, $sid, getActiveSchoolYear($pdo))) continue;
 
         $year = preg_match('/(\d)/', (string)$a['year_level'], $m) ? max(1, min(4, (int)$m[1])) : 1;
         $sy = trim((string)$a['school_year']) !== '' ? trim($a['school_year']) : getActiveSchoolYear($pdo);

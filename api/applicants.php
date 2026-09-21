@@ -93,7 +93,9 @@ try {
                 'enrolled' => (bool)$r['enrolled'],
                 'docsComplete' => (bool)$r['docs_complete'],
 
-                'status' => $r['status'],
+                // Shown as non-compliant here in Evaluation only (GWA requirement not met); the
+                // applicant's real status is untouched, so the Applicants page keeps showing it.
+                'status' => isGwaRequirementUnmet($pdo, $r) ? STATUS_NON_COMPLIANT : $r['status'],
                 'remarks' => $r['remarks'] ?? '',
 
                 'grades' => (object)($gradesMap[$r['student_id']] ?? [])
@@ -147,6 +149,32 @@ try {
                 if ((float)$cand['gwa'] > $required) {
                     sendError('Cannot approve: GWA ' . number_format((float)$cand['gwa'], 2) . ' does not meet the required ' . number_format($required, 2) . ' for ' . $cand['scholarship_type'] . '.', 422);
                 }
+            }
+        }
+
+        // "Non-compliant" is only a view in Evaluation, never a saved status. The page echoes it back
+        // when saving remarks, so just leave the real status as it is.
+        if ($status !== null && strtolower($status) === STATUS_NON_COMPLIANT) {
+            $status = null;
+        }
+
+        // A student terminated from this scholarship can't be approved for it again.
+        if ($status !== null && strtolower($status) === 'approved') {
+            $chk = $pdo->prepare("SELECT student_id, scholarship_type FROM applicants WHERE id = ?");
+            $chk->execute([$id]);
+            $cand = $chk->fetch();
+            if ($cand && findScholarshipTermination($pdo, (string)$cand['student_id'], (string)$cand['scholarship_type'])) {
+                sendError(terminationBlockMessage((string)$cand['scholarship_type']), 422);
+            }
+        }
+
+        // A non-compliant applicant (GWA requirement not met) can only be rejected, not moved forward.
+        if ($status !== null && in_array(strtolower($status), ['interview', 'review'], true)) {
+            $chk = $pdo->prepare("SELECT gwa, gwa_req, scholarship_type FROM applicants WHERE id = ?");
+            $chk->execute([$id]);
+            $cand = $chk->fetch();
+            if ($cand && isGwaRequirementUnmet($pdo, $cand)) {
+                sendError('This applicant is non-compliant (GWA requirement not met) and can only be rejected.', 422);
             }
         }
 
@@ -230,9 +258,9 @@ if ($status !== null && in_array(strtolower($status), ['approved', 'rejected']))
 
         $name = buildFullName($applicant['first_name'], $applicant['middle_name'] ?? '', $applicant['last_name']);
 
-        // Evaluation only finishes the review: an approval becomes a PENDING record until
-        // Renewal & Retention confirms it. A rejection is final straight away.
-        $recordStatus = strtolower($applicant['status']) === 'approved' ? 'pending' : strtolower($applicant['status']);
+        // The Record carries the same status as the decision (approved / rejected). Either way the
+        // applicant then goes to Renewal & Retention as pending, locked until the next semester.
+        $recordStatus = strtolower($applicant['status']) === 'approved' ? 'approved' : 'rejected';
         $recordSemester = normalizeSemesterName($applicant['semester'] ?: getActiveSemester($pdo));
         $recordSy = trim((string)$applicant['school_year']) !== '' ? trim($applicant['school_year']) : getActiveSchoolYear($pdo);
 
@@ -290,16 +318,13 @@ if ($status !== null && in_array(strtolower($status), ['approved', 'rejected']))
                 $applicant['remarks'] ?? ''
             ]);
 
-            // An approved applicant is not final yet: the Record is PENDING and they go to
-            // Renewal & Retention, where their GWA is checked against the scholarship's
-            // requirement. Renewing them there approves the Record.
-            if ($recordStatus === 'pending') {
-                $newRecord = $pdo->prepare("SELECT * FROM records WHERE id = ?");
-                $newRecord->execute([(int)$pdo->lastInsertId()]);
-                $recordRow = $newRecord->fetch(PDO::FETCH_ASSOC);
-                if ($recordRow) {
-                    sendRecordToRenewal($pdo, $recordRow);
-                }
+            // Approved and rejected applicants both enter Renewal & Retention as pending. The row
+            // is view-only until the Active Semester moves on (see isRenewalLocked).
+            $newRecord = $pdo->prepare("SELECT * FROM records WHERE id = ?");
+            $newRecord->execute([(int)$pdo->lastInsertId()]);
+            $recordRow = $newRecord->fetch(PDO::FETCH_ASSOC);
+            if ($recordRow) {
+                sendRecordToRenewal($pdo, $recordRow, 'pending', null, $recordStatus);
             }
         }
     }

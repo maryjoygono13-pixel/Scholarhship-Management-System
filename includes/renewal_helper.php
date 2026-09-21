@@ -2,17 +2,26 @@
 /*
  * Evaluation -> Records -> Renewal & Retention flow:
  *
- *   1. Evaluation approves an applicant. Their Record is created as PENDING and
- *      they are sent straight to Renewal & Retention (sendRecordToRenewal).
- *   2. Renewal & Retention checks the scholar's GWA against the requirement of
- *      their scholarship type.
- *   3. "Renew Scholarship" moves the Record to APPROVED (syncRecordWithRenewal).
- *      "Terminate" turns it REJECTED; "Flag for Review" keeps it PENDING.
+ *   1. Evaluation approves or rejects an applicant. Their Record gets that same status
+ *      (approved / rejected), and either way they are added to Renewal & Retention as PENDING
+ *      (sendRecordToRenewal), remembering how they entered (`origin`).
+ *   2. While the Active Semester is still the row's own term, the row is LOCKED: it can be
+ *      viewed but not changed (isRenewalLocked). Once the Active Semester moves on (Settings >
+ *      Portal Configuration), it unlocks, and the approved scholars go back to Evaluation for
+ *      the new term (see rollScholarsForward in term_helper.php).
+ *   3. An unlocked row can be decided:
+ *        - "Renew" (approved scholars whose GWA meets their scholarship's requirement);
+ *        - "Terminate" (those whose GWA does not meet it, or who were rejected).
+ *      Terminating a scholar who held the scholarship blocks them from applying for that same
+ *      scholarship again (scholarship_terminations); they can still apply for a different one.
+ *      MERIT-BASED Academic is never blocked. A rejected applicant's entry is only closed.
  */
 
 require_once __DIR__ . '/term_helper.php';
 require_once __DIR__ . '/grades_helper.php';
 require_once __DIR__ . '/gwa_helper.php';
+require_once __DIR__ . '/scholarship_type_helper.php';
+require_once __DIR__ . '/merit_helper.php';
 
 /*
  * Adds the record's scholar to Renewal & Retention for the record's term, unless
@@ -20,7 +29,7 @@ require_once __DIR__ . '/gwa_helper.php';
  * that were already approved); 'pending' = awaiting the renewal decision.
  * Returns the new renewal row id, or null when one already existed.
  */
-function sendRecordToRenewal(PDO $pdo, array $rec, ?string $status = 'pending', ?string $remarks = null): ?int {
+function sendRecordToRenewal(PDO $pdo, array $rec, ?string $status = 'pending', ?string $remarks = null, string $origin = 'approved'): ?int {
     $sid = trim((string)$rec['student_id']);
     $semester = normalizeSemesterName($rec['semester'] ?? '');
     $sy = trim((string)($rec['sy'] ?? '')) !== '' ? trim($rec['sy']) : getActiveSchoolYear($pdo);
@@ -54,8 +63,8 @@ function sendRecordToRenewal(PDO $pdo, array $rec, ?string $status = 'pending', 
     }
 
     $insert = $pdo->prepare("
-        INSERT INTO renewal_retention (student_id, name, gwa, failing_grades, enrolled, status, school_year, semester, scholarship_type, remarks)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO renewal_retention (student_id, name, gwa, failing_grades, enrolled, status, school_year, semester, scholarship_type, remarks, origin)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ");
     $insert->execute([
         $sid,
@@ -67,7 +76,10 @@ function sendRecordToRenewal(PDO $pdo, array $rec, ?string $status = 'pending', 
         $sy,
         $semester,
         $rec['scholarship_type'],
-        $remarks ?? 'Awaiting renewal check: GWA against the scholarship requirement.',
+        $remarks ?? ($origin === 'rejected'
+            ? 'Rejected in Evaluation. Locked until the next semester begins.'
+            : 'Approved in Evaluation. Locked until the next semester begins, then renew or terminate by GWA.'),
+        $origin === 'rejected' ? 'rejected' : 'approved',
     ]);
     return (int)$pdo->lastInsertId();
 }
@@ -143,4 +155,71 @@ function hasRecordForTerm(PDO $pdo, string $studentId, string $scholarshipType, 
         if (normalizeSemesterName($r['semester']) === normalizeSemesterName($semester)) return true;
     }
     return false;
+}
+
+/*
+ * A pending row is locked (view only) while the Active Semester and School Year are still the
+ * row's own term. When the term moves on, it unlocks and can be renewed or terminated.
+ */
+function isRenewalLocked(PDO $pdo, array $row): bool {
+    return strtolower(trim((string)$row['status'])) === 'pending'
+        && normalizeSemesterName($row['semester']) === getActiveSemester($pdo)
+        && trim((string)$row['school_year']) === getActiveSchoolYear($pdo);
+}
+
+// Lower-cased acronym form of a scholarship type, so "CMSP", "cmsp" and the long name compare equal.
+function scholarshipTypeKey(PDO $pdo, string $type): string {
+    return strtolower(normalizeScholarshipType($pdo, $type));
+}
+
+/*
+ * Blocks a scholar from applying for this scholarship again. MERIT-BASED Academic is exempt
+ * (its standing follows the GWA every semester). Returns false when nothing was recorded.
+ */
+function recordScholarshipTermination(PDO $pdo, string $studentId, string $scholarshipType, ?int $renewalId, string $reason): bool {
+    $sid = trim($studentId);
+    $key = scholarshipTypeKey($pdo, $scholarshipType);
+    if ($sid === '' || $key === '' || isMeritScholarshipType($key)) return false;
+    if (findScholarshipTermination($pdo, $sid, $scholarshipType)) return true;
+
+    $pdo->prepare("INSERT INTO scholarship_terminations (student_id, scholarship_type, renewal_id, reason) VALUES (?, ?, ?, ?)")
+        ->execute([$sid, normalizeScholarshipType($pdo, $scholarshipType), $renewalId, $reason]);
+    return true;
+}
+
+// The termination that bars this student from this scholarship, or null when they may apply.
+function findScholarshipTermination(PDO $pdo, string $studentId, string $scholarshipType): ?array {
+    $sid = trim($studentId);
+    $key = scholarshipTypeKey($pdo, $scholarshipType);
+    if ($sid === '' || $key === '' || isMeritScholarshipType($key)) return null;
+
+    $stmt = $pdo->prepare("SELECT * FROM scholarship_terminations WHERE student_id = ?");
+    $stmt->execute([$sid]);
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $t) {
+        if (scholarshipTypeKey($pdo, (string)$t['scholarship_type']) === $key) return $t;
+    }
+    return null;
+}
+
+function terminationBlockMessage(string $scholarshipType): string {
+    return 'This student was terminated from the ' . $scholarshipType . ' scholarship and cannot apply for it again. They can still apply for a different scholarship.';
+}
+
+/*
+ * Makes sure every record of the ACTIVE term has its Renewal & Retention row (pending, locked
+ * for the rest of the term). Older approvals and all rejections made before rejected applicants
+ * were sent to Renewal have none yet. Returns how many rows were added.
+ */
+function backfillCurrentTermRenewals(PDO $pdo): int {
+    $semester = getActiveSemester($pdo);
+    $stmt = $pdo->prepare("SELECT * FROM records WHERE LOWER(TRIM(status)) IN ('approved', 'rejected', 'pending') AND TRIM(sy) = ?");
+    $stmt->execute([getActiveSchoolYear($pdo)]);
+
+    $added = 0;
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $rec) {
+        if (normalizeSemesterName($rec['semester']) !== $semester) continue;
+        $origin = strtolower(trim((string)$rec['status'])) === 'rejected' ? 'rejected' : 'approved';
+        if (sendRecordToRenewal($pdo, $rec, 'pending', null, $origin) !== null) $added++;
+    }
+    return $added;
 }

@@ -36,3 +36,17 @@ function findGwaRequirement(PDO $pdo, string $scholarshipType): ?float {
 function resolveGwaRequirement(PDO $pdo, string $scholarshipType, ?float $fallback = null): float {
     return findGwaRequirement($pdo, $scholarshipType) ?? ($fallback && $fallback > 0 ? $fallback : DEFAULT_GWA_REQUIREMENT);
 }
+
+const STATUS_NON_COMPLIANT = 'non-compliant';
+
+/*
+ * "Non-compliant" is an Evaluation-only view: an applicant still being processed whose GWA (once
+ * grades are on file) is above what their scholarship requires. It is worked out on the fly and
+ * never saved as the applicant's status, so other pages (Applicants, dashboard) keep the real one.
+ */
+function isGwaRequirementUnmet(PDO $pdo, array $applicant): bool {
+    $gwa = (float)($applicant['gwa'] ?? 0);
+    if ($gwa <= 0) return false;
+    $required = resolveGwaRequirement($pdo, (string)($applicant['scholarship_type'] ?? ''), (float)($applicant['gwa_req'] ?? 0));
+    return $gwa > $required;
+}

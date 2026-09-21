@@ -1102,9 +1102,14 @@ window.editApplicant =
                     '[data-field="age"]'
                 );
 
-            const fAddr =
+            const fMunicipality =
                 document.querySelector(
-                    '[data-field="address"]'
+                    '[data-field="municipality"]'
+                );
+
+            const fBarangay =
+                document.querySelector(
+                    '[data-field="barangay"]'
                 );
 
 
@@ -1188,9 +1193,13 @@ window.editApplicant =
                 fAge.value =
                     app.age || "";
 
-            if (fAddr)
-                fAddr.value =
-                    app.address || "";
+            if (fMunicipality)
+                fMunicipality.value =
+                    app.municipality || "";
+
+            if (fBarangay)
+                fBarangay.value =
+                    app.barangay || "";
 
 
             if (fSchool)

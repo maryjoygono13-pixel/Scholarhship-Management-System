@@ -7,7 +7,9 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!mapElement) return;
 
     // Initialize Leaflet Map centered around Leyte / Southern Leyte
-    const map = L.map("scholarMap").setView([10.2500, 124.9000], 10);
+    // The zoom buttons live in the top-right corner; the department filter takes the top-left.
+    const map = L.map("scholarMap", { zoomControl: false }).setView([10.2500, 124.9000], 10);
+    L.control.zoom({ position: "topright" }).addTo(map);
     window.scholarMap = map;
 
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -184,6 +186,17 @@ async function loadStudentLocations(map) {
             throw new Error("Invalid response format.");
         }
 
+        // Students with no location yet (their town isn't set): listed above the map instead of pinned somewhere made up.
+        const note = document.getElementById("mapUnlocated");
+        if (note) {
+            const missing = Array.isArray(result.unlocated) ? result.unlocated : [];
+            note.hidden = missing.length === 0;
+            note.textContent = missing.length
+                ? missing.length + " student" + (missing.length === 1 ? "" : "s") + " not shown: no location yet (set their Municipality on the Applicants page) — " + missing.map((s) => s.name).join(", ")
+                : "";
+            map.invalidateSize();
+        }
+
         // Clear existing markers
         scholarMarkers.forEach(item => {
             if (map.hasLayer(item.marker)) {
@@ -242,12 +255,13 @@ async function loadStudentLocations(map) {
                 }
             ).addTo(map);
 
+            // Status comes from the student's newest record in Records.
             const isMaintained =
-                Number(student.gwa) <= 1.50;
+                student.status !== "rejected";
 
             const statusLabel = isMaintained
-                ? "Active (≤ 1.50 GWA)"
-                : "Removed (Below 1.50)";
+                ? "Approved"
+                : "Rejected";
 
             const statusColor = isMaintained
                 ? "#16a34a"

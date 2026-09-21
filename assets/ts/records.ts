@@ -5,6 +5,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const filterStatus = document.getElementById("filterStatus") as HTMLSelectElement | null;
   const filterSemester = document.getElementById("filterSemester") as HTMLSelectElement | null;
   const filterSy = document.getElementById("filterSy") as HTMLSelectElement | null;
+  const filterProgram = document.getElementById("filterProgram") as HTMLSelectElement | null;
   const exportBtn = document.getElementById("exportRecordsBtn");
 
   const recFormOverlay = document.getElementById("recFormOverlay");
@@ -82,8 +83,19 @@ document.addEventListener("DOMContentLoaded", () => {
     filterSy.value = years.includes(current) ? current : "all";
   }
 
+  // Program choices (acronyms) come from the records themselves.
+  function populateProgramFilter(): void {
+    if (!filterProgram) return;
+    const current = filterProgram.value;
+    const codes = Array.from(new Set(recordsData.map((r: any) => r.programCode))).filter(Boolean).sort() as string[];
+    filterProgram.innerHTML = '<option value="all">Programs</option>' +
+      codes.map((c) => '<option value="' + c + '">' + c + '</option>').join("");
+    filterProgram.value = codes.includes(current) ? current : "all";
+  }
+
   function populateFilterTypes(): void {
     populateSchoolYearFilter();
+    populateProgramFilter();
     if (!filterType) return;
     const types = Array.from(new Set(recordsData.map((r: any) => r.scholarshipType))).filter(Boolean);
     filterType.innerHTML = '<option value="all">Scholarship Types</option>';
@@ -112,6 +124,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const statusVal = filterStatus ? filterStatus.value.toLowerCase() : "all";
     const semVal = filterSemester ? filterSemester.value : "all";
     const syVal = filterSy ? filterSy.value : "all";
+    const progVal = filterProgram ? filterProgram.value : "all";
 
     return recordsData.filter((r: any) => {
       const matchQuery = r.name.toLowerCase().includes(query) || r.studentId.toLowerCase().includes(query);
@@ -119,7 +132,8 @@ document.addEventListener("DOMContentLoaded", () => {
       const matchStatus = statusVal === "all" || statusVal === "all status" || r.status.toLowerCase() === statusVal;
       const matchSem = semVal === "all" || semesterKey(r.semester) === semVal;
       const matchSy = syVal === "all" || r.sy === syVal;
-      return matchQuery && matchType && matchStatus && matchSem && matchSy;
+      const matchProg = progVal === "all" || r.programCode === progVal;
+      return matchQuery && matchType && matchStatus && matchSem && matchSy && matchProg;
     });
   }
 
@@ -510,6 +524,7 @@ document.addEventListener("DOMContentLoaded", () => {
   if (filterStatus) filterStatus.addEventListener("change", resetRecordsPageAndRender);
   if (filterSemester) filterSemester.addEventListener("change", resetRecordsPageAndRender);
   if (filterSy) filterSy.addEventListener("change", resetRecordsPageAndRender);
+  if (filterProgram) filterProgram.addEventListener("change", resetRecordsPageAndRender);
 
   function csvEscape(value: any): string {
     const str = value == null ? "" : String(value);

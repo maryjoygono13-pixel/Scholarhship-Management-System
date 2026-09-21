@@ -256,7 +256,8 @@ function closeViewModal(): void {
     const fEmail = document.querySelector<HTMLInputElement>('[data-field="email"]');
     const fPhone = document.querySelector<HTMLInputElement>('[data-field="phone"]');
     const fBirth = document.querySelector<HTMLInputElement>('[data-field="birthdate"]');
-    const fAddr = document.querySelector<HTMLInputElement>('[data-field="address"]');
+    const fMunicipality = document.querySelector<HTMLSelectElement>('[data-field="municipality"]');
+    const fBarangay = document.querySelector<HTMLInputElement>('[data-field="barangay"]');
     const fSchool = document.querySelector<HTMLInputElement>('[data-field="school"]');
     const fProg = document.querySelector<HTMLInputElement>('[data-field="program"]');
     const fYear = document.querySelector<HTMLSelectElement>('[data-field="yearLevel"]');
@@ -269,7 +270,8 @@ function closeViewModal(): void {
     if (fEmail) fEmail.value = app.email || '';
     if (fPhone) fPhone.value = app.phone || '';
     if (fBirth) fBirth.value = app.birthdate || '';
-    if (fAddr) fAddr.value = app.address || '';
+    if (fMunicipality) fMunicipality.value = app.municipality || '';
+    if (fBarangay) fBarangay.value = app.barangay || '';
     if (fSchool) fSchool.value = app.school || '';
     if (fProg) fProg.value = app.program || '';
     if (fYear) fYear.value = app.yearLevel || '';

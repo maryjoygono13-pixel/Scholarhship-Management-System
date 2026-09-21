@@ -6,9 +6,11 @@
  * from here.
  *
  * Changing the active term rolls the cycle forward:
- *   - every scholar approved in the term that just ended is sent to
- *     Renewal & Retention (their old-term record stays in Records as history);
- *   - those same scholars go back to Evaluation, now under the new term.
+ *   - the Renewal & Retention rows of the term that just ended unlock, so they can be renewed
+ *     or terminated (they are view-only while their own term is still the active one);
+ *     an approved record that somehow has no row yet is added as pending;
+ *   - every scholar approved in that term goes back to Evaluation under the new term, so
+ *     their new semester's GWA can be checked (their old-term record stays in Records).
  * Their earlier grades are kept (student_grades is keyed by semester).
  */
 
@@ -19,7 +21,17 @@ require_once __DIR__ . '/grades_helper.php';
 require_once __DIR__ . '/renewal_helper.php';
 
 const TERM_SEMESTERS = ['1st Semester', '2nd Semester', 'Summer Term'];
-const DEFAULT_ACTIVE_SCHOOL_YEAR = '2025-2026';
+
+/*
+ * The academic year of today's date: a school year starts in June, so June 2026 to May 2027 is
+ * "2026-2027". Used as the default until a different Active Academic Year is saved in Settings.
+ */
+function currentSchoolYear(?DateTimeInterface $today = null): string {
+    $today = $today ?? new DateTimeImmutable('now');
+    $year = (int)$today->format('Y');
+    $start = (int)$today->format('n') >= 6 ? $year : $year - 1;
+    return $start . '-' . ($start + 1);
+}
 
 // Maps any stored spelling ("First Semester", "2nd", "summer"...) onto one of TERM_SEMESTERS.
 function normalizeSemesterName(?string $raw): string {
@@ -34,8 +46,8 @@ function getActiveSemester(PDO $pdo): string {
 }
 
 function getActiveSchoolYear(PDO $pdo): string {
-    $sy = trim(getSetting($pdo, 'active_school_year', DEFAULT_ACTIVE_SCHOOL_YEAR));
-    return $sy !== '' ? $sy : DEFAULT_ACTIVE_SCHOOL_YEAR;
+    $sy = trim(getSetting($pdo, 'active_school_year', currentSchoolYear()));
+    return $sy !== '' ? $sy : currentSchoolYear();
 }
 
 // "2025-2026" -> "2026-2027"
@@ -145,7 +157,7 @@ function rollScholarsForward(PDO $pdo, string $oldSemester, string $newSemester,
         // 1. Renewal & Retention (once per scholar per term). Scholars approved under the
         //    current flow are already there; this covers older approved records.
         $recordSy = trim((string)$rec['sy']) !== '' ? trim($rec['sy']) : $newSchoolYear;
-        sendRecordToRenewal($pdo, $rec, null, 'Sent from Records at the end of ' . $oldSemester . ' ' . $recordSy . '.');
+        sendRecordToRenewal($pdo, $rec, 'pending', 'Sent from Records at the end of ' . $oldSemester . ' ' . $recordSy . '. Renew or terminate by GWA.');
 
         // 2. Back to Evaluation for the new term (grades are kept).
         if ($applicant && strtolower((string)$applicant['status']) === 'approved') {

@@ -23,6 +23,12 @@ include __DIR__ . '/../includes/header.php';
                 <i data-lucide="chevron-down"></i>
             </div>
             <div class="select-wrap">
+                <select id="filterProgram">
+                    <option value="all">Programs</option>
+                </select>
+                <i data-lucide="chevron-down"></i>
+            </div>
+            <div class="select-wrap">
                 <select id="filterStatus">
                     <option value="all">Status</option>
                     <option value="pending">Pending</option>

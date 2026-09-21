@@ -78,6 +78,14 @@ try {
         $gwa = $standingSemester ? $stats[$standingSemester]['gwa'] : (float)$s['gwa'];
         $maintains = $gwa <= $required;
 
+        // MERIT-BASED Academic: 2.00 or worse in any semester of this school year removes the
+        // scholar until the next school year, even if a later semester is back within 1.50.
+        $lockout = isMeritScholarshipType($type) ? meritLockout($pdo, $sid, getActiveSchoolYear($pdo)) : null;
+        if ($lockout) {
+            $maintains = false;
+            $s['remarks'] = 'Removed: GWA ' . number_format($lockout['gwa'], 2) . ' in ' . $lockout['semester'] . ' is ' . number_format(MERIT_LOCKOUT_GWA, 2) . ' or worse. Not a scholar again until the next school year.';
+        }
+
         if ($wantAbove && !$maintains) continue;
         if ($wantBelow && $maintains) continue;
 

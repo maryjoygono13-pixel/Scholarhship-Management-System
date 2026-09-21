@@ -97,6 +97,7 @@ function normalizeEval(record: any): EvaluationApplicant {
   // Why this applicant can't be approved right now, or "" when they can. Mirrors the checks
   // the Approve button and the server make, so the reason is visible before clicking.
   function approveBlockReason(a: EvaluationApplicant): string {
+    if (a.status === "non-compliant") return "Non-compliant: " + a.semester + " GWA " + Number(a.gwa).toFixed(2) + " is above the required " + Number(a.gwaReq).toFixed(2) + " for " + a.type + ". This applicant can only be rejected.";
     if (!(a.gwa > 0)) return "Can't approve yet: no grades are recorded for " + a.semester + ". Import the academic records in Data Management.";
     if (a.gwa > a.gwaReq) return "Can't approve: " + a.semester + " GWA " + Number(a.gwa).toFixed(2) + " is above the required " + Number(a.gwaReq).toFixed(2) + " for " + a.type + ".";
     return "";
@@ -177,6 +178,7 @@ function normalizeEval(record: any): EvaluationApplicant {
       interview: { label: "For Interview", cls: "badge-interview" },
       approved: { label: "Approved", cls: "badge-approved" },
       rejected: { label: "Rejected", cls: "badge-rejected" },
+      "non-compliant": { label: "Non-Compliant", cls: "badge-non-compliant" },
     };
     const s = map[status] || map.review;
     return '<span class="badge ' + s.cls + '">' + s.label + "</span>";
@@ -491,7 +493,7 @@ function normalizeEval(record: any): EvaluationApplicant {
       "</div>" +
       '<div class="custom-modal-footer">' +
       approveBlockNote(a) +
-      '<button type="button" class="btn-secondary ' + (a.status === "interview" ? "active-choice" : "") + '" data-decide="interview">For Interview</button>' +
+      '<button type="button" class="btn-secondary ' + (a.status === "interview" ? "active-choice" : "") + '" data-decide="interview"' + (a.status === "non-compliant" ? ' disabled style="opacity:0.55; cursor:not-allowed;"' : "") + '>For Interview</button>' +
       '<button type="button" class="btn-danger" data-decide="rejected">Reject</button>' +
       '<button type="button" class="btn-primary" data-decide="approved"' + (approveBlockReason(a) ? ' title="' + esc(approveBlockReason(a)) + '" style="opacity:0.55;"' : "") + '>Approve</button>' +
       "</div>";
@@ -516,6 +518,10 @@ function normalizeEval(record: any): EvaluationApplicant {
         const decision = btn.getAttribute("data-decide");
         if (!decision) return;
         const remarksEl = panel.querySelector<HTMLTextAreaElement>("#remarksInput");
+        if (decision === "approved" && a.status === "non-compliant") {
+          showToast(approveBlockReason(a), "error");
+          return;
+        }
         if (decision === "approved" && a.gwa <= 0) {
           showToast("Cannot approve: no grades are recorded for the current semester yet. Import the academic records in Data Management first.", "error");
           return;

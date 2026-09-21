@@ -15,19 +15,15 @@ include __DIR__ . '/../includes/header.php';
         <div class="value" id="countPending">0</div>
       </div>
       <div class="summary-card eligible">
-        <div class="label">Eligible</div>
+        <div class="label">Renewed</div>
         <div class="value" id="countEligible">0</div>
-      </div>
-      <div class="summary-card at-risk">
-        <div class="label">At-Risk</div>
-        <div class="value" id="countAtRisk">0</div>
       </div>
       <div class="summary-card terminated">
         <div class="label">Terminated</div>
         <div class="value" id="countTerminated">0</div>
       </div>
       <div class="summary-card">
-        <div class="label">Total Scholars</div>
+        <div class="label">Total Entries</div>
         <div class="value" id="countTotal">0</div>
       </div>
     </div>
@@ -37,9 +33,6 @@ include __DIR__ . '/../includes/header.php';
       <div class="select-wrap">
         <select id="SchoolYearFilter">
           <option value="">School Year</option>
-          <option value="eligible">2024</option>
-          <option value="at-risk">2025</option>
-          <option value="terminated">2026</option>
         </select>
       </div>
 
@@ -55,9 +48,12 @@ include __DIR__ . '/../includes/header.php';
       <div class="select-wrap">
         <select id="scholarshipFilter">
           <option value="">Scholarship Type</option>
-          <option value="eligible">Academic Scholarship</option>
-          <option value="at-risk">Merit Scholarship</option>
-          <option value="terminated">Endorsement Scholarships</option>
+        </select>
+      </div>
+
+      <div class="select-wrap">
+        <select id="programFilter">
+          <option value="">Program</option>
         </select>
       </div>
 
@@ -65,8 +61,7 @@ include __DIR__ . '/../includes/header.php';
         <select id="statusFilter">
           <option value="">Statuses</option>
           <option value="pending">Pending</option>
-          <option value="eligible">Eligible</option>
-          <option value="at-risk">At-Risk</option>
+          <option value="eligible">Renewed</option>
           <option value="terminated">Terminated</option>
         </select>
       </div>
@@ -82,6 +77,7 @@ include __DIR__ . '/../includes/header.php';
         <tr>
           <th>Student ID</th>
           <th>Name</th>
+          <th>Scholarship</th>
           <th>GWA</th>
           <th>Grades</th>
           <th>Enrollment</th>
@@ -114,6 +110,8 @@ include __DIR__ . '/../includes/header.php';
     <div class="custom-modal-body">
       <div class="criteria-list" id="modalCriteria" style="margin-bottom: 20px;"></div>
 
+      <div id="modalLockNote" style="display:none; background:#fffbeb; border:1px solid #fde68a; color:#92400e; border-radius:10px; padding:10px 14px; font-size:13px; line-height:1.4; margin-bottom:12px;"></div>
+
       <div class="remarks-box" id="modalRemarks" style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; margin-top: 12px;">
         <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; margin-bottom: 8px;">Evaluation Result</div>
         <span class="status-badge" id="modalSeal">—</span>
@@ -122,7 +120,7 @@ include __DIR__ . '/../includes/header.php';
     </div>
 
     <div class="custom-modal-footer">
-      <button type="button" class="btn-secondary" id="flagBtn">Flag for Review</button>
+      <button type="button" class="btn-danger" id="terminateBtn">Terminate</button>
       <button type="button" class="btn-primary" id="renewBtn">Renew Scholarship</button>
     </div>
   </div>

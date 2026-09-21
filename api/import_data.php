@@ -80,6 +80,8 @@
                 'phone'           => ['phone', 'phone_number', 'contact_number', 'mobile', 'mobile_number'],
                 'school'          => ['school', 'school_name'],
                 'address'         => ['address', 'home_address'],
+                'municipality'    => ['municipality', 'city', 'town', 'city_municipality', 'municipality_city'],
+                'barangay'        => ['barangay', 'brgy', 'barrio'],
                 'enrolled'        => ['enrolled', 'enrollment', 'enrollment_status', 'status'],
                 'school_year'     => ['school_year', 'schoolyear', 'sy'],
                 'program'         => ['program', 'course'],
@@ -166,6 +168,23 @@
                     $schoolVal = isset($resolved['school']) ? trim($row[$resolved['school']] ?? '') : '';
                     $addressVal = isset($resolved['address']) ? trim($row[$resolved['address']] ?? '') : '';
 
+                    // Where the student lives: a Municipality (and Barangay) column is used as given; otherwise
+                    // the town is found inside a plain Address column. The map position comes from the town.
+                    $municipalityRaw = isset($resolved['municipality']) ? trim($row[$resolved['municipality']] ?? '') : '';
+                    $barangayVal = isset($resolved['barangay']) ? trim($row[$resolved['barangay']] ?? '') : '';
+                    $municipalityVal = resolveMunicipality($municipalityRaw) ?? (detectMunicipalityInText($municipalityRaw) ?? '');
+                    if ($municipalityVal === '' && $addressVal !== '') {
+                        $split = splitAddress($addressVal);
+                        $municipalityVal = $split['municipality'];
+                        if ($barangayVal === '') $barangayVal = $split['barangay'];
+                    }
+                    $latVal = null;
+                    $lonVal = null;
+                    if ($municipalityVal !== '') {
+                        [$latVal, $lonVal] = locationCoordinates($municipalityVal, $barangayVal);
+                        $addressVal = composeAddress($barangayVal, $municipalityVal);
+                    }
+
                     $ageVal = null;
                     if (isset($resolved['age'])) {
                         $rawAge = trim($row[$resolved['age']] ?? '');
@@ -233,6 +252,12 @@
                             $sets[] = 'age = ?';
                             $params[] = $ageVal;
                         }
+                        if ($municipalityVal !== '') {
+                            foreach (['municipality' => $municipalityVal, 'barangay' => $barangayVal, 'latitude' => $latVal, 'longitude' => $lonVal] as $locCol => $locVal) {
+                                $sets[] = "$locCol = ?";
+                                $params[] = $locVal;
+                            }
+                        }
                         foreach ([
                             'program' => $programVal,
                             'major' => $majorVal,
@@ -270,9 +295,10 @@
                             $insertStmt = $pdo->prepare("
                                 INSERT INTO applicants
                                     (student_id, first_name, last_name, gender, age, birthdate, email, phone, school, address,
+                                    municipality, barangay, latitude, longitude,
                                     school_year, program, major, year_level, semester, scholarship_type, status, enrolled, docs_complete)
                                 VALUES
-                                    (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, 1)
+                                    (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, 1)
                             ");
                             $insertStmt->execute([
                                 $studentId,
@@ -285,6 +311,10 @@
                                 $phoneVal,
                                 $schoolVal,
                                 $addressVal,
+                                $municipalityVal,
+                                $barangayVal,
+                                $latVal,
+                                $lonVal,
                                 $schoolYearVal,
                                 $programVal,
                                 $majorVal,

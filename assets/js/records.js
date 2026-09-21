@@ -6,6 +6,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const filterStatus = document.getElementById("filterStatus");
     const filterSemester = document.getElementById("filterSemester");
     const filterSy = document.getElementById("filterSy");
+    const filterProgram = document.getElementById("filterProgram");
     const exportBtn = document.getElementById("exportRecordsBtn");
     const recFormOverlay = document.getElementById("recFormOverlay");
     const recFormTitle = document.getElementById("recFormTitle");
@@ -76,8 +77,19 @@ document.addEventListener("DOMContentLoaded", () => {
             years.map((y) => '<option value="' + y + '">' + y + '</option>').join("");
         filterSy.value = years.includes(current) ? current : "all";
     }
+    // Program choices (acronyms) come from the records themselves.
+    function populateProgramFilter() {
+        if (!filterProgram)
+            return;
+        const current = filterProgram.value;
+        const codes = Array.from(new Set(recordsData.map((r) => r.programCode))).filter(Boolean).sort();
+        filterProgram.innerHTML = '<option value="all">Programs</option>' +
+            codes.map((c) => '<option value="' + c + '">' + c + '</option>').join("");
+        filterProgram.value = codes.includes(current) ? current : "all";
+    }
     function populateFilterTypes() {
         populateSchoolYearFilter();
+    populateProgramFilter();
         if (!filterType)
             return;
         const types = Array.from(new Set(recordsData.map((r) => r.scholarshipType))).filter(Boolean);
@@ -106,13 +118,15 @@ document.addEventListener("DOMContentLoaded", () => {
         const statusVal = filterStatus ? filterStatus.value.toLowerCase() : "all";
         const semVal = filterSemester ? filterSemester.value : "all";
         const syVal = filterSy ? filterSy.value : "all";
+    const progVal = filterProgram ? filterProgram.value : "all";
         return recordsData.filter((r) => {
             const matchQuery = r.name.toLowerCase().includes(query) || r.studentId.toLowerCase().includes(query);
             const matchType = typeVal === "all" || r.scholarshipType.toLowerCase() === typeVal;
             const matchStatus = statusVal === "all" || statusVal === "all status" || r.status.toLowerCase() === statusVal;
             const matchSem = semVal === "all" || semesterKey(r.semester) === semVal;
             const matchSy = syVal === "all" || r.sy === syVal;
-            return matchQuery && matchType && matchStatus && matchSem && matchSy;
+      const matchProg = progVal === "all" || r.programCode === progVal;
+            return matchQuery && matchType && matchStatus && matchSem && matchSy && matchProg;
         });
     }
     function renderPaginationBar(total) {
@@ -497,6 +511,7 @@ document.addEventListener("DOMContentLoaded", () => {
         filterSemester.addEventListener("change", resetRecordsPageAndRender);
     if (filterSy)
         filterSy.addEventListener("change", resetRecordsPageAndRender);
+  if (filterProgram) filterProgram.addEventListener("change", resetRecordsPageAndRender);
     function csvEscape(value) {
         const str = value == null ? "" : String(value);
         if (/[",\n]/.test(str))

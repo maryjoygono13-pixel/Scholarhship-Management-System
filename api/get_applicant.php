@@ -58,6 +58,8 @@ try {
         : null,
 
     'address' => $r['address'] ?? '',
+    'municipality' => $r['municipality'] ?? '',
+    'barangay' => $r['barangay'] ?? '',
 
     /* --------------------------------------------------
        SCHOOL / ACADEMIC INFORMATION
@@ -125,9 +127,9 @@ try {
 
     'transcriptFile' => $r['transcript_file'] ?? '',
 
-    'recommendationFile' => $r['recommendation_file'] ?? '',
+    'coeFile' => $r['coe_file'] ?? '',
 
-    'validIdFile' => $r['valid_id_file'] ?? '',
+    'goodMoralFile' => $r['good_moral_file'] ?? '',
 
     'createdAt' => $r['created_at'] ?? '',
     'created_at' => $r['created_at'] ?? ''

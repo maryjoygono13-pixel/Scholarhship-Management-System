@@ -13,6 +13,16 @@
     overflow: hidden;
     border: 1px solid #e2e8f0;
     box-shadow: 0 4px 14px rgba(0, 0, 0, 0.05);
+    display: flex;
+    flex-direction: column;
+}
+
+/* The map and everything floating over it (zoom, filter, legend) live in this box, so the
+   notice above it never sits underneath them. */
+.map-stage {
+    position: relative;
+    flex: 1;
+    min-height: 0;
 }
 
 #scholarMap {
@@ -20,17 +30,17 @@
     height: 100%;
 }
 
-/* Reposition Leaflet Zoom Control to prevent overlap */
-.leaflet-top.leaflet-left {
+/* Zoom control: top-right corner of the map */
+.leaflet-top.leaflet-right {
     top: 16px !important;
-    left: 16px !important;
+    right: 16px !important;
 }
 
-/* Department Filter Overlay */
+/* Department Filter Overlay: top-left corner of the map */
 .map-controls {
     position: absolute;
     top: 16px;
-    left: 65px;
+    left: 16px;
     z-index: 1000;
 }
 
@@ -160,4 +170,16 @@
     border-radius: 50%;
     display: inline-block;
     flex-shrink: 0;
+}
+
+/* Students that can't be pinned yet (no town on file): a strip across the top of the card */
+.map-unlocated {
+    flex: none;
+    margin: 0;
+    padding: 8px 14px;
+    background: #fff7ed;
+    border-bottom: 1px solid #fed7aa;
+    color: #9a3412;
+    font-size: 13px;
+    line-height: 1.4;
 }

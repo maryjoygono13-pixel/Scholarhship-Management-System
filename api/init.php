@@ -10,6 +10,7 @@ require_once __DIR__ . '/../includes/grades_helper.php';
 require_once __DIR__ . '/../includes/renewal_helper.php';
 require_once __DIR__ . '/../includes/programs_helper.php';
 require_once __DIR__ . '/../includes/scholarship_type_helper.php';
+require_once __DIR__ . '/../includes/locations.php';
 require_once __DIR__ . '/../includes/merit_helper.php';
 
 header('Content-Type: application/json; charset=utf-8');

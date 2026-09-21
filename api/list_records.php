@@ -134,6 +134,7 @@ try {
             'date_evaluated' => $r['date_evaluated'],
             'remarks' => $r['remarks'],
             'program' => $app['program'] ?? null,
+            'programCode' => programAcronym($app['program'] ?? ''),
             'major' => $app['major'] ?? '',
             'yearLevel' => $app['year_level'] ?? '',
             'gwa' => $recordGwa,
