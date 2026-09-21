@@ -363,6 +363,25 @@ function initDatabase(): PDO {
     $pdo->exec("CREATE INDEX IF NOT EXISTS idx_activity_logs_module ON activity_logs(module)");
     $pdo->exec("CREATE INDEX IF NOT EXISTS idx_activity_logs_action ON activity_logs(action)");
 
+        // 10a. Login Attempts / Brute-Force Protection
+    $pdo->exec("CREATE TABLE IF NOT EXISTS login_attempts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        identifier TEXT NOT NULL,
+        ip_address TEXT NOT NULL,
+        successful INTEGER NOT NULL DEFAULT 0,
+        attempted_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )");
+
+    $pdo->exec("
+        CREATE INDEX IF NOT EXISTS idx_login_attempts_lookup
+        ON login_attempts(identifier, ip_address, attempted_at)
+    ");
+
+    $pdo->exec("
+        CREATE INDEX IF NOT EXISTS idx_login_attempts_attempted_at
+        ON login_attempts(attempted_at)
+    ");
+
     // 11. Settings — simple key/value feature toggles & system config
     $pdo->exec("CREATE TABLE IF NOT EXISTS settings (
         setting_key TEXT PRIMARY KEY,

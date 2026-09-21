@@ -16,7 +16,7 @@
                 <div class="map-filter">
                     <label for="programFilter" style="font-weight:700; color:#134e2a;">Filter Students by Department</label>
                     <select id="programFilter" class="filter-select">
-                        <option value="all">All Departments</option>
+                        <option value="all">Departments</option>
                         <option value="Nursing">BS Nursing</option>
                         <option value="Information Technology">BS Information Technology</option>
                         <option value="Accountancy">BS Accountancy</option>

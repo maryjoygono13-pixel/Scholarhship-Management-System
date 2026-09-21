@@ -292,7 +292,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const previousValue = filterType.value;
 
-    filterType.innerHTML = '<option value="all">All Types</option>';
+    filterType.innerHTML = '<option value="all">Types</option>';
 
     // Every canonical type, plus any type still used by an older
     // program that isn't in the canonical list.
@@ -325,7 +325,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const previousValue = filterSubtype.value;
     const typeVal = filterType ? filterType.value : "all";
 
-    filterSubtype.innerHTML = '<option value="all">All Sub-types</option>';
+    filterSubtype.innerHTML = '<option value="all">Sub-types</option>';
 
     const names: string[] = [];
     scholarshipTypes.forEach((t) => {

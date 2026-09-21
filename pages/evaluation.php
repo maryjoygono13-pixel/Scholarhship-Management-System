@@ -17,7 +17,7 @@
                     <i data-lucide="search"></i>
                 </div>
                 <div class="select-wrap">
-                    <select id="filterType"><option value="all">All Scholarship Types</option></select>
+                    <select id="filterType"><option value="all">Scholarship Types</option></select>
                     <i data-lucide="chevron-down"></i>
                 </div>
 

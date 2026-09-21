@@ -35,7 +35,7 @@ $activeSchoolYear = getActiveSchoolYear(getDB());
 
             <!-- Department Filter -->
             <select id="filterDepartment" class="filter-select">
-                <option value="all">All Departments</option>
+                <option value="all">Departments</option>
                 <option value="Nursing">Nursing</option>
                 <option value="Information Technology">Information Technology</option>
                 <option value="Accountancy">Accountancy</option>
@@ -46,7 +46,7 @@ $activeSchoolYear = getActiveSchoolYear(getDB());
 
             <!-- Grade Year Filter (1 to 4) -->
             <select id="filterYear" class="filter-select">
-                <option value="all">All Grade Years</option>
+                <option value="all">Grade Years</option>
                 <option value="1">1st Year (Year 1)</option>
                 <option value="2">2nd Year (Year 2)</option>
                 <option value="3">3rd Year (Year 3)</option>

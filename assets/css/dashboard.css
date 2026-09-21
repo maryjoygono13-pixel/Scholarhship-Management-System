@@ -248,3 +248,31 @@
     width: 100%;
     height: 320px;
 }
+
+/* School Year picker above the two charts */
+.chart-year-filter {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0 0 14px;
+}
+.chart-year-filter label {
+    font-size: 13px;
+    font-weight: 600;
+    color: #374151;
+}
+.chart-year-filter select {
+    height: 38px;
+    padding: 0 34px 0 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    background: #fff;
+    font-size: 13.5px;
+    color: #1f2937;
+    cursor: pointer;
+    outline: none;
+}
+.chart-year-filter select:focus {
+    border-color: #238f54;
+    box-shadow: 0 0 0 3px rgba(35, 143, 84, 0.12);
+}

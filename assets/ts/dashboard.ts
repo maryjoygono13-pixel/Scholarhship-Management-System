@@ -200,7 +200,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   async function refreshDistribution(): Promise<void> {
     try {
-      const res = await fetch("api/scholarship_distribution.php", { cache: "no-store" });
+      const res = await fetch("api/scholarship_distribution.php?sy=" + encodeURIComponent((window as any).dashboardSchoolYear || "all"), { cache: "no-store" });
       const json = await res.json();
       if (json && json.success) renderDistribution(json as DistributionData);
     } catch (e) {

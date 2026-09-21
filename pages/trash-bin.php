@@ -24,7 +24,7 @@ include __DIR__ . '/../includes/header.php';
         <div style="display:flex; align-items:center; gap:12px;">
             <label for="trashTypeFilter" style="font-size:13.5px; font-weight:600; color:#334155;">Filter by Category:</label>
             <select id="trashTypeFilter" class="trash-type-filter">
-                <option value="all">All Categories</option>
+                <option value="all">Categories</option>
                 <option value="applicant">Applicants</option>
                 <option value="scholar">Scholars</option>
                 <option value="scholarship">Scholarships</option>

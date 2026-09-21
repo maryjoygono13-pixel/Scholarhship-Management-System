@@ -20,7 +20,7 @@
                     </div>
                     <div class="select-wrap">
                         <select id="filterType">
-                          <option value="all">All Scholarship Types</option>
+                          <option value="all">Scholarship Types</option>
                           <option value="CMSP">CMSP (CHED Merit Scholarship Program)</option>
                           <option value="TDP">TDP (Tulong Dunong Program)</option>
                           <option value="TES">TES (Tertiary Education Subsidy)</option>
@@ -228,45 +228,6 @@
                             data-field="school"
                             required
                         >
-                    </div>
-
-
-                    <!-- SCHOOL YEAR -->
-                    <div class="field">
-                        <label>
-                            School Year
-                            <span class="req">*</span>
-                        </label>
-
-                        <select
-                            name="school_year"
-                            data-field="schoolYear"
-                            required
-                        >
-                            <option value="">
-                                Select school year
-                            </option>
-
-                            <option value="2025-2026">
-                                2025-2026
-                            </option>
-
-                            <option value="2026-2027">
-                                2026-2027
-                            </option>
-
-                            <option value="2027-2028">
-                                2027-2028
-                            </option>
-
-                            <option value="2028-2029">
-                                2028-2029
-                            </option>
-
-                            <option value="2029-2030">
-                                2029-2030
-                            </option>
-                        </select>
                     </div>
 
 

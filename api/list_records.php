@@ -7,7 +7,7 @@ try {
         $id = (int)($_POST['id'] ?? 0);
         $studentId = trim($_POST['student_id'] ?? $_POST['studentId'] ?? '');
         $name = trim($_POST['name'] ?? '');
-        $type = trim($_POST['scholarship_type'] ?? $_POST['scholarshipType'] ?? 'Academic Merit');
+        $type = normalizeScholarshipType($pdo, trim($_POST['scholarship_type'] ?? $_POST['scholarshipType'] ?? 'Academic Merit'));
         $status = trim($_POST['status'] ?? 'approved');
         // The semester and school year come from the Active Term (Settings), never from
         // the form. Editing a record leaves its term alone; a new record gets the active one.

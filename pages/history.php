@@ -78,12 +78,12 @@ include __DIR__ . '/../includes/header.php';
             <input type="date" id="historyDateFilter" class="history-date-input">
 
             <div class="select-wrap">
-                <select id="historyActionFilter"><option value="all">All Actions</option></select>
+                <select id="historyActionFilter"><option value="all">Actions</option></select>
                 <i data-lucide="chevron-down"></i>
             </div>
 
             <div class="select-wrap">
-                <select id="historyModuleFilter"><option value="all">All Modules</option></select>
+                <select id="historyModuleFilter"><option value="all">Modules</option></select>
                 <i data-lucide="chevron-down"></i>
             </div>
 

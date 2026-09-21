@@ -212,7 +212,7 @@ function normalizeEval(record: any): EvaluationApplicant {
     const current = sel.value;
     const types = Array.from(new Set(applicants.map((a) => a.type))).sort();
     sel.innerHTML =
-      '<option value="all">All Scholarship Types</option>' +
+      '<option value="all">Scholarship Types</option>' +
       types.map((t) => '<option value="' + esc(t) + '">' + esc(t) + "</option>").join("");
     sel.value = types.includes(current) ? current : "all";
   }

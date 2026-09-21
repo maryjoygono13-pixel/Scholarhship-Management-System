@@ -18,13 +18,13 @@ include __DIR__ . '/../includes/header.php';
 
             <div class="select-wrap">
                 <select id="filterType">
-                    <option >All Scholarship Types</option>
+                    <option value="all">Scholarship Types</option>
                 </select>
                 <i data-lucide="chevron-down"></i>
             </div>
             <div class="select-wrap">
                 <select id="filterStatus">
-                    <option value="all">All Status</option>
+                    <option value="all">Status</option>
                     <option value="pending">Pending</option>
                     <option value="approved">Approved</option>
                     <option value="rejected">Rejected</option>
@@ -33,7 +33,7 @@ include __DIR__ . '/../includes/header.php';
             </div>
             <div class="select-wrap">
                 <select id="filterSemester">
-                    <option value="all">All Semesters</option>
+                    <option value="all">Semesters</option>
                     <option value="1st">1st Semester</option>
                     <option value="2nd">2nd Semester</option>
                     <option value="summer">Summer Term</option>
@@ -42,12 +42,12 @@ include __DIR__ . '/../includes/header.php';
             </div>
             <div class="select-wrap">
                 <select id="filterSy">
-                    <option value="all">All School Years</option>
+                    <option value="all">School Years</option>
                 </select>
                 <i data-lucide="chevron-down"></i>
             </div>
         </div>
-        <div style="display:flex; gap:10px;">
+        <div class="toolbar-actions">
             <button class="btn-primary btn-export" id="exportRecordsBtn">
                 <i data-lucide="download"></i>
                 Export Records

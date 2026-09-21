@@ -62,7 +62,25 @@ function buildScholarshipTypeResolver(PDO $pdo): callable {
     };
 }
 
-function getScholarshipDistribution(PDO $pdo): array {
+// The school years that have any data (records, scholars or applicants), newest first.
+function getDashboardSchoolYears(PDO $pdo): array {
+    $years = [];
+    foreach ([
+        "SELECT DISTINCT TRIM(sy) FROM records",
+        "SELECT DISTINCT TRIM(school_year) FROM scholars",
+        "SELECT DISTINCT TRIM(school_year) FROM applicants",
+    ] as $sql) {
+        foreach ($pdo->query($sql)->fetchAll(PDO::FETCH_COLUMN) as $y) {
+            if ($y !== null && trim((string)$y) !== '') $years[trim((string)$y)] = true;
+        }
+    }
+    $list = array_keys($years);
+    rsort($list, SORT_STRING);
+    return $list;
+}
+
+// $schoolYear null = every school year; otherwise only records / scholars of that year.
+function getScholarshipDistribution(PDO $pdo, ?string $schoolYear = null): array {
     // Every type currently defined in the Scholarships module (plus any type
     // that only exists on a program) starts at 0.
     $counts = [];
@@ -78,7 +96,10 @@ function getScholarshipDistribution(PDO $pdo): array {
 
     // Approved records only. Each scholar counts once per type, however many
     // semesters they were approved for.
-    $rows = $pdo->query("SELECT id, student_id, scholarship_type FROM records WHERE LOWER(TRIM(status)) = 'approved'")->fetchAll(PDO::FETCH_ASSOC);
+    $recordSql = "SELECT id, student_id, scholarship_type FROM records WHERE LOWER(TRIM(status)) = 'approved'" . ($schoolYear !== null ? " AND TRIM(sy) = ?" : '');
+    $recordStmt = $pdo->prepare($recordSql);
+    $recordStmt->execute($schoolYear !== null ? [$schoolYear] : []);
+    $rows = $recordStmt->fetchAll(PDO::FETCH_ASSOC);
     foreach ($rows as $r) {
         $type = $resolve((string)$r['scholarship_type']);
         $scholar = trim((string)$r['student_id']) !== '' ? 's:' . trim($r['student_id']) : 'r:' . $r['id'];
@@ -87,7 +108,10 @@ function getScholarshipDistribution(PDO $pdo): array {
 
     // Scholars on the Scholars list who hold a scholarship (e.g. MERIT-BASED, added automatically).
     // They count while their newest graded semester still meets that scholarship's requirement.
-    $scholarRows = $pdo->query("SELECT student_id, gwa, scholarship_type FROM scholars WHERE TRIM(COALESCE(scholarship_type, '')) != ''")->fetchAll(PDO::FETCH_ASSOC);
+    $scholarSql = "SELECT student_id, gwa, scholarship_type FROM scholars WHERE TRIM(COALESCE(scholarship_type, '')) != ''" . ($schoolYear !== null ? " AND TRIM(COALESCE(school_year, '')) = ?" : '');
+    $scholarStmt = $pdo->prepare($scholarSql);
+    $scholarStmt->execute($schoolYear !== null ? [$schoolYear] : []);
+    $scholarRows = $scholarStmt->fetchAll(PDO::FETCH_ASSOC);
     if ($scholarRows) {
         $gradeStats = getSemesterGradeStats($pdo, array_column($scholarRows, 'student_id'));
         foreach ($scholarRows as $sc) {
@@ -129,6 +153,7 @@ function getScholarshipDistribution(PDO $pdo): array {
         'totalApproved' => $totalApproved,
         'totalTypes' => $totalTypes,
         'mostPopular' => $top,
+        'schoolYear' => $schoolYear ?? 'all',
         'generatedAt' => date('c'),
     ];
 }

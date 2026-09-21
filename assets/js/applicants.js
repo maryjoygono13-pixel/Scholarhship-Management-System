@@ -1131,11 +1131,6 @@ window.editApplicant =
                     '[data-field="yearLevel"]'
                 );
 
-            const fSchoolYear =
-                document.querySelector(
-                    '[data-field="schoolYear"]'
-                );
-
             const fSemester =
                 document.querySelector(
                     '[data-field="semester"]'
@@ -1201,10 +1196,6 @@ window.editApplicant =
             if (fSchool)
                 fSchool.value =
                     app.school || "";
-
-            if (fSchoolYear)
-                fSchoolYear.value =
-                    app.schoolYear || "";
 
 
             /*
@@ -1885,7 +1876,8 @@ async function loadScholarshipTypeOptions() {
                 group.label = type.name;
                 type.subtypes.forEach((sub) => {
                     const opt = document.createElement("option");
-                    opt.value = sub.name;
+                    // Label = full name, value = acronym ("CMSP"), which is what gets saved.
+                    opt.value = (sub.name.match(/^([A-Z0-9&\/\-]{2,})\s*\(/) || [])[1] || sub.name;
                     opt.textContent = sub.name;
                     opt.dataset.gwa = String(sub.gwaRequirement);
                     group.appendChild(opt);

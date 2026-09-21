@@ -77,7 +77,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!filterSy) return;
     const current = filterSy.value;
     const years = Array.from(new Set(recordsData.map((r: any) => r.sy))).filter(Boolean).sort().reverse() as string[];
-    filterSy.innerHTML = '<option value="all">All School Years</option>' +
+    filterSy.innerHTML = '<option value="all">School Years</option>' +
       years.map((y) => '<option value="' + y + '">' + y + '</option>').join("");
     filterSy.value = years.includes(current) ? current : "all";
   }
@@ -86,7 +86,7 @@ document.addEventListener("DOMContentLoaded", () => {
     populateSchoolYearFilter();
     if (!filterType) return;
     const types = Array.from(new Set(recordsData.map((r: any) => r.scholarshipType))).filter(Boolean);
-    filterType.innerHTML = '<option value="all">All Scholarship Types</option>';
+    filterType.innerHTML = '<option value="all">Scholarship Types</option>';
     types.forEach(t => {
       const opt = document.createElement("option");
       opt.value = t;

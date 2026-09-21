@@ -192,11 +192,9 @@ function createSystemNotification(
 
         $school = trim($_POST['school'] ?? '');
 
-        $schoolYear = trim(
-            $_POST['schoolYear'] ??
-            $_POST['school_year'] ??
-            ''
-        );
+        // The school year is never typed on the form: a new applicant gets the Academic Year set in
+        // Settings > Portal Configuration, and editing an applicant leaves theirs alone.
+        $schoolYear = getActiveSchoolYear($pdo);
 
         $program = trim(
             $_POST['program'] ?? ''
@@ -220,11 +218,12 @@ function createSystemNotification(
         // imported in Data Management, so a new applicant starts at 0.
         $gpa = 0.0;
 
-        $scholarshipType = trim(
+        // Always stored as the acronym ("CMSP"), even if the full name was typed or sent.
+        $scholarshipType = normalizeScholarshipType($pdo, trim(
             $_POST['scholarshipType'] ??
             $_POST['scholarship_type'] ??
             'Academic Merit'
-        );
+        ));
 
         // Comes from the selected scholarship sub-type's own required GWA
         // (see api/scholarship_types.php) — falls back to 1.75 only if the
@@ -254,7 +253,6 @@ function createSystemNotification(
             empty($email) ||
             empty($gender) ||
             empty($birthdate) ||
-            empty($schoolYear) ||
             empty($program) ||
             empty($yearLevel)
         ) {
@@ -462,7 +460,6 @@ function createSystemNotification(
                 latitude = ?,
                 longitude = ?,
                 school = ?,
-                school_year = ?,
                 program = ?,
                 major = ?,
                 year_level = ?,
@@ -486,7 +483,6 @@ function createSystemNotification(
                 $latitude,
                 $longitude,
                 $school,
-                $schoolYear,
                 $program,
                 $major,
                 $yearLevel,
@@ -519,6 +515,12 @@ function createSystemNotification(
 
             $updateStmt = $pdo->prepare($updateSql);
             $updateStmt->execute($updateParams);
+
+            // Records are the source of truth for the dashboard's Scholarship
+            // Distribution, so a changed type / ID carries over to this
+            // applicant's records right away.
+            $pdo->prepare("UPDATE records SET scholarship_type = ?, student_id = ? WHERE applicant_id = ?")
+                ->execute([$scholarshipType, $studentId, $id]);
 
             $fullName =
                 trim(

@@ -36,7 +36,7 @@ include __DIR__ . '/../includes/header.php';
       <input type="search" id="searchBox" placeholder="Search by name or student ID…">
       <div class="select-wrap">
         <select id="SchoolYearFilter">
-          <option value="">All School Year</option>
+          <option value="">School Year</option>
           <option value="eligible">2024</option>
           <option value="at-risk">2025</option>
           <option value="terminated">2026</option>
@@ -45,7 +45,7 @@ include __DIR__ . '/../includes/header.php';
 
       <div class="select-wrap">
         <select id="semesterFilter">
-          <option value="">All Semesters</option>
+          <option value="">Semesters</option>
           <option value="1st Semester">1st Semester</option>
           <option value="2nd Semester">2nd Semester</option>
           <option value="Summer Term">Summer Term</option>
@@ -54,7 +54,7 @@ include __DIR__ . '/../includes/header.php';
 
       <div class="select-wrap">
         <select id="scholarshipFilter">
-          <option value="">All Scholarship Type</option>
+          <option value="">Scholarship Type</option>
           <option value="eligible">Academic Scholarship</option>
           <option value="at-risk">Merit Scholarship</option>
           <option value="terminated">Endorsement Scholarships</option>
@@ -63,7 +63,7 @@ include __DIR__ . '/../includes/header.php';
 
       <div class="select-wrap">
         <select id="statusFilter">
-          <option value="">All statuses</option>
+          <option value="">Statuses</option>
           <option value="pending">Pending</option>
           <option value="eligible">Eligible</option>
           <option value="at-risk">At-Risk</option>

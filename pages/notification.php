@@ -22,7 +22,7 @@ include __DIR__ . '/../includes/header.php';
           <input type="text" id="inboxSearch" placeholder="Search sender, subject or message...">
         </div>
         <select id="inboxFilter">
-          <option value="">All messages</option>
+          <option value="">Messages</option>
           <option value="unread">Unread only</option>
         </select>
         <button type="button" class="btn-secondary" id="inboxMarkAllBtn">Mark all as read</button>

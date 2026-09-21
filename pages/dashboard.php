@@ -39,6 +39,14 @@ function activityIcon(string $action): string {
 try {
     $pdo = getDB();
 
+    // School year shown in the two charts: the one picked in the dropdown, else the newest year that has data.
+    $schoolYears = getDashboardSchoolYears($pdo);
+    $selectedYear = trim((string)($_GET['sy'] ?? ''));
+    if ($selectedYear !== 'all' && !in_array($selectedYear, $schoolYears, true)) {
+        $selectedYear = $schoolYears[0] ?? 'all';
+    }
+    $yearFilter = $selectedYear === 'all' ? null : $selectedYear;
+
     // Total applicants, matching the Applicants page: approved/rejected
     // applicants are already decided, so they're excluded here too.
     $total_applicants = (int)$pdo->query("
@@ -87,12 +95,13 @@ try {
         $monthly_buckets[date('Y-m', $ts)] = ['label' => date('M', $ts), 'count' => 0];
     }
 
-    $monthlyStmt = $pdo->query("
+    $monthlyStmt = $pdo->prepare("
         SELECT strftime('%Y-%m', created_at) AS ym, COUNT(*) AS cnt
         FROM applicants
-        WHERE created_at IS NOT NULL
+        WHERE created_at IS NOT NULL" . ($yearFilter !== null ? " AND TRIM(COALESCE(school_year, '')) = ?" : '') . "
         GROUP BY ym
     ");
+    $monthlyStmt->execute($yearFilter !== null ? [$yearFilter] : []);
     foreach ($monthlyStmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
         if (isset($monthly_buckets[$row['ym']])) {
             $monthly_buckets[$row['ym']]['count'] = (int)$row['cnt'];
@@ -104,9 +113,11 @@ try {
 
     // Scholarship Distribution — approved scholars per scholarship type, live
     // from the records table (see includes/scholarship_distribution.php).
-    $distribution = getScholarshipDistribution($pdo);
+    $distribution = getScholarshipDistribution($pdo, $yearFilter);
 
 } catch (Exception $e) {
+    $schoolYears = [];
+    $selectedYear = 'all';
     $total_applicants = 0;
     $under_evaluation = 0;
     $active_scholars = 0;
@@ -123,6 +134,7 @@ try {
         counts: <?= json_encode($monthly_counts) ?>
     };
     window.scholarshipDistributionData = <?= json_encode($distribution) ?>;
+    window.dashboardSchoolYear = <?= json_encode($selectedYear) ?>;
 </script>
 
 <div class="main-content">
@@ -167,6 +179,17 @@ try {
                 <h1><?= number_format($renewal_due) ?></h1>
             </div>
         </div>
+    </div>
+
+    <!-- School year the two charts below show -->
+    <div class="chart-year-filter">
+        <label for="chartSchoolYear">School Year</label>
+        <select id="chartSchoolYear" onchange="window.location.search = '?sy=' + encodeURIComponent(this.value)">
+            <?php foreach ($schoolYears as $sy): ?>
+                <option value="<?= htmlspecialchars($sy) ?>" <?= $sy === $selectedYear ? 'selected' : '' ?>><?= htmlspecialchars(str_replace('-', ' - ', $sy)) ?></option>
+            <?php endforeach; ?>
+            <option value="all" <?= $selectedYear === 'all' ? 'selected' : '' ?>>School Years</option>
+        </select>
     </div>
 
     <!-- Charts -->

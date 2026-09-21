@@ -141,7 +141,9 @@
                         }
                     }
 
-                    $schoolYearVal = isset($resolved['school_year']) ? trim($row[$resolved['school_year']] ?? '') : '';
+                    // Applicants created by an import get the Academic Year set in Settings > Portal Configuration;
+                    // any School Year column in the file is ignored, and existing applicants keep theirs.
+                    $schoolYearVal = getActiveSchoolYear($pdo);
                     $programVal = isset($resolved['program']) ? trim($row[$resolved['program']] ?? '') : '';
                     if ($programVal !== '') {
                         // The program must be one the school really offers (also accepts short forms
@@ -232,7 +234,6 @@
                             $params[] = $ageVal;
                         }
                         foreach ([
-                            'school_year' => $schoolYearVal,
                             'program' => $programVal,
                             'major' => $majorVal,
                             'year_level' => $yearLevelVal,
@@ -263,6 +264,8 @@
                             if ($scholarshipTypeVal === '') {
                                 $scholarshipTypeVal = 'Unspecified';
                             }
+                            // "CMSP (CHED Merit Scholarship Program)" or the full name alone is stored as "CMSP".
+                            $scholarshipTypeVal = normalizeScholarshipType($pdo, $scholarshipTypeVal);
 
                             $insertStmt = $pdo->prepare("
                                 INSERT INTO applicants
@@ -341,10 +344,8 @@
                         $semesterForGrade = $applicantRow['semester'] ?: getActiveSemester($pdo);
                     }
 
-                    $schoolYearForGrade = isset($resolved['school_year']) ? trim($row[$resolved['school_year']] ?? '') : '';
-                    if ($schoolYearForGrade === '') {
-                        $schoolYearForGrade = $applicantRow['school_year'] ?: '';
-                    }
+                    // Grades are filed under the student's own school year (the active one if they have none).
+                    $schoolYearForGrade = $applicantRow['school_year'] ?: getActiveSchoolYear($pdo);
 
                     // Only meaningful for the single-pair (Subject Code + Grade
                     // column) form — the packed form has no separate name column.

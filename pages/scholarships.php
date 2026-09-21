@@ -17,14 +17,14 @@ include __DIR__ . '/../includes/header.php';
 
             <div class="select-wrap">
                 <select id="filterType">
-                    <option value="all">All Types</option>
+                    <option value="all">Types</option>
                 </select>
                 <i data-lucide="chevron-down"></i>
             </div>
 
             <div class="select-wrap">
                 <select id="filterSubtype">
-                    <option value="all">All Sub-types</option>
+                    <option value="all">Sub-types</option>
                 </select>
                 <i data-lucide="chevron-down"></i>
             </div>

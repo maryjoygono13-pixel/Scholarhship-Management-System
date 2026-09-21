@@ -249,3 +249,36 @@
         align-items: stretch;
     }
 }
+
+/* =========================================================
+   TOOLBAR BUTTONS
+   Clear Filters (an inline-block button) and Export CSV (an inline-flex one) used to sit in an
+   unstyled wrapper, so they were level with neither each other nor the boxes beside them.
+   Same height, same centring, same row.
+========================================================= */
+.table-header-toolbar .toolbar .header-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 0;
+}
+
+.table-header-toolbar .toolbar .header-actions .btn-secondary,
+.table-header-toolbar .toolbar .header-actions .btn-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    height: 40px;
+    box-sizing: border-box;
+    margin: 0;
+    white-space: nowrap;
+    line-height: 1;
+}
+
+.table-header-toolbar .toolbar .header-actions .btn-primary svg,
+.table-header-toolbar .toolbar .header-actions .btn-primary i {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+}

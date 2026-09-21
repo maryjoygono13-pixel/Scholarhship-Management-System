@@ -17,6 +17,13 @@ try {
     $module = trim($_GET['module'] ?? '');
     $user = trim($_GET['user'] ?? '');
 
+    // created_at is stored in UTC (CURRENT_TIMESTAMP). The browser sends its own
+    // UTC offset (minutes east of UTC) so "today" and the date filter follow the
+    // viewer's calendar day, not UTC's.
+    $tzMinutes = max(-840, min(840, (int)($_GET['tz'] ?? 0)));
+    $localDate = sprintf("DATE(created_at, '%+d minutes')", $tzMinutes);
+    $localTime = sprintf("datetime(created_at, '%+d minutes')", $tzMinutes);
+
     $where = "WHERE 1=1";
     $params = [];
 
@@ -28,7 +35,7 @@ try {
     }
 
     if ($date !== '') {
-        $where .= " AND DATE(created_at) = ?";
+        $where .= " AND $localDate = ?";
         $params[] = $date;
     }
 
@@ -53,7 +60,7 @@ try {
        pagination) as a CSV download instead of JSON.
     ========================================================= */
     if (($_GET['export'] ?? '') === 'csv') {
-        $stmt = $pdo->prepare("SELECT * FROM activity_logs $where ORDER BY created_at DESC");
+        $stmt = $pdo->prepare("SELECT *, $localTime AS local_created_at FROM activity_logs $where ORDER BY created_at DESC, id DESC");
         $stmt->execute($params);
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -63,7 +70,7 @@ try {
         $out = fopen('php://output', 'w');
         fputcsv($out, ['Date & Time', 'User', 'Module', 'Action', 'Description', 'Record ID']);
         foreach ($rows as $r) {
-            fputcsv($out, [$r['created_at'], $r['user_name'], $r['module'], $r['action'], $r['description'], $r['record_id']]);
+            fputcsv($out, [$r['local_created_at'], $r['user_name'], $r['module'], $r['action'], $r['description'], $r['record_id']]);
         }
         fclose($out);
         exit();
@@ -80,7 +87,7 @@ try {
     $countStmt->execute($params);
     $totalFiltered = (int)$countStmt->fetchColumn();
 
-    $stmt = $pdo->prepare("SELECT * FROM activity_logs $where ORDER BY created_at DESC LIMIT $limit OFFSET $offset");
+    $stmt = $pdo->prepare("SELECT * FROM activity_logs $where ORDER BY created_at DESC, id DESC LIMIT $limit OFFSET $offset");
     $stmt->execute($params);
     $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -102,7 +109,7 @@ try {
     ========================================================= */
     $totalCount = (int)$pdo->query("SELECT COUNT(*) FROM activity_logs")->fetchColumn();
 
-    $todayCountStmt = $pdo->prepare("SELECT COUNT(*) FROM activity_logs WHERE DATE(created_at) = DATE('now')");
+    $todayCountStmt = $pdo->prepare("SELECT COUNT(*) FROM activity_logs WHERE $localDate = DATE('now', '" . sprintf('%+d', $tzMinutes) . " minutes')");
     $todayCountStmt->execute();
     $todayCount = (int)$todayCountStmt->fetchColumn();
 
