@@ -7,7 +7,7 @@ const STEPS: Step[] = [
   { key: "personal", label: "Personal" },
   { key: "academic", label: "Academic" },
   { key: "scholarship", label: "Scholarship" },
-  { key: "documents", label: "Documents" },
+  // { key: "documents", label: "Documents" },
 ];
 
 function getEl<T extends HTMLElement = HTMLElement>(id: string): T | null {

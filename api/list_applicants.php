@@ -16,7 +16,7 @@ try {
     $query = "
         SELECT *
         FROM applicants
-        WHERE LOWER(status) IN ('pending', 'review', 'interview')
+        WHERE LOWER(status) IN ('pending', 'review')
     ";
 
     $params = [];

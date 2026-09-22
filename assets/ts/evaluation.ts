@@ -175,7 +175,6 @@ function normalizeEval(record: any): EvaluationApplicant {
   function statusBadge(status: string): string {
     const map: Record<string, { label: string; cls: string }> = {
       review: { label: "For Review", cls: "badge-review" },
-      interview: { label: "For Interview", cls: "badge-interview" },
       approved: { label: "Approved", cls: "badge-approved" },
       rejected: { label: "Rejected", cls: "badge-rejected" },
       "non-compliant": { label: "Non-Compliant", cls: "badge-non-compliant" },
@@ -301,7 +300,6 @@ function normalizeEval(record: any): EvaluationApplicant {
           '<td class="type-cell">' + esc(a.type) + "</td>" +
           semGwaCell(a.semesterGwa.first, a.gwaReq) + semGwaCell(a.semesterGwa.second, a.gwaReq) +
           '<td><span style="color:' + (a.enrolled ? "var(--green)" : "var(--red)") + '"><span class="dot" style="background:' + (a.enrolled ? "var(--green)" : "var(--red)") + '"></span>' + (a.enrolled ? "Enrolled" : "Not Enrolled") + "</span></td>" +
-          '<td style="color:' + (a.docsComplete ? "var(--ink)" : "var(--red)") + '">' + (a.docsComplete ? "Complete" : "Missing") + "</td>" +
           "<td>" + statusBadge(a.status) + "</td>" +
           '<td><button class="btn-primary" style="height:32px; padding:0 12px; font-size:12.5px;" data-review="' + a.id + '">Review</button></td>' +
           "</tr>"
@@ -311,7 +309,7 @@ function normalizeEval(record: any): EvaluationApplicant {
 
     wrap.innerHTML =
       '<table class="applicants-table"><thead><tr>' +
-      '<th>Applicant</th><th>Scholarship Type</th><th>1st Sem GWA</th><th>2nd Sem GWA</th><th>Enrollment</th><th>Documents</th><th>Status</th><th class="actions-head">Action</th>' +
+      '<th>Applicant</th><th>Scholarship Type</th><th>1st Sem GWA</th><th>2nd Sem GWA</th><th>Enrollment</th><th>Status</th><th class="actions-head">Action</th>' +
       '</tr></thead><tbody>' + rows + '</tbody></table>';
 
     wrap.querySelectorAll<HTMLElement>("[data-review]").forEach((btn) => {
@@ -471,7 +469,7 @@ function normalizeEval(record: any): EvaluationApplicant {
     }
     overlay.classList.add("open");
 
-    const tabsHtml = ["overview", "grades", "enrollment", "documents", "evaluation"]
+    const tabsHtml = ["overview", "grades", "enrollment", "evaluation"]
       .map((t) => '<button class="tab ' + (activeTab === t ? "active" : "") + '" data-tab="' + t + '">' + t + "</button>")
       .join("");
 
@@ -493,7 +491,6 @@ function normalizeEval(record: any): EvaluationApplicant {
       "</div>" +
       '<div class="custom-modal-footer">' +
       approveBlockNote(a) +
-      '<button type="button" class="btn-secondary ' + (a.status === "interview" ? "active-choice" : "") + '" data-decide="interview"' + (a.status === "non-compliant" ? ' disabled style="opacity:0.55; cursor:not-allowed;"' : "") + '>For Interview</button>' +
       '<button type="button" class="btn-danger" data-decide="rejected">Reject</button>' +
       '<button type="button" class="btn-primary" data-decide="approved"' + (approveBlockReason(a) ? ' title="' + esc(approveBlockReason(a)) + '" style="opacity:0.55;"' : "") + '>Approve</button>' +
       "</div>";
@@ -544,7 +541,7 @@ function normalizeEval(record: any): EvaluationApplicant {
         renderTable();
         renderRightPanel();
         showToast(
-          decision === "approved" ? "Applicant approved." : decision === "rejected" ? "Applicant rejected." : "Moved to interview.",
+          decision === "approved" ? "Applicant approved." : "Applicant rejected.",
           decision === "rejected" ? undefined : "success"
         );
       });

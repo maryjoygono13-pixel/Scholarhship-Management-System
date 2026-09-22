@@ -11,13 +11,13 @@
             <div class="nav-profile-avatar">
                 <i data-lucide="user"></i>
             </div>
-            <span class="nav-profile-name">Registrar Staff</span>
+            <span class="nav-profile-name"><?= htmlspecialchars($_SESSION['user_name'] ?? 'Registrar Staff') ?></span>
             <i data-lucide="chevron-down" class="nav-profile-chevron"></i>
         </button>
         <div class="nav-profile-menu" id="profileDropdownMenu">
             <div class="nav-profile-header">
                 <p class="user-role-title">Signed in as</p>
-                <p class="user-role-name">Registrar Staff</p>
+                <p class="user-role-name"><?= htmlspecialchars($_SESSION['user_name'] ?? 'Registrar Staff') ?></p>
             </div>
             <div class="nav-profile-divider"></div>
             <a href="<?= SITE_BASE ?>/settings" class="nav-profile-item">

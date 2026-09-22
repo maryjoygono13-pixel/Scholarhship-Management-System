@@ -337,7 +337,7 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         const r = viewingRecord;
         const statusClass = r.status === 'approved' ? 'badge-approved' : 'badge-rejected';
-        const tabs = ["overview", "grades", "enrollment", "documents", "evaluation"];
+        const tabs = ["overview", "grades", "enrollment", "evaluation"];
         const tabsHtml = tabs
             .map(t => '<button type="button" class="tab ' + (activeRecordTab === t ? "active" : "") + '" data-rec-tab="' + t + '">' + t + '</button>')
             .join("");

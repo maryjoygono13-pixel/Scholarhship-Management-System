@@ -13,33 +13,44 @@ $error = '';
 
 /*
  * First run: a brand-new database has no accounts (the `users` table is empty), so nobody could
- * ever sign in. While that is the case, this page offers a form to create the first Registrar
- * account. As soon as one exists the form is gone and only the normal sign-in remains.
+ * ever sign in. While that is the case, only the Create Account form is offered (there is nothing
+ * to sign in to yet). Once an account exists, the page offers both forms behind a Sign In /
+ * Create Account switch, so anyone can still open a new Registrar account later.
  */
 $needsSetup = ((int)getDB()->query("SELECT COUNT(*) FROM users")->fetchColumn() === 0);
 $setupName = '';
 $setupEmail = '';
 
+// Which tab is showing: stays on Create Account after a failed signup, Sign In after a failed login.
+$activeTab = $needsSetup ? 'create' : 'signin';
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['setup_account'])) {
 
+    $activeTab = 'create';
     $setupName = trim($_POST['setup_name'] ?? '');
     $setupEmail = trim($_POST['setup_email'] ?? '');
     $setupPassword = $_POST['setup_password'] ?? '';
     $setupConfirm = $_POST['setup_confirm'] ?? '';
 
-    // Checked again on the server: this only ever works while there are no accounts.
-    if (!$needsSetup) {
-        $error = 'An account already exists. Please sign in.';
-    } elseif ($setupName === '') {
+    $pdo = getDB();
+    $emailTaken = false;
+    if ($setupEmail !== '') {
+        $checkStmt = $pdo->prepare("SELECT COUNT(*) FROM users WHERE LOWER(email) = LOWER(?)");
+        $checkStmt->execute([$setupEmail]);
+        $emailTaken = (int)$checkStmt->fetchColumn() > 0;
+    }
+
+    if ($setupName === '') {
         $error = 'Please enter your name.';
     } elseif (!filter_var($setupEmail, FILTER_VALIDATE_EMAIL)) {
         $error = 'Please enter a valid email address.';
+    } elseif ($emailTaken) {
+        $error = 'An account with that email already exists. Please sign in instead.';
     } elseif (strlen($setupPassword) < 8) {
         $error = 'The password must be at least 8 characters long.';
     } elseif ($setupPassword !== $setupConfirm) {
         $error = 'The password and its confirmation do not match.';
     } else {
-        $pdo = getDB();
         $pdo->prepare("INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, 'registrar')")
             ->execute([$setupName, $setupEmail, password_hash($setupPassword, PASSWORD_DEFAULT)]);
         $newId = (int)$pdo->lastInsertId();
@@ -53,7 +64,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['setup_account'])) {
         $_SESSION['user_identifier'] = $setupEmail;
         $_SESSION['user_role'] = 'registrar';
 
-        logActivity($pdo, 'Account Created', 'Authentication', $setupName . ' created the first Registrar account.', $newId);
+        $logMessage = $needsSetup
+            ? $setupName . ' created the first Registrar account.'
+            : $setupName . ' created a new Registrar account.';
+        logActivity($pdo, 'Account Created', 'Authentication', $logMessage, $newId);
 
         header("Location: " . SITE_URL . "/dashboard");
         exit();
@@ -61,6 +75,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['setup_account'])) {
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['setup_account'])) {
+
+    $activeTab = 'signin';
 
     $identifier = trim($_POST['identifier'] ?? '');
     $password = $_POST['password'] ?? '';
@@ -316,6 +332,42 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['setup_account'])) {
         background: var(--green-800);
     }
 
+    .auth-tabs {
+        display: flex;
+        background: #eef2ef;
+        border-radius: 10px;
+        padding: 4px;
+        margin-bottom: 20px;
+    }
+
+    .auth-tab {
+        flex: 1;
+        border: none;
+        background: transparent;
+        padding: 10px 0;
+        font-size: 13.5px;
+        font-weight: 600;
+        color: #6b7280;
+        border-radius: 7px;
+        cursor: pointer;
+        transition: background 0.2s ease, color 0.2s ease;
+        font-family: inherit;
+    }
+
+    .auth-tab.active {
+        background: #ffffff;
+        color: var(--green-900);
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+    }
+
+    .auth-panel {
+        display: none;
+    }
+
+    .auth-panel.active {
+        display: block;
+    }
+
 </style>
 
 </head>
@@ -337,7 +389,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['setup_account'])) {
 
     <h1>Registrar Portal</h1>
 
-    <p><?= $needsSetup ? 'No account exists yet. Create the first Registrar account to get started.' : 'Sign in to access the Registrar Management System' ?></p>
+    <p><?= $needsSetup ? 'No account exists yet. Create the first Registrar account to get started.' : 'Sign in, or create a new Registrar account' ?></p>
+
+    <?php if (!$needsSetup): ?>
+
+        <div class="auth-tabs">
+            <button type="button" class="auth-tab<?= $activeTab === 'signin' ? ' active' : '' ?>" data-tab="signin" onclick="switchAuthTab('signin')">Sign In</button>
+            <button type="button" class="auth-tab<?= $activeTab === 'create' ? ' active' : '' ?>" data-tab="create" onclick="switchAuthTab('create')">Create Account</button>
+        </div>
+
+    <?php endif; ?>
 
     <?php if (!empty($error)): ?>
 
@@ -347,7 +408,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['setup_account'])) {
 
     <?php endif; ?>
 
-    <?php if ($needsSetup): ?>
+    <div class="auth-panel<?= $activeTab === 'create' ? ' active' : '' ?>" data-panel="create">
 
     <form method="POST" action="<?= SITE_BASE ?>/login" id="setupForm" autocomplete="off">
 
@@ -377,7 +438,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['setup_account'])) {
 
     </form>
 
-    <?php else: ?>
+    </div>
+
+    <div class="auth-panel<?= $activeTab === 'signin' ? ' active' : '' ?>" data-panel="signin">
 
     <form
         method="POST"
@@ -459,13 +522,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['setup_account'])) {
 
     </form>
 
-    <?php endif; ?>
+    </div>
 
 </div>
 
 </div>
 
 <script>
+
+// Sign In / Create Account switch: both forms are on the page, this just shows one of them.
+function switchAuthTab(tab) {
+
+    document.querySelectorAll(".auth-tab").forEach((btn) => {
+        btn.classList.toggle("active", btn.dataset.tab === tab);
+    });
+
+    document.querySelectorAll(".auth-panel").forEach((panel) => {
+        panel.classList.toggle("active", panel.dataset.panel === tab);
+    });
+}
 
 function togglePassword() {
 

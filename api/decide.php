@@ -6,7 +6,7 @@ try {
     $decision = strtolower(trim($_POST['decision'] ?? ''));
     $remarks = trim($_POST['remarks'] ?? '');
 
-    if ($id <= 0 || !in_array($decision, ['approved', 'rejected', 'review', 'interview'])) {
+    if ($id <= 0 || !in_array($decision, ['approved', 'rejected', 'review'])) {
         sendError('Invalid decision request.');
     }
 

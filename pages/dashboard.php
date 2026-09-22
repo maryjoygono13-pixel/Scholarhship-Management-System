@@ -52,14 +52,14 @@ try {
     $total_applicants = (int)$pdo->query("
         SELECT COUNT(*)
         FROM applicants
-        WHERE LOWER(status) IN ('pending', 'review', 'interview')
+        WHERE LOWER(status) IN ('pending', 'review')
     ")->fetchColumn();
 
-    // Applicants awaiting a decision — pending review or already in the interview stage
+    // Applicants awaiting a decision — still pending or under review
     $under_evaluation = (int)$pdo->query("
         SELECT COUNT(*)
         FROM applicants
-        WHERE LOWER(status) IN ('pending', 'review', 'interview')
+        WHERE LOWER(status) IN ('pending', 'review')
     ")->fetchColumn();
 
     // Merit-based scholars are added to the roster automatically

@@ -25,7 +25,6 @@ try {
      *
      * pending   = newly submitted
      * review    = being evaluated
-     * interview = for interview
      *
      * Approved and rejected applicants are excluded.
      */
@@ -35,7 +34,7 @@ try {
         $stmt = $pdo->query("
             SELECT *
             FROM applicants
-            WHERE LOWER(status) IN ('pending', 'review', 'interview')
+            WHERE LOWER(status) IN ('pending', 'review')
             ORDER BY id DESC
         ");
 
@@ -112,9 +111,8 @@ try {
      * Used by the Evaluation page to change:
      *
      * pending → review
-     * review → interview
-     * interview → approved
-     * interview → rejected
+     * review → approved
+     * review → rejected
      *
      * The applicant is NOT deleted.
      */
@@ -169,7 +167,7 @@ try {
         }
 
         // A non-compliant applicant (GWA requirement not met) can only be rejected, not moved forward.
-        if ($status !== null && in_array(strtolower($status), ['interview', 'review'], true)) {
+        if ($status !== null && strtolower($status) === 'review') {
             $chk = $pdo->prepare("SELECT gwa, gwa_req, scholarship_type FROM applicants WHERE id = ?");
             $chk->execute([$id]);
             $cand = $chk->fetch();

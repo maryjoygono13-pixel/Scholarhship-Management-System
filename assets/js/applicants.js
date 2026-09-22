@@ -4,7 +4,7 @@ const STEPS = [
     { key: "personal", label: "Personal" },
     { key: "academic", label: "Academic" },
     { key: "scholarship", label: "Scholarship" },
-    { key: "documents", label: "Documents" },
+    // { key: "documents", label: "Documents" },
 ];
 
 function getEl(id) {

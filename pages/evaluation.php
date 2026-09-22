@@ -24,7 +24,6 @@
                     <select id="filterStatus">
                         <option value="all">All Statuses</option>
                         <option value="review">For Review</option>
-                        <option value="interview">For Interview</option>
                         <option value="non-compliant">Non-Compliant</option>
                     </select>
                     <i data-lucide="chevron-down"></i>

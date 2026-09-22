@@ -126,7 +126,7 @@ function resolveRecipients(PDO $pdo, string $mode, string $segment, string $indi
         $stmt->execute([$individualId]);
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
     } else {
-        $pending = "LOWER(status) IN ('pending', 'review', 'interview')";
+        $pending = "LOWER(status) IN ('pending', 'review')";
         switch ($segment) {
             case 'missing_docs':
             case 'missing_req':
@@ -136,7 +136,7 @@ function resolveRecipients(PDO $pdo, string $mode, string $segment, string $indi
                 $where = "LOWER(status) = 'pending'";
                 break;
             case 'evaluation':
-                $where = "LOWER(status) IN ('review', 'interview')";
+                $where = "LOWER(status) = 'review'";
                 break;
             case 'approved':
             case 'renewal':
