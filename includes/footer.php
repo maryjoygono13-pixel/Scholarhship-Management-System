@@ -72,20 +72,18 @@
                 handleScroll();
               }
 
-              // Fetch actual notification count for header badge
+              // Header bell badge: how many received messages (Inbox) are unread —
+              // not how many notifications have ever been sent.
               const badgeEl = document.getElementById('navNotifBadge');
-              if (badgeEl && typeof apiListNotifications === 'function') {
-                apiListNotifications().then(res => {
-                  const count = (res.data || []).length;
-                  badgeEl.textContent = count;
-                  if (count === 0) {
-                    badgeEl.style.display = 'none';
-                  } else {
-                    badgeEl.style.display = 'inline-flex';
-                  }
-                }).catch(() => {
-                  badgeEl.style.display = 'none';
-                });
+              if (badgeEl) {
+                fetch((window.API_BASE || 'api') + '/inbox.php?filter=unread')
+                  .then(res => res.json())
+                  .then(json => {
+                    const count = (json && json.success) ? Number(json.unread || 0) : 0;
+                    badgeEl.textContent = count;
+                    badgeEl.hidden = count === 0;
+                  })
+                  .catch(() => { badgeEl.hidden = true; });
               }
 
               // Profile dropdown toggle on click

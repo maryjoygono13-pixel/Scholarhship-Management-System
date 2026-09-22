@@ -62,12 +62,17 @@ try {
         }
 
         if ($action === 'delete') {
-            $sel = $pdo->prepare("SELECT subject, sender_name FROM inbox_messages WHERE id = ?");
+            $sel = $pdo->prepare("SELECT subject, sender_name, gmail_message_id FROM inbox_messages WHERE id = ?");
             $sel->execute([$id]);
             $row = $sel->fetch();
-            $pdo->prepare("DELETE FROM inbox_messages WHERE id = ?")->execute([$id]);
+            if ($row && $row['gmail_message_id'] !== null) {
+                // Keep the id so a later Gmail sync doesn't re-import it; drop the content.
+                $pdo->prepare("UPDATE inbox_messages SET is_hidden = 1, message = '' WHERE id = ?")->execute([$id]);
+            } else {
+                $pdo->prepare("DELETE FROM inbox_messages WHERE id = ?")->execute([$id]);
+            }
             if ($row) {
-                logActivity($pdo, 'Message Deleted', 'Notifications', 'Inbox message "' . $row['subject'] . '" from ' . $row['sender_name'] . ' was deleted.', $id);
+                logActivity($pdo, 'Message Deleted', 'Notifications', 'An inbox message from ' . $row['sender_name'] . ' was deleted.', $id);
             }
             sendJson(['success' => true]);
         }
@@ -75,10 +80,31 @@ try {
         sendError('Unknown action.');
     }
 
+    // Conversation view: every message of one Gmail thread — received and sent — oldest first.
+    if (isset($_GET['thread'])) {
+        $tid = trim($_GET['thread']);
+        $acct = trim($_GET['account'] ?? ''); // thread ids are per Gmail account
+        $items = [];
+        if ($tid !== '') {
+            $in = $pdo->prepare("SELECT sender_name, sender_email, subject, message, received_at FROM inbox_messages WHERE gmail_thread_id = ? AND is_hidden = 0 AND (? = '' OR gmail_account = ?)");
+            $in->execute([$tid, $acct, $acct]);
+            foreach ($in->fetchAll(PDO::FETCH_ASSOC) as $r) {
+                $items[] = ['direction' => 'received', 'name' => $r['sender_name'] ?: $r['sender_email'], 'email' => $r['sender_email'], 'subject' => $r['subject'], 'message' => $r['message'], 'at' => $r['received_at']];
+            }
+            $out = $pdo->prepare("SELECT recipient_name, recipient_email, subject, message, sent_at FROM notifications WHERE gmail_thread_id = ? AND status = 'sent' AND (? = '' OR gmail_account = ?)");
+            $out->execute([$tid, $acct, $acct]);
+            foreach ($out->fetchAll(PDO::FETCH_ASSOC) as $r) {
+                $items[] = ['direction' => 'sent', 'name' => 'You', 'email' => $r['recipient_email'], 'subject' => $r['subject'], 'message' => $r['message'], 'at' => $r['sent_at']];
+            }
+            usort($items, fn($a, $b) => strcmp($a['at'], $b['at']));
+        }
+        sendJson(['success' => true, 'data' => $items]);
+    }
+
     $filter = trim($_GET['filter'] ?? '');
     $q = trim($_GET['q'] ?? '');
 
-    $sql = "SELECT * FROM inbox_messages WHERE 1=1";
+    $sql = "SELECT * FROM inbox_messages WHERE is_hidden = 0";
     $params = [];
     if ($filter === 'unread') {
         $sql .= " AND is_read = 0";
@@ -102,13 +128,16 @@ try {
             'subject' => $r['subject'],
             'message' => $r['message'],
             'source' => $r['source'],
+            'gmailAccount' => $r['gmail_account'] ?? '',
+            'threadId' => $r['gmail_thread_id'] ?? '',
+            'toEmail' => $r['to_email'] ?? '',
             'isRead' => (int)$r['is_read'] === 1,
             'receivedAt' => $r['received_at'],
         ];
     }, $stmt->fetchAll());
 
-    $unread = (int)$pdo->query("SELECT COUNT(*) FROM inbox_messages WHERE is_read = 0")->fetchColumn();
-    $total = (int)$pdo->query("SELECT COUNT(*) FROM inbox_messages")->fetchColumn();
+    $unread = (int)$pdo->query("SELECT COUNT(*) FROM inbox_messages WHERE is_read = 0 AND is_hidden = 0")->fetchColumn();
+    $total = (int)$pdo->query("SELECT COUNT(*) FROM inbox_messages WHERE is_hidden = 0")->fetchColumn();
 
     sendJson(['success' => true, 'data' => $data, 'unread' => $unread, 'total' => $total]);
 } catch (Exception $e) {

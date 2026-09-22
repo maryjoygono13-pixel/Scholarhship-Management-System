@@ -92,21 +92,27 @@ async function apiSendNotification(payload: Record<string, string>): Promise<Api
 
 async function updateNavCounts(): Promise<void> {
   try {
-    const [pending, evaluation, decided, notifRes] = await Promise.all([
+    const [pending, evaluation, decided, inboxRes] = await Promise.all([
       apiListApplicants("pending"),
       apiListApplicants("evaluation"),
       apiListApplicants("approved,rejected"),
-      apiListNotifications().catch(() => ({ data: [] })),
+      // The bell shows how many received messages are unread, not how many
+      // notifications have ever been sent.
+      fetch(`${API_BASE}/inbox.php?filter=unread`)
+        .then((r) => r.json())
+        .catch(() => ({ unread: 0 })),
     ]);
     const appEl = document.getElementById("navAppCount");
     const evalEl = document.getElementById("navEvalCount");
     const recEl = document.getElementById("navRecordsCount");
-    const notifEl = document.getElementById("navNotifBadge");
+    const notifEl = document.getElementById("navNotifBadge") as HTMLElement | null;
     if (appEl) appEl.textContent = String(pending.length);
     if (evalEl) evalEl.textContent = String(evaluation.length);
     if (recEl) recEl.textContent = String(decided.length);
-    if (notifEl && notifRes && Array.isArray((notifRes as any).data)) {
-      notifEl.textContent = String((notifRes as any).data.length);
+    if (notifEl) {
+      const unread = (inboxRes && (inboxRes as any).success) ? Number((inboxRes as any).unread || 0) : 0;
+      notifEl.textContent = String(unread);
+      notifEl.hidden = unread === 0;
     }
   } catch (e) {
     console.error("Failed to update nav counts:", e);

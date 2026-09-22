@@ -8,6 +8,21 @@ include __DIR__ . '/../includes/header.php';
 
 <div class="page">
 
+    <!-- Gmail connection (the mailbox behind this page; account is chosen by Connect / Disconnect) -->
+    <div class="gmail-bar" id="gmailBar">
+      <div class="gmail-status">
+        <span class="gmail-dot off" id="gmailDot"></span>
+        <span id="gmailStatusText">Checking Gmail…</span>
+      </div>
+      <div class="gmail-actions">
+        <button type="button" class="btn-secondary" id="gmailSyncBtn" hidden>Sync now</button>
+        <a class="btn-primary" id="gmailConnectBtn" href="<?= SITE_BASE ?>/api/gmail_connect.php" hidden>Connect Gmail</a>
+        <button type="button" class="btn-secondary" id="gmailDisconnectBtn" hidden>Disconnect</button>
+      </div>
+    </div>
+    <p class="gmail-hint" id="gmailSetupHint" hidden></p>
+    <div class="gmail-flash" id="gmailFlash" hidden></div>
+
     <div class="notif-tabs" id="notifTabs" role="tablist">
       <button type="button" class="notif-tab active" data-tab="inbox" role="tab">
         Inbox <span class="tab-badge" id="inboxTabBadge" hidden>0</span>
@@ -125,6 +140,15 @@ include __DIR__ . '/../includes/header.php';
       <div class="custom-modal-body">
         <div class="inbox-view-from" id="inboxViewFrom"></div>
         <div class="inbox-view-message" id="inboxViewMessage"></div>
+        <div class="inbox-thread" id="inboxViewThread" hidden></div>
+        <div class="inbox-reply" id="inboxReplyBox" hidden>
+          <label for="inboxReplyText">Reply through Gmail</label>
+          <textarea id="inboxReplyText" rows="4" placeholder="Write your reply..."></textarea>
+          <div class="inbox-reply-actions">
+            <span id="inboxReplyStatus"></span>
+            <button type="button" class="btn-primary" id="inboxReplySendBtn">Send reply</button>
+          </div>
+        </div>
       </div>
       <div class="custom-modal-footer">
         <button type="button" class="btn-danger" id="inboxViewDeleteBtn">Delete</button>

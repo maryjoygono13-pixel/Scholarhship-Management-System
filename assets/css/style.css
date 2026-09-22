@@ -291,6 +291,10 @@ body {
   box-shadow: 0 4px 12px rgba(19, 78, 42, 0.12);
 }
 
+.nav-btn-badge[hidden] {
+  display: none !important;
+}
+
 .nav-btn-badge {
   position: absolute;
   top: -4px;

@@ -1,3 +1,6 @@
 # SQLite database
 database/*.sqlite
 database/*.sqlite-*
+
+# Gmail OAuth client secret (never commit)
+config/gmail.local.php

@@ -37,7 +37,10 @@ try {
             'status' => $r['status'],
             'sentAt' => $r['sent_at'],
             'sent_at' => $r['sent_at'],
-            'createdAt' => $r['sent_at']
+            'createdAt' => $r['sent_at'],
+            'errorMessage' => $r['error_message'] ?? '',
+            'gmailAccount' => $r['gmail_account'] ?? '',
+            'threadId' => $r['gmail_thread_id'] ?? ''
         ];
     }, $rows);
 

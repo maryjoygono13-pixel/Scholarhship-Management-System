@@ -148,10 +148,31 @@ function initDatabase(): PDO {
         message TEXT NOT NULL,
         deadline VARCHAR(50) DEFAULT '',
         status VARCHAR(50) NOT NULL DEFAULT 'sent',
-        sent_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        sent_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        gmail_account VARCHAR(255) DEFAULT '',
+        gmail_message_id VARCHAR(255) DEFAULT NULL,
+        gmail_thread_id VARCHAR(255) DEFAULT NULL,
+        error_message VARCHAR(255) DEFAULT '',
+        KEY idx_notifications_gmail_thread (gmail_thread_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
-    // Inbox: messages received from scholars / applicants
+    // Column adds a table might be missing if it already existed before this column was
+    // introduced (CREATE TABLE IF NOT EXISTS is a no-op on an existing table, so new
+    // columns need this too). Portable across MySQL/MariaDB: swallows "Duplicate column".
+    $addColumnIfMissing = function (string $table, string $column, string $definition) use ($pdo) {
+        try {
+            $pdo->exec("ALTER TABLE $table ADD COLUMN $column $definition");
+        } catch (PDOException $e) {
+            if ((int)$e->errorInfo[1] !== 1060) { // 1060 = Duplicate column name
+                throw $e;
+            }
+        }
+    };
+
+    // Inbox: messages received from scholars / applicants (manually logged, or synced
+    // from Gmail — see includes/gmail_client.php). A Gmail message is matched on
+    // (gmail_account, gmail_message_id); that pair is unique whenever both are set,
+    // but manually-logged rows (gmail_message_id NULL) never collide with each other.
     $pdo->exec("CREATE TABLE IF NOT EXISTS inbox_messages (
         id INT AUTO_INCREMENT PRIMARY KEY,
         sender_name VARCHAR(255) NOT NULL DEFAULT '',
@@ -161,7 +182,52 @@ function initDatabase(): PDO {
         message TEXT NOT NULL,
         source VARCHAR(50) NOT NULL DEFAULT 'manual',
         is_read INT NOT NULL DEFAULT 0,
-        received_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        received_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        gmail_account VARCHAR(255) DEFAULT '',
+        gmail_message_id VARCHAR(255) DEFAULT NULL,
+        gmail_thread_id VARCHAR(255) DEFAULT NULL,
+        rfc_message_id VARCHAR(255) DEFAULT '',
+        to_email VARCHAR(255) DEFAULT '',
+        is_hidden INT NOT NULL DEFAULT 0,
+        UNIQUE KEY uniq_inbox_gmail_msg (gmail_account, gmail_message_id),
+        KEY idx_inbox_gmail_thread (gmail_thread_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    foreach ([
+        'gmail_account' => "VARCHAR(255) DEFAULT ''",
+        'gmail_message_id' => 'VARCHAR(255) DEFAULT NULL',
+        'gmail_thread_id' => 'VARCHAR(255) DEFAULT NULL',
+        'rfc_message_id' => "VARCHAR(255) DEFAULT ''",
+        'to_email' => "VARCHAR(255) DEFAULT ''",
+        'is_hidden' => 'INT NOT NULL DEFAULT 0',
+    ] as $col => $def) {
+        $addColumnIfMissing('inbox_messages', $col, $def);
+    }
+    foreach ([
+        'gmail_account' => "VARCHAR(255) DEFAULT ''",
+        'gmail_message_id' => 'VARCHAR(255) DEFAULT NULL',
+        'gmail_thread_id' => 'VARCHAR(255) DEFAULT NULL',
+        'error_message' => "VARCHAR(255) DEFAULT ''",
+    ] as $col => $def) {
+        $addColumnIfMissing('notifications', $col, $def);
+    }
+
+    // Gmail integration. The connected Gmail account is a row here (never hard-coded),
+    // so it can be disconnected and replaced by another account (temporary test account
+    // now, official registrar account later) without touching the Messaging page.
+    // Tokens are stored encrypted (see includes/gmail_client.php).
+    $pdo->exec("CREATE TABLE IF NOT EXISTS gmail_connections (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        email VARCHAR(255) NOT NULL,
+        status VARCHAR(50) NOT NULL DEFAULT 'connected',
+        access_token_enc TEXT DEFAULT NULL,
+        refresh_token_enc TEXT DEFAULT NULL,
+        token_expires_at INT DEFAULT NULL,
+        scope VARCHAR(255) DEFAULT '',
+        connected_by VARCHAR(255) DEFAULT '',
+        connected_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        disconnected_at DATETIME DEFAULT NULL,
+        last_sync_at DATETIME DEFAULT NULL,
+        last_error VARCHAR(255) DEFAULT ''
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
     // 5. Records Table

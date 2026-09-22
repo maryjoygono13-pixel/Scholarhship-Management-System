@@ -23,7 +23,7 @@ checkAuth();
         </script>
         <script src="<?= SITE_BASE ?>/assets/lib/lucide.min.js"></script>
         <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-        <script src="<?= SITE_BASE ?>/assets/js/api.js"></script>
+        <script src="<?= SITE_BASE ?>/assets/js/api.js?v=<?= time() ?>"></script>
         <title><?= htmlspecialchars(($page_title ?? 'Scholarship Portal') . ' - Scholarship Portal') ?></title>
     </head>
 

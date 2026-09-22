@@ -365,7 +365,7 @@ async function updateNavCounts() {
             pending,
             evaluation,
             decided,
-            notifRes
+            inboxRes
         ] = await Promise.all([
 
             apiListApplicants("pending"),
@@ -376,10 +376,11 @@ async function updateNavCounts() {
                 "approved,rejected"
             ),
 
-            apiListNotifications()
-                .catch(() => ({
-                    data: []
-                }))
+            // The bell shows how many received messages are unread,
+            // not how many notifications have ever been sent.
+            fetch(`${API_BASE}/inbox.php?filter=unread`)
+                .then(r => r.json())
+                .catch(() => ({ unread: 0 }))
         ]);
 
 
@@ -422,15 +423,13 @@ async function updateNavCounts() {
         }
 
 
-        if (
-            notifEl &&
-            notifRes &&
-            Array.isArray(notifRes.data)
-        ) {
-            notifEl.textContent =
-                String(
-                    notifRes.data.length
-                );
+        if (notifEl) {
+            const unread =
+                (inboxRes && inboxRes.success)
+                    ? Number(inboxRes.unread || 0)
+                    : 0;
+            notifEl.textContent = String(unread);
+            notifEl.hidden = unread === 0;
         }
 
     } catch (e) {

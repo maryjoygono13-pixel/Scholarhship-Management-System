@@ -37,6 +37,7 @@ const TYPE_LABELS = {
     approval_status: "Approval status",
     new_applicant: "New applicant",
     applicant_updated: "Applicant updated",
+  reply: "Reply",
 };
 const TEMPLATES = {
     missing_requirements: {
@@ -68,6 +69,11 @@ function formatDate(iso) {
         return iso;
     return d.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 }
+function utcIso(v) {
+  if (!v) return v;
+  return v.includes("T") ? v : v.replace(" ", "T") + "Z";
+}
+// Times in the database are UTC (CURRENT_TIMESTAMP); tag them so they display in local time.
 /* ================= Log table ================= */
 const notifViewOverlay = document.getElementById("notifViewOverlay");
 const notifViewCloseBtn = document.getElementById("notifViewCloseBtn");
@@ -176,11 +182,11 @@ function renderNotifTable(notifications) {
         tr.innerHTML = `
       <td>
         <div class="name-cell">
-          <span class="name">${n.recipientName || 'Recipient'}</span>
-          <span class="email">${n.recipientEmail || ''}</span>
+          <span class="name">${inboxEscape(n.recipientName || 'Recipient')}</span>
+          <span class="email">${inboxEscape(n.recipientEmail || '')}</span>
         </div>
       </td>
-      <td><span class="badge badge-neutral">${TYPE_LABELS[n.type] || n.type}</span></td>
+      <td><span class="badge badge-neutral">${inboxEscape(TYPE_LABELS[n.type] || n.type)}</span></td>
       <td>
         <span style="display:inline-flex; align-items:center; gap:6px; color:var(--slate-500);">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v16H4z" opacity="0"/><path d="M22 6 12 13 2 6"/><rect x="2" y="4" width="20" height="16" rx="2"/></svg>
@@ -188,7 +194,7 @@ function renderNotifTable(notifications) {
         </span>
       </td>
       <td><span class="notif-status ${n.status}">${statusIcon} ${statusText}</span></td>
-      <td><span class="font-mono">${formatDate(n.sentAt || n.sent_at)}</span></td>
+      <td><span class="font-mono">${formatDate(utcIso(n.sentAt || n.sent_at))}</span></td>
       <td class="actions-cell">
         <button type="button" class="btn-icon-action delete" title="Delete Notification" onclick="confirmDeleteNotif(event, ${n.id})">
           <i data-lucide="trash-2"></i>
@@ -209,24 +215,25 @@ function openNotifViewModal(n) {
     <div class="view-detail-grid">
       <div class="detail-item full-width">
         <span class="detail-label">Recipient</span>
-        <span class="detail-value highlight">${n.recipientName || 'Recipient'} (${n.recipientEmail || 'No email'})</span>
+        <span class="detail-value highlight">${inboxEscape(n.recipientName || 'Recipient')} (${inboxEscape(n.recipientEmail || 'No email')})</span>
       </div>
       <div class="detail-item">
         <span class="detail-label">Notification Type</span>
-        <span class="detail-value">${TYPE_LABELS[n.type] || n.type}</span>
+        <span class="detail-value">${inboxEscape(TYPE_LABELS[n.type] || n.type)}</span>
       </div>
       <div class="detail-item">
         <span class="detail-label">Sent Timestamp</span>
-        <span class="detail-value mono font-mono">${formatDate(n.sentAt || n.sent_at)}</span>
+        <span class="detail-value mono font-mono">${formatDate(utcIso(n.sentAt || n.sent_at))}</span>
       </div>
       <div class="detail-item full-width">
         <span class="detail-label">Subject</span>
-        <span class="detail-value">${n.subject}</span>
+        <span class="detail-value">${inboxEscape(n.subject)}</span>
       </div>
       <div class="detail-item full-width">
         <span class="detail-label">Message Content</span>
-        <div class="detail-value remarks" style="white-space:pre-wrap;">${n.message}</div>
+        <div class="detail-value remarks" style="white-space:pre-wrap;">${inboxEscape(n.message)}</div>
       </div>
+      ${n.status === 'failed' && n.errorMessage ? '<div class="detail-item full-width"><span class="detail-label">Why it was not sent</span><span class="detail-value" style="color:#b91c1c;">' + inboxEscape(n.errorMessage) + '</span></div>' : ''}
     </div>
   `;
     notifViewOverlay.classList.add("open");
@@ -515,10 +522,10 @@ function renderInbox() {
         <div class="inbox-sub">${inboxEscape(m.senderName ? m.senderEmail : "")}</div>
       </td>
       <td>
-        <div class="inbox-subject">${inboxEscape(m.subject)}</div>
+        <div class="inbox-subject">${inboxEscape(m.subject)}${m.source === "gmail" ? ' <span class="src-tag" title="Received through Gmail">Gmail</span>' : ''}</div>
         <div class="inbox-sub">${inboxEscape(preview)}${m.message.length > 110 ? "…" : ""}</div>
       </td>
-      <td>${inboxEscape(formatDate(m.receivedAt))}</td>
+      <td>${inboxEscape(formatDate(utcIso(m.receivedAt)))}</td>
       <td class="actions-cell" style="text-align:right;">
         <button type="button" class="btn-icon-action" data-inbox-toggle title="${m.isRead ? "Mark as unread" : "Mark as read"}"><i data-lucide="${m.isRead ? "mail" : "mail-open"}"></i></button>
         <button type="button" class="btn-icon-action delete" data-inbox-delete title="Delete"><i data-lucide="trash-2"></i></button>
@@ -547,7 +554,7 @@ async function openInboxMessage(id) {
   inboxOpenId = id;
 
   if (inboxViewSubject) inboxViewSubject.textContent = m.subject;
-  if (inboxViewMeta) inboxViewMeta.textContent = "Received " + formatDate(m.receivedAt);
+  if (inboxViewMeta) inboxViewMeta.textContent = "Received " + formatDate(utcIso(m.receivedAt));
   if (inboxViewFrom) {
     inboxViewFrom.innerHTML =
       `<strong>${inboxEscape(m.senderName || m.senderEmail)}</strong>` +
@@ -560,6 +567,7 @@ async function openInboxMessage(id) {
     inboxViewReplyBtn.href = "mailto:" + m.senderEmail + "?subject=" + encodeURIComponent("Re: " + m.subject);
   }
   inboxViewOverlay.classList.add("open");
+  prepareInboxThreadAndReply(m);
 
   if (!m.isRead) {
     await inboxPost({ action: "mark_read", id: String(id) });
@@ -638,6 +646,226 @@ if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", loadInbox);
 } else {
   loadInbox();
+}
+
+/* ================= Gmail (connection bar, sync, thread + reply) =================
+   The page only talks to our own api/gmail_*.php endpoints. OAuth tokens and the
+   client secret stay on the server; this code never sees them. */
+const GMAIL_SYNC_INTERVAL_MS = 60000;
+const gmailStatusText = document.getElementById("gmailStatusText");
+const gmailDot = document.getElementById("gmailDot");
+const gmailSyncBtn = document.getElementById("gmailSyncBtn");
+const gmailConnectBtn = document.getElementById("gmailConnectBtn");
+const gmailDisconnectBtn = document.getElementById("gmailDisconnectBtn");
+const gmailFlash = document.getElementById("gmailFlash");
+const gmailSetupHint = document.getElementById("gmailSetupHint");
+
+const inboxViewThread = document.getElementById("inboxViewThread");
+const inboxReplyBox = document.getElementById("inboxReplyBox");
+const inboxReplyText = document.getElementById("inboxReplyText");
+const inboxReplyStatus = document.getElementById("inboxReplyStatus");
+const inboxReplySendBtn = document.getElementById("inboxReplySendBtn");
+
+let gmailState = null;
+let gmailSyncing = false;
+let gmailTimer;
+
+const GMAIL_ERROR_MESSAGES = {
+  denied: "Gmail was not connected: the request was cancelled on the Google page.",
+  state: "The Gmail connection request expired or could not be verified. Please try again.",
+  config: "Gmail could not be connected because of a setup problem. Check config/gmail.local.php.",
+  not_configured: "Gmail is not set up yet. Add the Google client ID and secret to config/gmail.local.php first.",
+  network: "Could not reach Google. Check the internet connection and try again.",
+  google: "Google reported a problem while connecting Gmail. Please try again.",
+};
+
+function showGmailFlash(text, kind) {
+  if (!gmailFlash) return;
+  gmailFlash.textContent = text;
+  gmailFlash.className = "gmail-flash " + kind;
+  gmailFlash.hidden = !text;
+}
+
+function renderGmailBar() {
+  const s = gmailState;
+  if (!s || !gmailStatusText) return;
+
+  const show = (el, visible) => { if (el) el.hidden = !visible; };
+  let text = "";
+  let dot = "off";
+
+  if (!s.configured) {
+    text = "Gmail is not set up yet";
+    if (gmailSetupHint) {
+      gmailSetupHint.textContent = "Copy config/gmail.local.example.php to config/gmail.local.php and add your Google client ID and secret. Redirect URI to register in Google Cloud: " + s.redirectUri;
+      gmailSetupHint.hidden = false;
+    }
+  } else if (s.connected) {
+    text = "Connected as " + s.email;
+    dot = s.lastError ? "warn" : "on";
+    if (gmailSetupHint) gmailSetupHint.hidden = true;
+  } else if (s.needsReauth) {
+    text = "Gmail authorization expired" + (s.email ? " (" + s.email + ")" : "") + " — reconnect to continue";
+    dot = "warn";
+    if (gmailSetupHint) gmailSetupHint.hidden = true;
+  } else {
+    text = "Gmail is not connected";
+    if (gmailSetupHint) gmailSetupHint.hidden = true;
+  }
+
+  gmailStatusText.textContent = text;
+  if (gmailDot) gmailDot.className = "gmail-dot " + dot;
+  show(gmailSyncBtn, s.connected);
+  show(gmailDisconnectBtn, s.connected || s.needsReauth);
+  show(gmailConnectBtn, s.configured && !s.connected);
+  if (gmailConnectBtn) gmailConnectBtn.textContent = s.needsReauth ? "Reconnect Gmail" : "Connect Gmail";
+
+  if (s.connected && s.lastError) showGmailFlash(s.lastError, "error");
+}
+
+async function loadGmailStatus() {
+  try {
+    const res = await fetch("api/gmail_status.php", { cache: "no-store" });
+    const json = await res.json();
+    if (json && json.success) {
+      gmailState = json;
+      renderGmailBar();
+    }
+  } catch (e) {
+    if (gmailStatusText) gmailStatusText.textContent = "Gmail status unavailable";
+  }
+}
+
+async function syncGmail(manual) {
+  if (gmailSyncing || !gmailState || !gmailState.connected) return;
+  gmailSyncing = true;
+  if (manual && gmailSyncBtn) { gmailSyncBtn.disabled = true; gmailSyncBtn.textContent = "Syncing…"; }
+
+  try {
+    const res = await fetch("api/gmail_sync.php", { method: "POST" });
+    const json = await res.json();
+    if (json.success) {
+      if (!manual && gmailFlash && gmailFlash.classList.contains("error")) showGmailFlash("", "");
+      if (json.new > 0 || manual) await loadInbox();
+      if (manual) {
+        showGmailFlash(json.new > 0 ? json.new + " new email" + (json.new === 1 ? "" : "s") + " received." : "No new emails.", "ok");
+      }
+    } else {
+      showGmailFlash(json.message || "Gmail could not be synchronized.", "error");
+    }
+    await loadGmailStatus();
+  } catch (e) {
+    showGmailFlash("Could not reach the server to synchronize Gmail.", "error");
+  } finally {
+    gmailSyncing = false;
+    if (gmailSyncBtn) { gmailSyncBtn.disabled = false; gmailSyncBtn.textContent = "Sync now"; }
+  }
+}
+
+async function disconnectGmail() {
+  const who = gmailState && gmailState.email ? gmailState.email : "the Gmail account";
+  if (!confirm("Disconnect " + who + "?\n\nSending and receiving through Gmail will stop until an account is connected again. Messages already downloaded stay in the Inbox.")) return;
+  try {
+    const res = await fetch("api/gmail_disconnect.php", { method: "POST" });
+    const json = await res.json();
+    showGmailFlash(json.success ? "Gmail account disconnected." : (json.message || "Could not disconnect Gmail."), json.success ? "ok" : "error");
+  } catch (e) {
+    showGmailFlash("Could not reach the server.", "error");
+  }
+  await loadGmailStatus();
+}
+
+/* ---------- thread + reply inside the existing message dialog ---------- */
+
+function renderInboxThread(items) {
+  if (!inboxViewThread) return;
+  if (items.length < 2) { inboxViewThread.hidden = true; inboxViewThread.innerHTML = ""; return; }
+
+  inboxViewThread.innerHTML =
+    '<div class="thread-title">Conversation (' + items.length + ' messages)</div>' +
+    items.map((it) =>
+      '<div class="thread-item ' + inboxEscape(it.direction) + '">' +
+        '<div class="thread-meta"><strong>' + inboxEscape(it.name) + '</strong> &middot; ' + inboxEscape(formatDate(utcIso(it.at))) + '</div>' +
+        '<div class="thread-body">' + inboxEscape(it.message) + '</div>' +
+      '</div>'
+    ).join("");
+  inboxViewThread.hidden = false;
+}
+
+async function prepareInboxThreadAndReply(m) {
+  const isGmail = m.source === "gmail";
+  const canReply = isGmail && !!m.senderEmail && !!gmailState && gmailState.connected;
+
+  if (inboxViewThread) { inboxViewThread.hidden = true; inboxViewThread.innerHTML = ""; }
+  if (inboxReplyBox) inboxReplyBox.hidden = !canReply;
+  if (inboxReplyText) inboxReplyText.value = "";
+  if (inboxReplyStatus) { inboxReplyStatus.textContent = ""; inboxReplyStatus.className = ""; }
+  // Gmail messages are answered in-app (same thread); others keep the mail-client link.
+  if (inboxViewReplyBtn && isGmail) inboxViewReplyBtn.hidden = true;
+
+  if (isGmail && m.threadId) {
+    try {
+      const res = await fetch("api/inbox.php?thread=" + encodeURIComponent(m.threadId) + "&account=" + encodeURIComponent(m.gmailAccount || ""));
+      const json = await res.json();
+      if (json.success && inboxOpenId === m.id) renderInboxThread(json.data || []);
+    } catch (e) { /* the message itself is already shown */ }
+  }
+}
+
+async function sendInboxReply() {
+  if (inboxOpenId === null || !inboxReplyText || !inboxReplySendBtn) return;
+  const body = inboxReplyText.value.trim();
+  const setStatus = (t, cls) => { if (inboxReplyStatus) { inboxReplyStatus.textContent = t; inboxReplyStatus.className = cls; } };
+  if (!body) { setStatus("Write a reply first.", "bad"); return; }
+
+  const openId = inboxOpenId;
+  inboxReplySendBtn.disabled = true;
+  setStatus("Sending…", "");
+  try {
+    const res = await fetch("api/gmail_send.php", { method: "POST", body: new URLSearchParams({ reply_to_id: String(openId), body }) });
+    const json = await res.json();
+    if (json.success) {
+      inboxReplyText.value = "";
+      setStatus("Reply sent.", "ok");
+      const m = inboxMessages.find((x) => x.id === openId);
+      if (m && m.threadId) {
+        const t = await (await fetch("api/inbox.php?thread=" + encodeURIComponent(m.threadId) + "&account=" + encodeURIComponent(m.gmailAccount || ""))).json();
+        if (t.success && inboxOpenId === openId) renderInboxThread(t.data || []);
+      }
+      refreshNotifications();
+    } else {
+      setStatus(json.message || "The reply could not be sent.", "bad");
+      if (json.code === "reauthorize" || json.code === "not_connected") loadGmailStatus();
+    }
+  } catch (e) {
+    setStatus("Could not reach the server.", "bad");
+  } finally {
+    inboxReplySendBtn.disabled = false;
+  }
+}
+
+if (gmailSyncBtn) gmailSyncBtn.addEventListener("click", () => syncGmail(true));
+if (gmailDisconnectBtn) gmailDisconnectBtn.addEventListener("click", disconnectGmail);
+if (inboxReplySendBtn) inboxReplySendBtn.addEventListener("click", sendInboxReply);
+
+async function initGmail() {
+  // Result of the OAuth round-trip (api/gmail_callback.php redirects back here).
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("gmail") === "connected") showGmailFlash("Gmail connected. Fetching your emails…", "ok");
+  const err = params.get("gmail_error");
+  if (err) showGmailFlash(GMAIL_ERROR_MESSAGES[err] || GMAIL_ERROR_MESSAGES.google, "error");
+  if (params.has("gmail") || err) window.history.replaceState({}, "", window.location.pathname);
+
+  await loadGmailStatus();
+  await syncGmail(false);
+  window.clearInterval(gmailTimer);
+  gmailTimer = window.setInterval(() => { if (!document.hidden) syncGmail(false); }, GMAIL_SYNC_INTERVAL_MS);
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", initGmail);
+} else {
+  initGmail();
 }
 
 /* ================= Init ================= */

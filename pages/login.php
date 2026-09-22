@@ -396,7 +396,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['setup_account'])) {
                 id="identifier"
                 name="identifier"
                 class="form-input"
-                placeholder="registrar@sms.local"
+                placeholder="Enter your registered email"
                 autocomplete="username"
                 required
             >
