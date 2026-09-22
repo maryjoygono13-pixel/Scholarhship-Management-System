@@ -42,7 +42,7 @@ try {
     }, $rows);
 
     // Calculate Summary stats
-    $todayCount = (int)$pdo->query("SELECT COUNT(*) FROM notifications WHERE DATE(sent_at) = DATE('now', 'localtime') OR DATE(sent_at) = DATE('now')")->fetchColumn();
+    $todayCount = (int)$pdo->query("SELECT COUNT(*) FROM notifications WHERE DATE(sent_at) = UTC_DATE()")->fetchColumn();
     $missingCount = (int)$pdo->query("SELECT COUNT(*) FROM notifications WHERE type = 'missing_requirements'")->fetchColumn();
     $renewalCount = (int)$pdo->query("SELECT COUNT(*) FROM notifications WHERE type = 'renewal_deadline'")->fetchColumn();
     $failedCount = (int)$pdo->query("SELECT COUNT(*) FROM notifications WHERE status = 'failed' OR type = 'failed_retention'")->fetchColumn();

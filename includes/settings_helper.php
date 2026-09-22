@@ -19,7 +19,7 @@ function getSetting(PDO $pdo, string $key, string $default = ''): string {
 function setSetting(PDO $pdo, string $key, string $value): void {
     $stmt = $pdo->prepare("
         INSERT INTO settings (setting_key, setting_value) VALUES (?, ?)
-        ON CONFLICT(setting_key) DO UPDATE SET setting_value = excluded.setting_value
+        ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)
     ");
     $stmt->execute([$key, $value]);
 }

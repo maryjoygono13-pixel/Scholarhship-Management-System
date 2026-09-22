@@ -21,8 +21,8 @@ try {
     // UTC offset (minutes east of UTC) so "today" and the date filter follow the
     // viewer's calendar day, not UTC's.
     $tzMinutes = max(-840, min(840, (int)($_GET['tz'] ?? 0)));
-    $localDate = sprintf("DATE(created_at, '%+d minutes')", $tzMinutes);
-    $localTime = sprintf("datetime(created_at, '%+d minutes')", $tzMinutes);
+    $localDate = sprintf("DATE(created_at + INTERVAL %d MINUTE)", $tzMinutes);
+    $localTime = sprintf("(created_at + INTERVAL %d MINUTE)", $tzMinutes);
 
     $where = "WHERE 1=1";
     $params = [];
@@ -109,7 +109,7 @@ try {
     ========================================================= */
     $totalCount = (int)$pdo->query("SELECT COUNT(*) FROM activity_logs")->fetchColumn();
 
-    $todayCountStmt = $pdo->prepare("SELECT COUNT(*) FROM activity_logs WHERE $localDate = DATE('now', '" . sprintf('%+d', $tzMinutes) . " minutes')");
+    $todayCountStmt = $pdo->prepare("SELECT COUNT(*) FROM activity_logs WHERE $localDate = DATE(UTC_TIMESTAMP() + INTERVAL $tzMinutes MINUTE)");
     $todayCountStmt->execute();
     $todayCount = (int)$todayCountStmt->fetchColumn();
 

@@ -96,7 +96,7 @@ try {
     }
 
     $monthlyStmt = $pdo->prepare("
-        SELECT strftime('%Y-%m', created_at) AS ym, COUNT(*) AS cnt
+        SELECT DATE_FORMAT(created_at, '%Y-%m') AS ym, COUNT(*) AS cnt
         FROM applicants
         WHERE created_at IS NOT NULL" . ($yearFilter !== null ? " AND TRIM(COALESCE(school_year, '')) = ?" : '') . "
         GROUP BY ym

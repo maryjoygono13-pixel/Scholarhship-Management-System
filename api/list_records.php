@@ -25,7 +25,7 @@ try {
             logActivity($pdo, 'Record Updated', 'Records', $name . ' (Student ID: ' . $studentId . ') record was updated.', $id);
             sendJson(['success' => true, 'id' => $id, 'message' => 'Record updated successfully.']);
         } else {
-            $stmt = $pdo->prepare("INSERT INTO records (student_id, name, scholarship_type, status, semester, sy, date_evaluated, remarks) VALUES (?, ?, ?, ?, ?, ?, DATE('now'), ?)");
+            $stmt = $pdo->prepare("INSERT INTO records (student_id, name, scholarship_type, status, semester, sy, date_evaluated, remarks) VALUES (?, ?, ?, ?, ?, ?, CURDATE(), ?)");
             $stmt->execute([$studentId, $name, $type, $status, $semester, $sy, $remarks]);
             $newId = (int)$pdo->lastInsertId();
             logActivity($pdo, 'Record Added', 'Records', $name . ' (Student ID: ' . $studentId . ') record was added.', $newId);

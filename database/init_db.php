@@ -2,77 +2,53 @@
 require_once __DIR__ . '/../config/database.php';
 
 function initDatabase(): PDO {
-    $pdo = getSQLiteConnection();
+    $pdo = getMySQLConnection();
 
     // 1. Users Table
     $pdo->exec("CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
-        email TEXT UNIQUE NOT NULL,
-        password_hash TEXT NOT NULL,
-        role TEXT NOT NULL DEFAULT 'registrar',
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        email VARCHAR(255) NOT NULL UNIQUE,
+        password_hash VARCHAR(255) NOT NULL,
+        role VARCHAR(50) NOT NULL DEFAULT 'registrar',
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )");
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
     // 2. Scholarships Table
     $pdo->exec("CREATE TABLE IF NOT EXISTS scholarships (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
-        code TEXT NOT NULL,
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        code VARCHAR(50) NOT NULL,
         description TEXT,
-        type TEXT NOT NULL,
-        gwa_requirement REAL NOT NULL,
-        slots INTEGER NOT NULL DEFAULT 0,
-        slots_available INTEGER NOT NULL DEFAULT 0,
+        type VARCHAR(255) NOT NULL,
+        gwa_requirement DOUBLE NOT NULL,
+        slots INT NOT NULL DEFAULT 0,
+        slots_available INT NOT NULL DEFAULT 0,
         coverage TEXT,
-        status TEXT NOT NULL DEFAULT 'active',
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )");
-
-    $scholarshipsCols = $pdo->query("PRAGMA table_info(scholarships)")->fetchAll(PDO::FETCH_ASSOC);
-    $scholarshipsColNames = array_column($scholarshipsCols, 'name');
-    if (!in_array('subtype', $scholarshipsColNames)) {
-        $pdo->exec("ALTER TABLE scholarships ADD COLUMN subtype TEXT DEFAULT ''");
-    }
-    // Where a student lives, picked from a list (see includes/locations.php) instead of free text.
-    $applicantCols = array_column($pdo->query("PRAGMA table_info(applicants)")->fetchAll(PDO::FETCH_ASSOC), 'name');
-    if (!in_array('municipality', $applicantCols, true)) {
-        $pdo->exec("ALTER TABLE applicants ADD COLUMN municipality TEXT DEFAULT ''");
-    }
-    if (!in_array('barangay', $applicantCols, true)) {
-        $pdo->exec("ALTER TABLE applicants ADD COLUMN barangay TEXT DEFAULT ''");
-    }
-
-    // Some scholarships (e.g. MERIT-BASED Academic, for students who reach the GWA) have no
-    // cap on how many students can hold them.
-    if (!in_array('unlimited_slots', $scholarshipsColNames)) {
-        $pdo->exec("ALTER TABLE scholarships ADD COLUMN unlimited_slots INTEGER NOT NULL DEFAULT 0");
-    }
+        status VARCHAR(50) NOT NULL DEFAULT 'active',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        subtype VARCHAR(255) DEFAULT '',
+        unlimited_slots INT NOT NULL DEFAULT 0
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
     // 2a. Scholarship Types / Sub-types — the selectable, growable taxonomy
     // used by the Add/Edit Scholarship form's Type and Sub-type pickers.
     $pdo->exec("CREATE TABLE IF NOT EXISTS scholarship_types (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL UNIQUE,
-        sort_order INTEGER DEFAULT 0,
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(255) NOT NULL UNIQUE,
+        sort_order INT DEFAULT 0,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )");
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
     $pdo->exec("CREATE TABLE IF NOT EXISTS scholarship_subtypes (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        type_id INTEGER NOT NULL,
-        name TEXT NOT NULL,
-        gwa_requirement REAL NOT NULL DEFAULT 1.75,
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        type_id INT NOT NULL,
+        name VARCHAR(255) NOT NULL,
+        gwa_requirement DOUBLE NOT NULL DEFAULT 1.75,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE(type_id, name),
+        UNIQUE KEY uq_type_name (type_id, name),
         FOREIGN KEY (type_id) REFERENCES scholarship_types(id)
-    )");
-
-    $subtypeCols = $pdo->query("PRAGMA table_info(scholarship_subtypes)")->fetchAll(PDO::FETCH_ASSOC);
-    $subtypeColNames = array_column($subtypeCols, 'name');
-    if (!in_array('gwa_requirement', $subtypeColNames)) {
-        $pdo->exec("ALTER TABLE scholarship_subtypes ADD COLUMN gwa_requirement REAL NOT NULL DEFAULT 1.75");
-    }
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
     $defaultTypes = [
         'MERIT-BASED Academic Scholarship',
@@ -82,7 +58,7 @@ function initDatabase(): PDO {
         'Other types of Scholarship and Discount',
         'CHED Scholarship',
     ];
-    $insertType = $pdo->prepare("INSERT OR IGNORE INTO scholarship_types (name, sort_order) VALUES (?, ?)");
+    $insertType = $pdo->prepare("INSERT IGNORE INTO scholarship_types (name, sort_order) VALUES (?, ?)");
     foreach ($defaultTypes as $i => $typeName) {
         $insertType->execute([$typeName, $i + 1]);
     }
@@ -98,23 +74,16 @@ function initDatabase(): PDO {
             'TES (Tertiary Education Subsidy)' => 2.00,
             'COSCHO (Scholarship for Coconut Farmers and Their Families)' => 2.50,
         ];
-        $insertSubtype = $pdo->prepare("INSERT OR IGNORE INTO scholarship_subtypes (type_id, name, gwa_requirement) VALUES (?, ?, ?)");
-        $backfillSubtypeGwa = $pdo->prepare("UPDATE scholarship_subtypes SET gwa_requirement = ? WHERE type_id = ? AND name = ? AND gwa_requirement = 1.75");
+        $insertSubtype = $pdo->prepare("INSERT IGNORE INTO scholarship_subtypes (type_id, name, gwa_requirement) VALUES (?, ?, ?)");
         foreach ($chedSubtypes as $subtypeName => $subtypeGwa) {
             $insertSubtype->execute([$chedTypeId, $subtypeName, $subtypeGwa]);
-            // One-time backfill for rows created before this column existed
-            // (they got the column's default of 1.75). Harmless no-op once
-            // the real value has already been set.
-            if ($subtypeGwa != 1.75) {
-                $backfillSubtypeGwa->execute([$subtypeGwa, $chedTypeId, $subtypeName]);
-            }
         }
 
-        // One-time backfill: the 4 scholarships already seeded under the old
-        // ad-hoc type values (Academic Merit / Financial Need-Based / etc.)
-        // are all genuinely CHED programs — reclassify them under the new
-        // CHED Scholarship type with their matching sub-type. Idempotent:
-        // once migrated, the WHERE code=... no longer matches a non-CHED type.
+        // The 4 scholarships already seeded under the old ad-hoc type values
+        // (Academic Merit / Financial Need-Based / etc.) are all genuinely CHED
+        // programs — reclassify them under the new CHED Scholarship type with
+        // their matching sub-type. Idempotent: once migrated, the WHERE code=...
+        // no longer matches a non-CHED type.
         $reclassify = $pdo->prepare("UPDATE scholarships SET type = ?, subtype = ? WHERE code = ? AND type != ?");
         foreach ([
             'CMSP' => 'CMSP (CHED Merit Scholarship Program)',
@@ -128,308 +97,214 @@ function initDatabase(): PDO {
 
     // 3. Applicants Table
     $pdo->exec("CREATE TABLE IF NOT EXISTS applicants (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        student_id TEXT NOT NULL,
-        first_name TEXT NOT NULL,
-        middle_name TEXT DEFAULT '',
-        last_name TEXT NOT NULL,
-        gender TEXT DEFAULT '',
-        email TEXT NOT NULL,
-        phone TEXT,
-        birthdate TEXT,
-        age INTEGER DEFAULT NULL,
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        student_id VARCHAR(50) NOT NULL,
+        first_name VARCHAR(255) NOT NULL,
+        middle_name VARCHAR(255) DEFAULT '',
+        last_name VARCHAR(255) NOT NULL,
+        gender VARCHAR(20) DEFAULT '',
+        email VARCHAR(255) NOT NULL,
+        phone VARCHAR(50),
+        birthdate VARCHAR(20),
+        age INT DEFAULT NULL,
         address TEXT,
-        latitude REAL,
-        longitude REAL,
-        school TEXT,
-        school_year TEXT DEFAULT '',
-        program TEXT,
-        major TEXT DEFAULT '',
-        year_level TEXT,
-        gpa REAL DEFAULT 0,
-        scholarship_type TEXT NOT NULL,
-        status TEXT NOT NULL DEFAULT 'pending',
-        gwa REAL DEFAULT 0,
-        gwa_req REAL DEFAULT 1.75,
-        failing_grades INTEGER DEFAULT 0,
-        units INTEGER DEFAULT 21,
-        enrolled INTEGER DEFAULT 1,
-        docs_complete INTEGER DEFAULT 1,
-        remarks TEXT DEFAULT '',
-        essay TEXT DEFAULT '',
-        transcript_file TEXT DEFAULT '',
-        coe_file TEXT DEFAULT '',
-        good_moral_file TEXT DEFAULT '',
+        latitude DOUBLE,
+        longitude DOUBLE,
+        school VARCHAR(255),
+        school_year VARCHAR(50) DEFAULT '',
+        program VARCHAR(255),
+        major VARCHAR(255) DEFAULT '',
+        year_level VARCHAR(50),
+        gpa DOUBLE DEFAULT 0,
+        scholarship_type VARCHAR(255) NOT NULL,
+        status VARCHAR(50) NOT NULL DEFAULT 'pending',
+        gwa DOUBLE DEFAULT 0,
+        gwa_req DOUBLE DEFAULT 1.75,
+        failing_grades INT DEFAULT 0,
+        units INT DEFAULT 21,
+        enrolled INT DEFAULT 1,
+        docs_complete INT DEFAULT 1,
+        remarks TEXT,
+        essay TEXT,
+        transcript_file VARCHAR(500) DEFAULT '',
+        coe_file VARCHAR(500) DEFAULT '',
+        good_moral_file VARCHAR(500) DEFAULT '',
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )");
-
-    // ------------------------------------------------------------
-    // UPDATE EXISTING APPLICANTS TABLE
-    // Adds new columns without deleting existing applicant data.
-    // ------------------------------------------------------------
-
-    $columns = $pdo->query("
-        PRAGMA table_info(applicants)
-    ")->fetchAll(PDO::FETCH_ASSOC);
-
-    $columnNames = array_column($columns, 'name');
-
-    // The application's supporting documents are now Transcript of Records, Certificate of
-    // Enrollment (COE) and Certificate of Good Moral Character, matching the Evaluation page.
-    // Databases made before that still have the old Recommendation Letter / Valid ID columns.
-    foreach (['recommendation_file' => 'coe_file', 'valid_id_file' => 'good_moral_file'] as $old => $new) {
-        if (in_array($old, $columnNames, true) && !in_array($new, $columnNames, true)) {
-            $pdo->exec("ALTER TABLE applicants RENAME COLUMN $old TO $new");
-        }
-    }
-
-    // Middle Name
-    if (!in_array('middle_name', $columnNames, true)) {
-        $pdo->exec("
-            ALTER TABLE applicants
-            ADD COLUMN middle_name TEXT DEFAULT ''
-        ");
-    }
-
-    // Gender
-    if (!in_array('gender', $columnNames, true)) {
-        $pdo->exec("
-            ALTER TABLE applicants
-            ADD COLUMN gender TEXT DEFAULT ''
-        ");
-    }
-
-    // Age
-    if (!in_array('age', $columnNames, true)) {
-        $pdo->exec("
-            ALTER TABLE applicants
-            ADD COLUMN age INTEGER DEFAULT NULL
-        ");
-    }
-
-    // School Year
-    if (!in_array('school_year', $columnNames, true)) {
-        $pdo->exec("
-            ALTER TABLE applicants
-            ADD COLUMN school_year TEXT DEFAULT ''
-        ");
-    }
-
-    // Major
-    if (!in_array('major', $columnNames, true)) {
-        $pdo->exec("
-            ALTER TABLE applicants
-            ADD COLUMN major TEXT DEFAULT ''
-        ");
-    }
-
-    // Semester
-    if (!in_array('semester', $columnNames, true)) {
-        $pdo->exec("
-            ALTER TABLE applicants
-            ADD COLUMN semester TEXT DEFAULT '1st Semester'
-        ");
-    }
-
-    // Location columns
-    if (!in_array('latitude', $columnNames, true)) {
-        $pdo->exec("
-            ALTER TABLE applicants
-            ADD COLUMN latitude REAL
-        ");
-    }
-
-    if (!in_array('longitude', $columnNames, true)) {
-        $pdo->exec("
-            ALTER TABLE applicants
-            ADD COLUMN longitude REAL
-        ");
-    }
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        semester VARCHAR(50) DEFAULT '1st Semester',
+        municipality VARCHAR(255) DEFAULT '',
+        barangay VARCHAR(255) DEFAULT ''
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
     // 4. Notifications Table
     $pdo->exec("CREATE TABLE IF NOT EXISTS notifications (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        type TEXT NOT NULL,
-        recipient_type TEXT NOT NULL DEFAULT 'segment',
-        recipient_id TEXT DEFAULT NULL,
-        recipient_name TEXT DEFAULT '',
-        recipient_email TEXT DEFAULT '',
-        subject TEXT NOT NULL,
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        type VARCHAR(100) NOT NULL,
+        recipient_type VARCHAR(50) NOT NULL DEFAULT 'segment',
+        recipient_id VARCHAR(50) DEFAULT NULL,
+        recipient_name VARCHAR(255) DEFAULT '',
+        recipient_email VARCHAR(255) DEFAULT '',
+        subject VARCHAR(255) NOT NULL,
         message TEXT NOT NULL,
-        deadline TEXT DEFAULT '',
-        status TEXT NOT NULL DEFAULT 'sent',
+        deadline VARCHAR(50) DEFAULT '',
+        status VARCHAR(50) NOT NULL DEFAULT 'sent',
         sent_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )");
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
     // Inbox: messages received from scholars / applicants
     $pdo->exec("CREATE TABLE IF NOT EXISTS inbox_messages (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        sender_name TEXT NOT NULL DEFAULT '',
-        sender_email TEXT NOT NULL DEFAULT '',
-        student_id TEXT DEFAULT '',
-        subject TEXT NOT NULL DEFAULT '',
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        sender_name VARCHAR(255) NOT NULL DEFAULT '',
+        sender_email VARCHAR(255) NOT NULL DEFAULT '',
+        student_id VARCHAR(50) DEFAULT '',
+        subject VARCHAR(255) NOT NULL DEFAULT '',
         message TEXT NOT NULL,
-        source TEXT NOT NULL DEFAULT 'manual',
-        is_read INTEGER NOT NULL DEFAULT 0,
+        source VARCHAR(50) NOT NULL DEFAULT 'manual',
+        is_read INT NOT NULL DEFAULT 0,
         received_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )");
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
     // 5. Records Table
     $pdo->exec("CREATE TABLE IF NOT EXISTS records (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        applicant_id INTEGER,
-        student_id TEXT NOT NULL,
-        name TEXT NOT NULL,
-        scholarship_type TEXT NOT NULL,
-        status TEXT NOT NULL,
-        semester TEXT NOT NULL,
-        sy TEXT NOT NULL,
-        date_evaluated TEXT NOT NULL,
-        remarks TEXT DEFAULT '',
-        FOREIGN KEY(applicant_id) REFERENCES applicants(id) ON DELETE SET NULL
-    )");
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        applicant_id INT,
+        student_id VARCHAR(50) NOT NULL,
+        name VARCHAR(255) NOT NULL,
+        scholarship_type VARCHAR(255) NOT NULL,
+        status VARCHAR(50) NOT NULL,
+        semester VARCHAR(50) NOT NULL,
+        sy VARCHAR(50) NOT NULL,
+        date_evaluated VARCHAR(20) NOT NULL,
+        remarks TEXT,
+        FOREIGN KEY (applicant_id) REFERENCES applicants(id) ON DELETE SET NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
     // 6. Renewal & Retention Table
     $pdo->exec("CREATE TABLE IF NOT EXISTS renewal_retention (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        student_id TEXT NOT NULL,
-        name TEXT NOT NULL,
-        gwa REAL NOT NULL,
-        failing_grades INTEGER DEFAULT 0,
-        enrolled INTEGER DEFAULT 1,
-        status TEXT NOT NULL DEFAULT 'eligible',
-        school_year TEXT NOT NULL,
-        semester TEXT NOT NULL,
-        scholarship_type TEXT NOT NULL,
-        remarks TEXT DEFAULT '',
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )");
-
-    // Whether the applicant was approved or rejected in Evaluation when they entered this ledger.
-    $renewalCols = array_column($pdo->query("PRAGMA table_info(renewal_retention)")->fetchAll(PDO::FETCH_ASSOC), 'name');
-    if (!in_array('origin', $renewalCols, true)) {
-        $pdo->exec("ALTER TABLE renewal_retention ADD COLUMN origin TEXT NOT NULL DEFAULT 'approved'");
-    }
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        student_id VARCHAR(50) NOT NULL,
+        name VARCHAR(255) NOT NULL,
+        gwa DOUBLE NOT NULL,
+        failing_grades INT DEFAULT 0,
+        enrolled INT DEFAULT 1,
+        status VARCHAR(50) NOT NULL DEFAULT 'eligible',
+        school_year VARCHAR(50) NOT NULL,
+        semester VARCHAR(50) NOT NULL,
+        scholarship_type VARCHAR(255) NOT NULL,
+        remarks TEXT,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        origin VARCHAR(50) NOT NULL DEFAULT 'approved'
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
     // A scholar terminated from a scholarship can't apply for that same scholarship again
     // (they may still apply for a different one). See includes/renewal_helper.php.
     $pdo->exec("CREATE TABLE IF NOT EXISTS scholarship_terminations (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        student_id TEXT NOT NULL,
-        scholarship_type TEXT NOT NULL,
-        renewal_id INTEGER,
-        reason TEXT DEFAULT '',
-        terminated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )");
-    $pdo->exec("CREATE INDEX IF NOT EXISTS idx_terminations_student ON scholarship_terminations (student_id, scholarship_type)");
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        student_id VARCHAR(50) NOT NULL,
+        scholarship_type VARCHAR(255) NOT NULL,
+        renewal_id INT,
+        reason TEXT,
+        terminated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_terminations_student (student_id, scholarship_type)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
     // 7. Student Grades Table (per-subject grades, keyed by student + subject + semester)
     $pdo->exec("CREATE TABLE IF NOT EXISTS student_grades (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        student_id TEXT NOT NULL,
-        subject_code TEXT NOT NULL,
-        subject_name TEXT DEFAULT '',
-        semester TEXT NOT NULL DEFAULT '1st Semester',
-        school_year TEXT DEFAULT '',
-        grade REAL NOT NULL,
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        student_id VARCHAR(50) NOT NULL,
+        subject_code VARCHAR(100) NOT NULL,
+        subject_name VARCHAR(255) DEFAULT '',
+        semester VARCHAR(50) NOT NULL DEFAULT '1st Semester',
+        school_year VARCHAR(50) DEFAULT '',
+        grade DOUBLE NOT NULL,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )");
-
-    $pdo->exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_student_grades_unique
-        ON student_grades (student_id, subject_code, semester)");
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY idx_student_grades_unique (student_id, subject_code, semester)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
     // 8. Scholars Table
     $pdo->exec("CREATE TABLE IF NOT EXISTS scholars (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        student_id TEXT NOT NULL,
-        name TEXT NOT NULL,
-        department TEXT NOT NULL,
-        year_level INTEGER NOT NULL DEFAULT 1,
-        gwa REAL NOT NULL DEFAULT 1.50,
-        status TEXT NOT NULL DEFAULT 'Active',
-        school_year TEXT NOT NULL DEFAULT '2025-2026',
-        remarks TEXT DEFAULT '',
-        address TEXT DEFAULT '',
-        latitude REAL DEFAULT NULL,
-        longitude REAL DEFAULT NULL,
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        student_id VARCHAR(50) NOT NULL,
+        name VARCHAR(255) NOT NULL,
+        department VARCHAR(255) NOT NULL,
+        year_level INT NOT NULL DEFAULT 1,
+        gwa DOUBLE NOT NULL DEFAULT 1.50,
+        status VARCHAR(50) NOT NULL DEFAULT 'Active',
+        school_year VARCHAR(50) NOT NULL DEFAULT '2025-2026',
+        remarks TEXT,
+        address VARCHAR(500) DEFAULT '',
+        latitude DOUBLE DEFAULT NULL,
+        longitude DOUBLE DEFAULT NULL,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )");
-
-    $scholarsCols = $pdo->query("PRAGMA table_info(scholars)")->fetchAll(PDO::FETCH_ASSOC);
-    $scholarsColNames = array_column($scholarsCols, 'name');
-    if (!in_array('address', $scholarsColNames)) {
-        $pdo->exec("ALTER TABLE scholars ADD COLUMN address TEXT DEFAULT ''");
-    }
-    if (!in_array('latitude', $scholarsColNames)) {
-        $pdo->exec("ALTER TABLE scholars ADD COLUMN latitude REAL DEFAULT NULL");
-    }
-    if (!in_array('longitude', $scholarsColNames)) {
-        $pdo->exec("ALTER TABLE scholars ADD COLUMN longitude REAL DEFAULT NULL");
-    }
-    // The scholarship a scholar holds (set for those added automatically by the Merit scholarship).
-    if (!in_array('scholarship_type', $scholarsColNames)) {
-        $pdo->exec("ALTER TABLE scholars ADD COLUMN scholarship_type TEXT DEFAULT ''");
-    }
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        scholarship_type VARCHAR(255) DEFAULT ''
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
     // 9. Deleted Items / Trash Bin Table
     $pdo->exec("CREATE TABLE IF NOT EXISTS deleted_items (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        item_type TEXT NOT NULL,
-        item_id INTEGER NOT NULL,
-        title TEXT NOT NULL,
-        item_data TEXT NOT NULL,
-        deleted_by TEXT DEFAULT 'Registrar Staff',
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        item_type VARCHAR(50) NOT NULL,
+        item_id INT NOT NULL,
+        title VARCHAR(255) NOT NULL,
+        item_data LONGTEXT NOT NULL,
+        deleted_by VARCHAR(255) DEFAULT 'Registrar Staff',
         deleted_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )");
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
     // 10. Activity Logs / History Audit Trail Table
     $pdo->exec("CREATE TABLE IF NOT EXISTS activity_logs (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER DEFAULT 0,
-        user_name TEXT NOT NULL DEFAULT 'Registrar Staff',
-        action TEXT NOT NULL,
-        module TEXT NOT NULL,
-        description TEXT DEFAULT '',
-        record_id INTEGER DEFAULT NULL,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )");
-    $pdo->exec("CREATE INDEX IF NOT EXISTS idx_activity_logs_created_at ON activity_logs(created_at)");
-    $pdo->exec("CREATE INDEX IF NOT EXISTS idx_activity_logs_module ON activity_logs(module)");
-    $pdo->exec("CREATE INDEX IF NOT EXISTS idx_activity_logs_action ON activity_logs(action)");
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT DEFAULT 0,
+        user_name VARCHAR(255) NOT NULL DEFAULT 'Registrar Staff',
+        action VARCHAR(100) NOT NULL,
+        module VARCHAR(100) NOT NULL,
+        description TEXT,
+        record_id INT DEFAULT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_activity_logs_created_at (created_at),
+        INDEX idx_activity_logs_module (module),
+        INDEX idx_activity_logs_action (action)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
-        // 10a. Login Attempts / Brute-Force Protection
+    // 10a. Login Attempts / Brute-Force Protection
     $pdo->exec("CREATE TABLE IF NOT EXISTS login_attempts (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        identifier TEXT NOT NULL,
-        ip_address TEXT NOT NULL,
-        successful INTEGER NOT NULL DEFAULT 0,
-        attempted_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )");
-
-    $pdo->exec("
-        CREATE INDEX IF NOT EXISTS idx_login_attempts_lookup
-        ON login_attempts(identifier, ip_address, attempted_at)
-    ");
-
-    $pdo->exec("
-        CREATE INDEX IF NOT EXISTS idx_login_attempts_attempted_at
-        ON login_attempts(attempted_at)
-    ");
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        identifier VARCHAR(255) NOT NULL,
+        ip_address VARCHAR(100) NOT NULL,
+        successful INT NOT NULL DEFAULT 0,
+        attempted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_login_attempts_lookup (identifier, ip_address, attempted_at),
+        INDEX idx_login_attempts_attempted_at (attempted_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
     // 11. Settings — simple key/value feature toggles & system config
     $pdo->exec("CREATE TABLE IF NOT EXISTS settings (
-        setting_key TEXT PRIMARY KEY,
+        setting_key VARCHAR(100) PRIMARY KEY,
         setting_value TEXT
-    )");
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
     // History menu is accessible to everyone by default; can be turned off from Settings.
-    $pdo->exec("INSERT OR IGNORE INTO settings (setting_key, setting_value) VALUES ('history_enabled', '1')");
+    $pdo->exec("INSERT IGNORE INTO settings (setting_key, setting_value) VALUES ('history_enabled', '1')");
     // Active term: everything (Applicants, Records, Renewal & Retention) follows these.
-    $pdo->exec("INSERT OR IGNORE INTO settings (setting_key, setting_value) VALUES ('active_semester', '1st Semester')");
+    $pdo->exec("INSERT IGNORE INTO settings (setting_key, setting_value) VALUES ('active_semester', '1st Semester')");
     // New installs start on the academic year of today's date (June to May).
     $startYear = (int)date('n') >= 6 ? (int)date('Y') : (int)date('Y') - 1;
-    $pdo->exec("INSERT OR IGNORE INTO settings (setting_key, setting_value) VALUES ('active_school_year', '" . $startYear . '-' . ($startYear + 1) . "')");
+    $pdo->exec("INSERT IGNORE INTO settings (setting_key, setting_value) VALUES ('active_school_year', '" . $startYear . '-' . ($startYear + 1) . "')");
+
+    // Imported Files Table
+    $pdo->exec("CREATE TABLE IF NOT EXISTS imported_files (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        file_type VARCHAR(50) NOT NULL,
+        file_name VARCHAR(255) NOT NULL,
+        file_size INT DEFAULT 0,
+        records_count INT DEFAULT 0,
+        imported_by VARCHAR(255) DEFAULT 'Registrar Staff',
+        status VARCHAR(50) NOT NULL DEFAULT 'Active',
+        stored_path VARCHAR(500) DEFAULT NULL,
+        created_applicant_ids TEXT DEFAULT NULL,
+        created_grade_ids TEXT DEFAULT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
     // Seed Data if empty
     seedDataIfEmpty($pdo);
@@ -536,45 +411,6 @@ function seedDataIfEmpty(PDO $pdo): void {
         }
     }
 
-    // Imported Files Table
-    $pdo->exec("CREATE TABLE IF NOT EXISTS imported_files (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        file_type TEXT NOT NULL,
-        file_name TEXT NOT NULL,
-        file_size INTEGER DEFAULT 0,
-        records_count INTEGER DEFAULT 0,
-        imported_by TEXT DEFAULT 'Registrar Staff',
-        status TEXT NOT NULL DEFAULT 'Active',
-        stored_path TEXT DEFAULT NULL,
-        created_applicant_ids TEXT DEFAULT NULL,
-        created_grade_ids TEXT DEFAULT NULL,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )");
-
-    $impColumns = $pdo->query("PRAGMA table_info(imported_files)")->fetchAll(PDO::FETCH_ASSOC);
-    $impColumnNames = array_column($impColumns, 'name');
-
-    if (!in_array('stored_path', $impColumnNames, true)) {
-        $pdo->exec("
-            ALTER TABLE imported_files
-            ADD COLUMN stored_path TEXT DEFAULT NULL
-        ");
-    }
-
-    if (!in_array('created_applicant_ids', $impColumnNames, true)) {
-        $pdo->exec("
-            ALTER TABLE imported_files
-            ADD COLUMN created_applicant_ids TEXT DEFAULT NULL
-        ");
-    }
-
-    if (!in_array('created_grade_ids', $impColumnNames, true)) {
-        $pdo->exec("
-            ALTER TABLE imported_files
-            ADD COLUMN created_grade_ids TEXT DEFAULT NULL
-        ");
-    }
-
     // Check if imported_files is empty
     $stmtImp = $pdo->query("SELECT COUNT(*) FROM imported_files");
     if (!$demoSeeded && $stmtImp->fetchColumn() == 0) {
@@ -591,11 +427,11 @@ function seedDataIfEmpty(PDO $pdo): void {
     }
 
     if (!$demoSeeded) {
-        $pdo->exec("INSERT OR REPLACE INTO settings (setting_key, setting_value) VALUES ('demo_data_seeded', '1')");
+        $pdo->exec("REPLACE INTO settings (setting_key, setting_value) VALUES ('demo_data_seeded', '1')");
     }
 }
 
 if (basename(__FILE__) === basename($_SERVER['SCRIPT_FILENAME'] ?? '')) {
     initDatabase();
-    echo "SQLite Database initialized & seeded successfully!\n";
+    echo "MySQL Database initialized & seeded successfully!\n";
 }

@@ -2,7 +2,7 @@
 require_once __DIR__ . '/init.php';
 
 function restoreApplicantRow(PDO $pdo, array $data): void {
-    $stmtRestore = $pdo->prepare("INSERT OR REPLACE INTO applicants (
+    $stmtRestore = $pdo->prepare("REPLACE INTO applicants (
         id, student_id, first_name, last_name, email, phone, birthdate, address, latitude, longitude,
         school, program, year_level, gpa, scholarship_type, status, gwa, gwa_req, failing_grades,
         units, enrolled, docs_complete, remarks, essay, transcript_file, coe_file, good_moral_file,
@@ -68,7 +68,7 @@ try {
     if ($type === 'applicant') {
         restoreApplicantRow($pdo, $data);
     } else if ($type === 'scholar') {
-        $stmtRestore = $pdo->prepare("INSERT OR REPLACE INTO scholars (
+        $stmtRestore = $pdo->prepare("REPLACE INTO scholars (
             id, student_id, name, department, year_level, gwa, status, school_year, remarks, address, latitude, longitude, created_at, updated_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
@@ -89,7 +89,7 @@ try {
             date('Y-m-d H:i:s')
         ]);
     } else if ($type === 'scholarship') {
-        $stmtRestore = $pdo->prepare("INSERT OR REPLACE INTO scholarships (
+        $stmtRestore = $pdo->prepare("REPLACE INTO scholarships (
             id, name, code, description, type, gwa_requirement, slots, slots_available, unlimited_slots, coverage, status, created_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
@@ -108,7 +108,7 @@ try {
             $data['created_at'] ?? date('Y-m-d H:i:s')
         ]);
     } else if ($type === 'record') {
-        $stmtRestore = $pdo->prepare("INSERT OR REPLACE INTO records (
+        $stmtRestore = $pdo->prepare("REPLACE INTO records (
             id, applicant_id, student_id, name, scholarship_type, status, semester, sy, date_evaluated, remarks
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
@@ -125,7 +125,7 @@ try {
             $data['remarks'] ?? ''
         ]);
     } else if ($type === 'notification') {
-        $stmtRestore = $pdo->prepare("INSERT OR REPLACE INTO notifications (
+        $stmtRestore = $pdo->prepare("REPLACE INTO notifications (
             id, type, recipient_type, recipient_id, recipient_name, recipient_email, subject, message, deadline, status, sent_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
@@ -143,7 +143,7 @@ try {
             $data['sent_at'] ?? date('Y-m-d H:i:s')
         ]);
     } else if ($type === 'import') {
-        $stmtRestore = $pdo->prepare("INSERT OR REPLACE INTO imported_files (
+        $stmtRestore = $pdo->prepare("REPLACE INTO imported_files (
             id, file_type, file_name, file_size, records_count, imported_by, status, stored_path, created_applicant_ids, created_grade_ids, created_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
@@ -173,7 +173,7 @@ try {
         // Bring back any subject grades that were removed alongside this
         // import, then recompute GWA / failing count for whoever they belong to.
         if (!empty($data['created_grade_snapshots']) && is_array($data['created_grade_snapshots'])) {
-            $restoreGradeStmt = $pdo->prepare("INSERT OR REPLACE INTO student_grades (
+            $restoreGradeStmt = $pdo->prepare("REPLACE INTO student_grades (
                 id, student_id, subject_code, subject_name, semester, school_year, grade, created_at, updated_at
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
 

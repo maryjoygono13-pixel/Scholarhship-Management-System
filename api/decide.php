@@ -32,7 +32,7 @@ try {
 
     if ($app && in_array($decision, ['approved', 'rejected'])) {
         $stmtRec = $pdo->prepare("INSERT INTO records (applicant_id, student_id, name, scholarship_type, status, semester, sy, date_evaluated, remarks) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, DATE('now'), ?)");
+            VALUES (?, ?, ?, ?, ?, ?, ?, CURDATE(), ?)");
         $stmtRec->execute([
             $app['id'],
             $app['student_id'],

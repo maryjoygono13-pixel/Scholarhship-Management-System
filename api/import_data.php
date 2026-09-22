@@ -388,8 +388,7 @@
                     $gradeInsert = $pdo->prepare("
                         INSERT INTO student_grades (student_id, subject_code, subject_name, semester, school_year, grade, updated_at)
                         VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-                        ON CONFLICT(student_id, subject_code, semester)
-                        DO UPDATE SET subject_name = excluded.subject_name, school_year = excluded.school_year, grade = excluded.grade, updated_at = CURRENT_TIMESTAMP
+                        ON DUPLICATE KEY UPDATE subject_name = VALUES(subject_name), school_year = VALUES(school_year), grade = VALUES(grade), updated_at = CURRENT_TIMESTAMP
                     ");
 
                     foreach ($pairs as [$subjectCode, $gradeVal]) {
