@@ -6,7 +6,7 @@ const pillFilter = document.getElementById("pillFilter");
 const statSentToday = document.getElementById("statSentToday");
 const statMissingReq = document.getElementById("statMissingReq");
 const statRenewal = document.getElementById("statRenewal");
-const statFailed = document.getElementById("statFailed");
+const statFailedRetention = document.getElementById("statFailedRetention");
 
 const composeOverlay = document.getElementById("composeOverlay");
 const composeBtn = document.getElementById("composeBtn");
@@ -29,7 +29,6 @@ const notifMessage = document.getElementById("notifMessage") as HTMLTextAreaElem
 
 let activeType = "";
 let recipientMode = "segment";
-let allApplicants: any[] = [];
 const NOTIF_PAGE_SIZE = 10;
 let notifCurrentPage = 1;
 let notifCurrentData: any[] = [];
@@ -53,7 +52,7 @@ interface TemplateInfo {
 const TEMPLATES: Record<string, TemplateInfo> = {
   missing_requirements: {
     subject: "Action needed: missing scholarship requirements",
-    message: "Hi {{first_name}},\n\nYour scholarship application is missing one or more required documents. Please upload them before {{deadline}} to keep your application active.\n\nThank you!",
+    message: "Hi {{first_name}},\n\nWe noticed that your scholarship application is still missing some required documents. Please submit the remaining requirements by {{deadline}} so that your application can continue to be processed.\n\nThank you, and we look forward to receiving your documents.",
     showDeadline: true,
   },
   renewal_deadline: {
@@ -68,7 +67,7 @@ const TEMPLATES: Record<string, TemplateInfo> = {
   },
   approval_status: {
     subject: "Update on your scholarship application",
-    message: "Hi {{first_name}},\n\nWe have an update regarding your scholarship application. Please log in to your portal or contact our office for details.\n\nThank you!",
+    message: "Hi {{first_name}},\n\nWe have an update regarding your scholarship application. Please contact our office for details.\n\nThank you!",
     showDeadline: false,
   },
 };
@@ -107,7 +106,7 @@ async function refreshNotifications(): Promise<void> {
       if (statSentToday) statSentToday.textContent = String(summary.sent_today ?? summary.sentToday ?? 0);
       if (statMissingReq) statMissingReq.textContent = String(summary.missing_req ?? summary.missingRequirements ?? 0);
       if (statRenewal) statRenewal.textContent = String(summary.renewal ?? summary.renewalDeadline ?? 0);
-      if (statFailed) statFailed.textContent = String(summary.failed ?? 0);
+      if (statFailedRetention) statFailedRetention.textContent = String(summary.failedRetention ?? summary.failed_retention ?? 0);
     }
   } catch (err: any) {
     if (notifTableBody) notifTableBody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:32px; color:var(--slate-400);">Couldn't load notifications: ${err.message}</td></tr>`;
@@ -296,17 +295,7 @@ async function openComposeModal(): Promise<void> {
   if (segmentField) segmentField.style.display = "block";
   if (individualField) individualField.style.display = "none";
 
-  if (allApplicants.length === 0 && individualSelect) {
-    try {
-      allApplicants = await (window as any).apiListApplicants();
-      individualSelect.innerHTML = allApplicants
-        .map(a => `<option value="${a.id}">${a.firstName} ${a.lastName} (${a.studentId})</option>`)
-        .join("");
-    } catch (err) {
-      individualSelect.innerHTML = `<option value="">Couldn't load applicants</option>`;
-    }
-  }
-
+  await loadIndividualOptions();
   await refreshRecipientCount();
   if (composeOverlay) composeOverlay.classList.add("open");
 }
@@ -324,7 +313,31 @@ function applyTemplate(): void {
   if (deadlineField) deadlineField.style.display = tpl.showDeadline ? "block" : "none";
 }
 
-if (notifType) notifType.addEventListener("change", applyTemplate);
+/* Who shows up in the Individual dropdown depends on the notification type:
+   Missing requirements -> Applicants with a document missing; Renewal deadline /
+   Failed retention -> Renewal & Retention entries; Approval status -> Records. */
+async function loadIndividualOptions(): Promise<void> {
+  if (!individualSelect) return;
+  const type = notifType ? notifType.value : "";
+  individualSelect.innerHTML = `<option value="">Loading...</option>`;
+  try {
+    const res = await fetch(`api/get_recipients.php?mode=individual&type=${encodeURIComponent(type)}`);
+    const json = await res.json();
+    if (!json.success) throw new Error(json.message || "Failed to load recipients.");
+    const options = (json.data || []) as { id: number; kind: string; studentId: string; name: string }[];
+    individualSelect.innerHTML = options.length
+      ? options.map(o => `<option value="${o.kind}:${o.id}">${o.name}${o.studentId ? " (" + o.studentId + ")" : ""}</option>`).join("")
+      : `<option value="">No matching recipients</option>`;
+  } catch (err) {
+    individualSelect.innerHTML = `<option value="">Couldn't load recipients</option>`;
+  }
+  if (recipientMode === "individual") refreshRecipientCount();
+}
+
+if (notifType) notifType.addEventListener("change", () => {
+  applyTemplate();
+  loadIndividualOptions();
+});
 
 modeButtons.forEach(btn => {
   btn.addEventListener("click", () => {
@@ -384,10 +397,12 @@ if (sendBtn) {
       payload.segment = segmentSelect ? segmentSelect.value : "";
     } else {
       if (!individualSelect || !individualSelect.value) {
-        alert("No applicant selected.");
+        alert("No recipient selected.");
         return;
       }
-      payload.applicantId = individualSelect.value;
+      const [kind, id] = individualSelect.value.split(":");
+      payload.individualKind = kind;
+      payload.applicantId = id;
     }
 
     sendBtn.disabled = true;

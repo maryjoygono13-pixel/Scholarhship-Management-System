@@ -85,8 +85,8 @@ include __DIR__ . '/../includes/header.php';
         <div class="value accent" id="statRenewal">0</div>
       </div>
       <div class="stat-card">
-        <div class="label">Failed to deliver</div>
-        <div class="value danger" id="statFailed">0</div>
+        <div class="label">Failed retention</div>
+        <div class="value danger" id="statFailedRetention">0</div>
       </div>
     </div>
 

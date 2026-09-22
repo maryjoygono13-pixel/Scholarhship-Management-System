@@ -21,6 +21,10 @@ try {
     $mode = trim($_POST['recipientMode'] ?? $_POST['mode'] ?? 'segment');
     $segment = trim($_POST['segment'] ?? 'all');
     $individualId = trim($_POST['applicantId'] ?? $_POST['individual'] ?? '');
+    // Which table $individualId refers to (see includes/recipients.php): the Individual
+    // dropdown's options come from Applicants, Records, or Renewal & Retention depending
+    // on the notification type.
+    $individualKind = trim($_POST['individualKind'] ?? 'applicant');
     $deadline = trim($_POST['deadline'] ?? '');
     $subject = trim($_POST['subject'] ?? '');
     $message = trim($_POST['message'] ?? '');
@@ -46,7 +50,7 @@ try {
         ));
     }
 
-    $recipients = resolveRecipients($pdo, $mode === 'individual' ? 'individual' : 'segment', $segment, $individualId);
+    $recipients = resolveRecipients($pdo, $mode === 'individual' ? 'individual' : 'segment', $segment, $individualId, $individualKind);
     if (empty($recipients)) {
         sendError('There are no recipients for this selection.');
     }

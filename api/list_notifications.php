@@ -48,7 +48,10 @@ try {
     $todayCount = (int)$pdo->query("SELECT COUNT(*) FROM notifications WHERE DATE(sent_at) = UTC_DATE()")->fetchColumn();
     $missingCount = (int)$pdo->query("SELECT COUNT(*) FROM notifications WHERE type = 'missing_requirements'")->fetchColumn();
     $renewalCount = (int)$pdo->query("SELECT COUNT(*) FROM notifications WHERE type = 'renewal_deadline'")->fetchColumn();
-    $failedCount = (int)$pdo->query("SELECT COUNT(*) FROM notifications WHERE status = 'failed' OR type = 'failed_retention'")->fetchColumn();
+    // "Failed Retention" — scholars notified that their retention/GPA standing
+    // failed, not a delivery failure (a message that failed to send is its own
+    // thing, shown per-row in the Sent log with an error, not in this card).
+    $failedRetentionCount = (int)$pdo->query("SELECT COUNT(*) FROM notifications WHERE type = 'failed_retention'")->fetchColumn();
 
     sendJson([
         'success' => true,
@@ -57,7 +60,7 @@ try {
             'sent_today' => $todayCount,
             'missing_req' => $missingCount,
             'renewal' => $renewalCount,
-            'failed' => $failedCount
+            'failedRetention' => $failedRetentionCount
         ]
     ]);
 } catch (Exception $e) {
