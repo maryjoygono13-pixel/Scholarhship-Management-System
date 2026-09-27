@@ -9,6 +9,8 @@ try {
 
     // Students who meet the MERIT-BASED Academic requirement are scholars automatically.
     syncMeritScholars($pdo);
+    // Anyone approved in Records for any other scholarship belongs here too.
+    syncApprovedScholars($pdo);
 
     $department = trim($_GET['department'] ?? '');
     $yearLevel = (int)($_GET['year_level'] ?? $_GET['year'] ?? 0);

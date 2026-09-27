@@ -202,6 +202,28 @@ try {
                 recalculateApplicantGwa($pdo, (string)$sid);
             }
         }
+    } else if ($type === 'renewal') {
+        $stmtRestore = $pdo->prepare("REPLACE INTO renewal_retention (
+            id, student_id, name, gwa, failing_grades, enrolled, status, school_year, semester, scholarship_type, remarks, updated_at, origin, decided_semester, decided_school_year
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+
+        $stmtRestore->execute([
+            $data['id'] ?? null,
+            $data['student_id'] ?? '',
+            $data['name'] ?? '',
+            $data['gwa'] ?? 0,
+            $data['failing_grades'] ?? 0,
+            $data['enrolled'] ?? 1,
+            $data['status'] ?? 'pending',
+            $data['school_year'] ?? '2025-2026',
+            $data['semester'] ?? '1st Semester',
+            $data['scholarship_type'] ?? 'Academic Merit',
+            $data['remarks'] ?? '',
+            $data['updated_at'] ?? date('Y-m-d H:i:s'),
+            $data['origin'] ?? 'approved',
+            $data['decided_semester'] ?? null,
+            $data['decided_school_year'] ?? null,
+        ]);
     }
 
     // Delete item from Trash Bin

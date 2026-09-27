@@ -3,6 +3,16 @@ if (session_status() === PHP_SESSION_NONE) {
 
     $isHttps = !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off';
 
+    /*
+     * PHP's default session.gc_maxlifetime is only 1440 seconds (24 minutes). That's how
+     * long the session data file survives on the server, separate from the cookie itself —
+     * a registrar who leaves a form open longer than that (reading a long applicant record,
+     * filling in a scholarship program) gets silently logged out server-side while the
+     * browser still shows them as signed in, so saving then fails with "Unauthorized."
+     * Eight hours comfortably covers a full work session.
+     */
+    ini_set('session.gc_maxlifetime', '28800');
+
     session_set_cookie_params([
         'lifetime' => 0,
         'path' => '/',

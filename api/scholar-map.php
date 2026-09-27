@@ -60,6 +60,7 @@ try {
     ========================================================= */
     $deletedStudentIds = [];
     $deletedRecordIds = [];
+    $gradesRemovedStudentIds = []; // had grades from an Excel/CSV import that was later deleted
 
     $stmtDeleted = $pdo->query("
         SELECT item_type, item_id, item_data
@@ -83,12 +84,21 @@ try {
                 if ($deleted['item_type'] === 'record' && !empty($data['id'])) {
                     $deletedRecordIds[] = (int)$data['id'];
                 }
+                // A deleted grade-import file: the students it graded no longer have that data on file.
+                if ($deleted['item_type'] === 'import' && !empty($data['created_grade_snapshots'])) {
+                    foreach ($data['created_grade_snapshots'] as $snap) {
+                        if (!empty($snap['student_id'])) {
+                            $gradesRemovedStudentIds[] = trim((string)$snap['student_id']);
+                        }
+                    }
+                }
             }
         }
     }
 
     $deletedStudentIds = array_unique($deletedStudentIds);
     $deletedRecordIds = array_unique($deletedRecordIds);
+    $gradesRemovedStudentIds = array_unique($gradesRemovedStudentIds);
 
     // A student ID in the trash only hides the student while nobody with that ID is still live.
     // Otherwise an old trashed applicant/scholar (or one re-imported later) hides the new live student.
@@ -236,7 +246,7 @@ try {
                 $town = $split['municipality'];
                 if ($brgy === '') $brgy = $split['barangay'];
             }
-            $coords = $town !== '' ? locationCoordinates($town, $brgy) : null;
+            $coords = $town !== '' ? locationCoordinates($town, $brgy, $studentId) : null;
             if ($coords !== null) {
                 [$lat, $lng] = $coords;
             } else {
@@ -246,8 +256,15 @@ try {
             }
         }
 
-        $gwa = (float)($app['gwa'] ?? $app['gpa'] ?? $sch['gwa'] ?? 1.50);
+        $gwa = (float)($app['gwa'] ?? $app['gpa'] ?? $sch['gwa'] ?? 0);
         $yearLevel = (int)($app['year_level'] ?? $sch['year_level'] ?? 1);
+
+        // Only hide a scholar whose grades came from an Excel/CSV import that was later deleted —
+        // not scholars who simply haven't been graded yet (those still show, with "No grades yet").
+        // They still show up in Records either way, just not on this map.
+        if ($gwa <= 0 && $studentId !== '' && in_array($studentId, $gradesRemovedStudentIds, true)) {
+            continue;
+        }
 
         $list[] = [
             'id' => $recordId,

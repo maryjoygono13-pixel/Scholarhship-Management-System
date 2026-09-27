@@ -53,6 +53,9 @@ function normalizeEval(record) {
         units: Number(record.units ?? record.units_earned ?? 0),
         enrolled: Boolean(record.enrolled ?? record.is_enrolled ?? false),
         docsComplete: Boolean(record.docsComplete ?? record.documents_complete ?? false),
+        transcriptFile: String(record.transcriptFile ?? record.transcript_file ?? ""),
+        coeFile: String(record.coeFile ?? record.coe_file ?? ""),
+        goodMoralFile: String(record.goodMoralFile ?? record.good_moral_file ?? ""),
         status: String(record.status ?? "review"),
         remarks: String(record.remarks ?? ""),
         grades: record.grades && typeof record.grades === "object" ? record.grades : {},
@@ -90,15 +93,14 @@ function normalizeEval(record) {
         const pass = has && v <= req;
         return '<div class="summary-card"><div class="big font-mono" style="color:' + (has ? gwaColor(v, req) : "var(--ink-soft)") + '">' + fmtGwa(v) + '</div><div class="lbl">' + label + '</div><div class="sub" style="color:' + (!has ? "var(--ink-soft)" : pass ? "var(--green)" : "var(--red)") + '">' + (!has ? "NO GRADES YET" : pass ? "PASSED" : "FAILED") + "</div></div>";
     }
-    // Why this applicant can't be approved right now, or "" when they can. Mirrors the checks
-    // the Approve button and the server make, so the reason is visible before clicking.
+    // A heads-up shown next to Approve when the GWA on file doesn't meet the requirement — it no
+    // longer blocks the click. Missing grades (a new first-year applicant with no college semester
+    // GWA yet) isn't a warning at all; their eligibility follows their Grade 12 record instead.
     function approveBlockReason(a) {
         if (a.status === "non-compliant")
-            return "Non-compliant: " + a.semester + " GWA " + Number(a.gwa).toFixed(2) + " is above the required " + Number(a.gwaReq).toFixed(2) + " for " + a.type + ". This applicant can only be rejected.";
-        if (!(a.gwa > 0))
-            return "Can't approve yet: no grades are recorded for " + a.semester + ". Import the academic records in Data Management.";
-        if (a.gwa > a.gwaReq)
-            return "Can't approve: " + a.semester + " GWA " + Number(a.gwa).toFixed(2) + " is above the required " + Number(a.gwaReq).toFixed(2) + " for " + a.type + ".";
+            return "Note: " + a.semester + " GWA " + Number(a.gwa).toFixed(2) + " is above the required " + Number(a.gwaReq).toFixed(2) + " for " + a.type + ".";
+        if (a.gwa > 0 && a.gwa > a.gwaReq)
+            return "Note: " + a.semester + " GWA " + Number(a.gwa).toFixed(2) + " is above the required " + Number(a.gwaReq).toFixed(2) + " for " + a.type + ".";
         return "";
     }
     function approveBlockNote(a) {
@@ -155,7 +157,10 @@ function normalizeEval(record) {
     }
     function computeChecklist(a) {
         const hasGwa = a.gwa > 0;
-    const gwaPass = hasGwa && a.gwa <= a.gwaReq;
+        // No grades yet isn't a failure \u2014 a new first-year applicant has no college semester GWA
+        // to check (their eligibility is based on their Grade 12 record instead). Only an actual
+        // recorded GWA above the requirement counts against them.
+        const gwaPass = !hasGwa || a.gwa <= a.gwaReq;
         const failPass = Number(a.failingGrades) === 0;
         return [
             { label: "Currently Enrolled", value: a.enrolled ? "Enrolled" : "Not Enrolled", pass: a.enrolled },
@@ -328,6 +333,18 @@ function normalizeEval(record) {
             panel.innerHTML = "";
         renderTable();
     }
+    // Every subject currently listed on the applicant's curriculum (their own semester, plus
+    // the 1st semester's too once they're in 2nd Semester/Summer — same subjects the Grades
+    // tab breaks down) is worth 3 units, whether or not it has a grade recorded yet.
+    function computeCurriculumUnits(a) {
+        const bySem = window.getCurriculumSubjectsBySemester
+            ? window.getCurriculumSubjectsBySemester(cleanProgramName(a.program, a.yearLevel), a.major, a.yearLevel)
+            : { firstSem: [], secondSem: [] };
+        const semLower = String(a.semester || "").toLowerCase();
+        const isSecondSem = semLower.includes("2") || semLower.includes("second") || semLower.includes("summer");
+        const count = bySem.firstSem.length + (isSecondSem ? bySem.secondSem.length : 0);
+        return count * 3;
+    }
     function getTabBodyHtml(a) {
         const checklist = computeChecklist(a);
         const eligible = checklist.every((c) => c.pass);
@@ -336,7 +353,7 @@ function normalizeEval(record) {
                 semesterSummaryCard("1st Semester GWA", a.semesterGwa.first, a.gwaReq) +
         semesterSummaryCard("2nd Semester GWA", a.semesterGwa.second, a.gwaReq) +
                 '<div class="summary-card"><div class="big font-mono">' + a.failingGrades + '</div><div class="lbl">Failing Grades</div><div class="sub" style="color:var(--ink-soft)">' + (Number(a.failingGrades) === 0 ? "None" : "Review") + "</div></div>" +
-                '<div class="summary-card"><div class="big font-mono">' + a.units + '</div><div class="lbl">Units Earned</div><div class="sub" style="color:var(--ink-soft)">Units</div></div>' +
+                '<div class="summary-card"><div class="big font-mono">' + computeCurriculumUnits(a) + '</div><div class="lbl">Units Earned</div><div class="sub" style="color:var(--ink-soft)">Units</div></div>' +
                 "</div></div>" +
                 '<div class="section"><h3>Requirements Checklist</h3>' +
                 checklist
@@ -350,8 +367,8 @@ function normalizeEval(record) {
                     .join("") +
                 "</div>" +
                 '<div class="section"><h3>Evaluation Result</h3>' +
-                '<div class="result-big" style="color:' + (eligible ? "var(--green)" : "var(--red)") + '">' + (eligible ? "ELIGIBLE" : "NOT ELIGIBLE") + "</div>" +
-                '<div class="result-sub">' + (eligible ? "Applicant meets all requirements." : "Applicant does not meet all requirements.") + "</div>" +
+                '<div class="result-big" style="color:' + (eligible ? "var(--green)" : "var(--blue)") + '">' + (eligible ? "ELIGIBLE" : "PENDING") + "</div>" +
+                '<div class="result-sub">' + (eligible ? "Applicant meets all requirements." : "Still awaiting review — not all requirements are confirmed yet.") + "</div>" +
                 "</div>" +
                 '<div class="section"><h3>Remarks</h3>' +
                 '<textarea id="remarksInput" rows="3" placeholder="Enter remarks (optional)...">' + esc(a.remarks || "") + "</textarea>" +
@@ -385,30 +402,40 @@ function normalizeEval(record) {
                 '</div></div>');
         }
         if (activeTab === "enrollment") {
+            // Driven only by real evidence — the uploaded Certificate of Enrollment — not the
+            // generic `enrolled` flag, which defaults true regardless of whether anything was
+            // actually submitted or verified.
+            var isVerified = Boolean(a.coeFile);
             return ('<div class="section"><h3>Enrollment Verification</h3>' +
                 '<div class="view-detail-grid">' +
-                '<div class="detail-item"><span class="detail-label">Enrollment Status</span><span class="detail-value highlight">' + (a.enrolled ? "Validated & Official" : "Unconfirmed") + '</span></div>' +
-                '<div class="detail-item"><span class="detail-label">Academic Year</span><span class="detail-value font-mono">2025 - 2026</span></div>' +
+                '<div class="detail-item"><span class="detail-label">Enrollment Status</span><span class="detail-value highlight" style="color:' + (isVerified ? "var(--green)" : "var(--red)") + '">' + (isVerified ? "Enrolled & Official" : "Unconfirmed — no Certificate of Enrollment on file") + '</span></div>' +
                 '<div class="detail-item"><span class="detail-label">Semester</span><span class="detail-value">' + esc(a.semester || "1st Semester") + '</span></div>' +
-                '<div class="detail-item"><span class="detail-label">Registrar Verified</span><span class="detail-value">Office of the Registrar</span></div>' +
+                '<div class="detail-item"><span class="detail-label">Registrar Verified</span><span class="detail-value">' + (isVerified ? "Office of the Registrar (via uploaded COE)" : "Not yet verified") + '</span></div>' +
                 '<div class="detail-item full-width"><span class="detail-label">Degree Program</span><span class="detail-value">' + esc(formatDeptLine(a.program, a.major, a.yearLevel)) + '</span></div>' +
                 '</div></div>');
         }
         if (activeTab === "documents") {
+            const uploadsBase = (window.SITE_BASE || "") + "/uploads/";
+            const docRow = (label, filename) => {
+                if (!filename) {
+                    return '<div class="doc-row">' +
+                        '<div class="doc-row-info"><div class="doc-row-label">' + esc(label) + '</div><div class="doc-row-meta">Not submitted</div></div>' +
+                        '<span class="badge badge-rejected">Missing</span>' +
+                        '</div>';
+                }
+                const url = uploadsBase + encodeURIComponent(filename);
+                return '<div class="doc-row">' +
+                    '<a href="' + url + '" target="_blank" rel="noopener" class="doc-row-thumb"><img src="' + url + '" alt="' + esc(label) + '"></a>' +
+                    '<div class="doc-row-info"><div class="doc-row-label">' + esc(label) + '</div><div class="doc-row-meta">Uploaded · PNG</div></div>' +
+                    '<a href="' + url + '" target="_blank" rel="noopener" class="badge badge-approved">View Full Size</a>' +
+                    '</div>';
+            };
             return ('<div class="section"><h3>Submitted Verification Documents</h3>' +
+                '<p style="font-size:12.5px; color:#6b7280; margin-bottom:14px;">Uploaded by the applicant through the public Apply page. Review each image before approving or rejecting this application.</p>' +
                 '<div style="display:flex; flex-direction:column; gap:10px;">' +
-                '<div style="display:flex; align-items:center; justify-content:space-between; padding:12px 14px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px;">' +
-                '<div><div style="font-weight:600; font-size:13.5px; color:#1e293b;">Official Transcript of Records (TOR)</div><div style="font-size:12px; color:#64748b;">Uploaded · PDF (2.4 MB)</div></div>' +
-                '<span class="badge badge-approved">Verified</span>' +
-                '</div>' +
-                '<div style="display:flex; align-items:center; justify-content:space-between; padding:12px 14px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px;">' +
-                '<div><div style="font-weight:600; font-size:13.5px; color:#1e293b;">Certificate of Enrollment (COE)</div><div style="font-size:12px; color:#64748b;">Uploaded · PDF (1.1 MB)</div></div>' +
-                '<span class="badge badge-approved">Verified</span>' +
-                '</div>' +
-                '<div style="display:flex; align-items:center; justify-content:space-between; padding:12px 14px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px;">' +
-                '<div><div style="font-weight:600; font-size:13.5px; color:#1e293b;">Certificate of Good Moral Character</div><div style="font-size:12px; color:#64748b;">Uploaded · PDF (850 KB)</div></div>' +
-                '<span class="badge badge-approved">Verified</span>' +
-                '</div>' +
+                docRow("Official Transcript of Records (TOR)", a.transcriptFile) +
+                docRow("Certificate of Enrollment (COE)", a.coeFile) +
+                docRow("Certificate of Good Moral Character", a.goodMoralFile) +
                 '</div></div>');
         }
         return ('<div class="section"><h3>Scholarship Committee Assessment</h3>' +
@@ -430,7 +457,7 @@ function normalizeEval(record) {
             return;
         }
         overlay.classList.add("open");
-        const tabsHtml = ["overview", "grades", "enrollment", "evaluation"]
+        const tabsHtml = ["overview", "grades", "enrollment", "documents", "evaluation"]
             .map((t) => '<button class="tab ' + (activeTab === t ? "active" : "") + '" data-tab="' + t + '">' + t + "</button>")
             .join("");
         panel.innerHTML =
@@ -452,7 +479,7 @@ function normalizeEval(record) {
                 '<div class="custom-modal-footer">' +
                 approveBlockNote(a) +
                 '<button type="button" class="btn-danger" data-decide="rejected">Reject</button>' +
-                '<button type="button" class="btn-primary" data-decide="approved"' + (approveBlockReason(a) ? ' title="' + esc(approveBlockReason(a)) + '" style="opacity:0.55;"' : "") + '>Approve</button>' +
+                '<button type="button" class="btn-primary" data-decide="approved"' + (approveBlockReason(a) ? ' title="' + esc(approveBlockReason(a)) + '"' : "") + '>Approve</button>' +
                 "</div>";
         const closeBtn = panel.querySelector("#closePanelBtn");
         if (closeBtn)
@@ -479,18 +506,9 @@ function normalizeEval(record) {
 
         const remarksEl = panel.querySelector("#remarksInput");
 
-        if (decision === "approved" && a.status === "non-compliant") {
-            showToast(approveBlockReason(a), "error");
-            return;
-        }
-        if (decision === "approved" && a.gwa <= 0) {
-          showToast("Cannot approve: no grades are recorded for the current semester yet. Import the academic records in Data Management first.", "error");
-          return;
-        }
-        if (decision === "approved" && a.gwa > a.gwaReq) {
-            showToast("Cannot approve: GWA " + Number(a.gwa).toFixed(2) + " does not meet the required " + Number(a.gwaReq).toFixed(2) + " for " + a.type + ".", "error");
-            return;
-        }
+        // Approve is always clickable and always submits, whatever the GWA status shows
+        // (missing grades, non-compliant, below requirement). The GWA note next to the
+        // button stays as a heads-up for staff — it no longer blocks the decision.
 
         const previousStatus = a.status;
         const previousRemarks = a.remarks;

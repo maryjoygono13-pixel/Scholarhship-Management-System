@@ -1,0 +1,181 @@
+:root { --green-900: #134e2a; --green-800: #1b6336; --green-700: #238f54; }
+* { box-sizing: border-box; margin: 0; padding: 0; font-family: 'DM Sans', -apple-system, sans-serif; }
+body { background: #f4f7f5; min-height: 100vh; position: relative; overflow-x: hidden; }
+
+.ap-bg {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    background: url('../img/login-bg.webp') center center / cover no-repeat;
+}
+.ap-bg::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(160deg, rgba(19, 78, 42, 0.82) 0%, rgba(27, 99, 54, 0.78) 45%, rgba(15, 45, 26, 0.88) 100%);
+}
+
+/* ---------- Step 1: Student ID ---------- */
+.ap-viewport {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+}
+
+.ap-id-card {
+    background: rgba(255, 255, 255, 0.97);
+    backdrop-filter: blur(14px);
+    width: 100%;
+    max-width: 400px;
+    padding: 40px 34px;
+    border-radius: 18px;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    text-align: center;
+    animation: apRiseIn 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes apRiseIn {
+    from { opacity: 0; transform: translateY(24px) scale(0.98); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.ap-logo { margin-bottom: 14px; }
+.ap-logo img { width: 56px; height: 56px; object-fit: contain; }
+
+.ap-id-card h1 { font-size: 22px; font-weight: 700; color: var(--green-900); margin-bottom: 6px; }
+.ap-sub { font-size: 13px; color: #6b7280; margin-bottom: 22px; line-height: 1.5; }
+.ap-sub a { color: var(--green-700); font-weight: 600; text-decoration: none; }
+.ap-sub a:hover { text-decoration: underline; }
+
+.ap-field { margin-bottom: 16px; text-align: left; }
+.ap-field label { display: block; font-size: 12.5px; font-weight: 600; color: #374151; margin-bottom: 6px; }
+.ap-field input, .ap-field select {
+    width: 100%;
+    height: 44px;
+    padding: 0 14px;
+    border: 1px solid #d1d5db;
+    border-radius: 9px;
+    font-size: 14px;
+    outline: none;
+    font-family: inherit;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
+}
+.ap-field input:focus, .ap-field select:focus {
+    border-color: var(--green-700);
+    box-shadow: 0 0 0 3px rgba(35, 143, 84, 0.14);
+    transform: translateY(-1px);
+}
+
+.ap-btn-primary {
+    width: 100%;
+    height: 48px;
+    background: var(--green-900);
+    color: #fff;
+    font-size: 15px;
+    font-weight: 700;
+    border: none;
+    border-radius: 9px;
+    cursor: pointer;
+    transition: background 0.2s ease, transform 0.15s ease;
+}
+.ap-btn-primary:hover { background: var(--green-800); transform: translateY(-1px); }
+.ap-btn-primary:active { transform: translateY(0); }
+.ap-btn-primary:disabled { background: #9ca3af; cursor: not-allowed; transform: none; }
+
+.ap-back-link { display: inline-block; margin-top: 18px; font-size: 12.5px; color: #6b7280; text-decoration: none; }
+.ap-back-link:hover { color: var(--green-800); text-decoration: underline; }
+
+/* ---------- Step 2: Application form ---------- */
+.ap-viewport-wide { align-items: flex-start; padding: 40px 20px; }
+
+.ap-form-card {
+    background: rgba(255, 255, 255, 0.98);
+    width: 100%;
+    max-width: 780px;
+    margin: 0 auto;
+    padding: 32px 36px 40px;
+    border-radius: 18px;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.25);
+    animation: apRiseIn 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.ap-form-header { display: flex; align-items: center; gap: 14px; margin-bottom: 24px; padding-bottom: 20px; border-bottom: 1px solid #e5e7eb; }
+.ap-form-header .ap-logo { margin: 0; }
+.ap-form-header h1 { font-size: 20px; color: var(--green-900); margin-bottom: 2px; }
+.ap-form-header .ap-sub { margin-bottom: 0; }
+
+.ap-flash { padding: 12px 14px; border-radius: 8px; font-size: 13.5px; margin-bottom: 18px; }
+.ap-flash.error { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+
+.ap-success { text-align: center; padding: 40px 20px; animation: apRiseIn 0.4s ease both; }
+.ap-success-icon {
+    width: 64px; height: 64px; margin: 0 auto 16px; border-radius: 50%;
+    background: #d1fae5; color: #065f46; font-size: 30px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+}
+.ap-success h2 { font-size: 18px; color: var(--green-900); margin-bottom: 8px; line-height: 1.4; }
+.ap-success p { font-size: 13.5px; color: #6b7280; }
+
+.ap-section { margin-bottom: 26px; }
+.ap-section h3 { font-size: 14.5px; color: var(--green-900); margin-bottom: 4px; }
+.ap-note { font-size: 12.5px; color: #6b7280; margin-bottom: 14px; }
+
+.ap-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 18px; margin-top: 12px; }
+@media (max-width: 640px) { .ap-grid { grid-template-columns: 1fr; } }
+
+.ap-programs { display: flex; flex-direction: column; gap: 10px; }
+.ap-program-option {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    border: 1.5px solid #e5e7eb;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: border-color 0.15s ease, background 0.15s ease;
+}
+.ap-program-option:hover { border-color: var(--green-700); background: #f5faf6; }
+.ap-program-option input[type="radio"]:checked ~ .ap-program-info .ap-program-name { color: var(--green-900); }
+.ap-program-option:has(input:checked) { border-color: var(--green-700); background: #f0f9f2; }
+.ap-program-full { opacity: 0.55; cursor: not-allowed; }
+.ap-program-full:hover { border-color: #e5e7eb; background: none; }
+.ap-program-info { flex: 1; display: flex; flex-direction: column; }
+.ap-program-name { font-size: 13.5px; font-weight: 600; color: #1f2937; }
+.ap-program-meta { font-size: 11.5px; color: #9ca3af; margin-top: 1px; }
+.ap-program-badge { font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 999px; white-space: nowrap; }
+.ap-badge-open { background: #d1fae5; color: #065f46; }
+.ap-badge-full { background: #fee2e2; color: #991b1b; }
+.ap-empty { font-size: 13px; color: #9ca3af; font-style: italic; }
+
+.ap-btn-submit { margin-top: 6px; }
+
+/* ---------- Multi-step wizard ---------- */
+.ap-progress-wrap { margin-bottom: 24px; }
+.ap-step-counter { font-size: 12px; font-weight: 600; color: var(--green-800); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.03em; }
+.ap-progress-bar { width: 100%; height: 6px; background: #e5e7eb; border-radius: 999px; overflow: hidden; }
+.ap-progress-fill { height: 100%; width: 16.6667%; background: linear-gradient(90deg, var(--green-700), var(--green-900)); border-radius: 999px; transition: width 0.35s cubic-bezier(0.22, 1, 0.36, 1); }
+
+.ap-step { display: none; animation: apRiseIn 0.35s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.ap-step.active { display: block; }
+
+.ap-step-nav { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 8px; }
+.ap-step-nav .ap-btn-primary, .ap-step-nav .ap-btn-secondary { width: auto; min-width: 120px; padding: 0 24px; }
+
+.ap-btn-secondary {
+    height: 48px;
+    background: #fff;
+    color: var(--green-900);
+    font-size: 15px;
+    font-weight: 700;
+    border: 1.5px solid #d1d5db;
+    border-radius: 9px;
+    cursor: pointer;
+    transition: border-color 0.2s ease, background 0.2s ease, transform 0.15s ease;
+}
+.ap-btn-secondary:hover { border-color: var(--green-700); background: #f5faf6; transform: translateY(-1px); }
+.ap-btn-secondary:active { transform: translateY(0); }
+
+.ap-success-btn { display: inline-block; width: auto; min-width: 220px; margin-top: 8px; text-decoration: none; line-height: 48px; padding: 0 28px; }

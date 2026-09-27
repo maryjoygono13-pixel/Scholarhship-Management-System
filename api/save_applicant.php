@@ -308,7 +308,7 @@ function createSystemNotification(
         */
 
         // No position (rather than a made-up default) when the town isn't in the list.
-        [$latitude, $longitude] = locationCoordinates($municipality, $barangay) ?? [null, null];
+        [$latitude, $longitude] = locationCoordinates($municipality, $barangay, $studentId) ?? [null, null];
 
         /*
         * ============================================================

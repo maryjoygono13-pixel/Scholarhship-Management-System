@@ -82,7 +82,25 @@
 
 .table-header-toolbar .search-wrap input { width: 100%; }
 
-.table-header-toolbar select { padding: 0 32px 0 12px; }
+/* Every filter dropdown is the same fixed width, so the row stays evenly lined up
+   instead of each box stretching to fit whichever option happens to be selected
+   (a long scholarship type name, for instance, used to blow its own box out wide). */
+.table-header-toolbar .select-wrap {
+  flex: 0 0 168px;
+  width: 168px;
+}
+
+.table-header-toolbar select {
+  width: 100%;
+  padding: 0 32px 0 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+  .table-header-toolbar .select-wrap { flex: 1 1 140px; width: auto; }
+}
 
 /* ---------------- Table ---------------- */
 .table-card {

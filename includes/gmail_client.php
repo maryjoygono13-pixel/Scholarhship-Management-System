@@ -338,6 +338,14 @@ function gmailAccessToken(PDO $pdo, array $conn, bool $force = false): string {
         return $json['access_token'];
     }
 
+    // The OAuth client itself (not just this token) was disabled in Google Cloud — reconnecting
+    // will not help until the client is fixed there, so say so plainly instead of "try again".
+    if (($json['error'] ?? '') === 'disabled_client') {
+        $why = 'Google disabled this app\'s OAuth client ("' . mb_substr((string)($json['error_description'] ?? ''), 0, 150) . '"). Fix it in Google Cloud Console (APIs & Services > Credentials) — re-enable the client or create a new one and update config/gmail.local.php — then reconnect Gmail.';
+        gmailMarkNeedsReauth($pdo, (int)$conn['id'], $why);
+        throw new GmailException('config', $why);
+    }
+
     // Revoked / expired refresh token: the account must be re-authorized.
     if (in_array($json['error'] ?? '', ['invalid_grant', 'invalid_client', 'unauthorized_client'], true)) {
         gmailMarkNeedsReauth($pdo, (int)$conn['id'], 'Google reports the authorization was revoked or expired.');

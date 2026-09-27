@@ -155,3 +155,86 @@ function syncMeritScholars(PDO $pdo): int {
     }
     return $added;
 }
+
+/*
+ * Every OTHER scholarship (unlike MERIT-BASED Academic above) is granted by an approved
+ * application — so once a Record is approved, that student belongs on the Scholars list too,
+ * regardless of their GWA at that moment. GWA maintenance (Active vs Removed) is judged
+ * afterwards by list_scholars.php from their imported grades, same as any other scholar.
+ */
+function syncApprovedScholars(PDO $pdo): int {
+    $records = $pdo->query("SELECT * FROM records WHERE LOWER(TRIM(status)) = 'approved' ORDER BY id")->fetchAll(PDO::FETCH_ASSOC);
+    if (empty($records)) return 0;
+
+    $existing = [];
+    foreach ($pdo->query("SELECT student_id FROM scholars")->fetchAll(PDO::FETCH_COLUMN) as $sid) {
+        $existing[trim((string)$sid)] = true;
+    }
+    // Deleted on purpose (Trash Bin): leave them out until they are restored.
+    $deleted = [];
+    foreach ($pdo->query("SELECT item_data FROM deleted_items WHERE item_type = 'scholar'")->fetchAll(PDO::FETCH_COLUMN) as $json) {
+        $d = json_decode((string)$json, true);
+        if (!empty($d['student_id'])) $deleted[trim((string)$d['student_id'])] = true;
+    }
+
+    $findApplicantById = $pdo->prepare("SELECT * FROM applicants WHERE id = ?");
+    $findApplicantByStudent = $pdo->prepare("SELECT * FROM applicants WHERE student_id = ? ORDER BY id DESC LIMIT 1");
+
+    $gradeStats = getSemesterGradeStats($pdo, array_column($records, 'student_id'));
+    $semesterOrder = ['Summer Term', '2nd Semester', '1st Semester'];   // newest graded semester first
+
+    $insert = $pdo->prepare("
+        INSERT INTO scholars (student_id, name, department, year_level, gwa, status, school_year, remarks, address, latitude, longitude, scholarship_type)
+        VALUES (?, ?, ?, ?, ?, 'Active', ?, ?, ?, ?, ?, ?)
+    ");
+
+    $added = 0;
+    $done = [];
+    foreach ($records as $rec) {
+        $sid = trim((string)$rec['student_id']);
+        if ($sid === '' || isset($existing[$sid]) || isset($deleted[$sid]) || isset($done[$sid])) continue;
+
+        $app = null;
+        if ((int)($rec['applicant_id'] ?? 0) > 0) {
+            $findApplicantById->execute([(int)$rec['applicant_id']]);
+            $app = $findApplicantById->fetch(PDO::FETCH_ASSOC) ?: null;
+        }
+        if (!$app) {
+            $findApplicantByStudent->execute([$sid]);
+            $app = $findApplicantByStudent->fetch(PDO::FETCH_ASSOC) ?: null;
+        }
+
+        $gwa = null;
+        foreach ($semesterOrder as $sem) {
+            if (isset($gradeStats[$sid][$sem])) { $gwa = $gradeStats[$sid][$sem]['gwa']; break; }
+        }
+        if ($gwa === null && $app && (float)$app['gwa'] > 0) $gwa = (float)$app['gwa'];
+        $gwa = $gwa ?? 0.0;
+
+        $name = $app ? buildFullName($app['first_name'], $app['middle_name'] ?? '', $app['last_name']) : trim((string)$rec['name']);
+        $department = $app ? departmentForProgram((string)$app['program']) : '';
+        $year = ($app && preg_match('/(\d)/', (string)$app['year_level'], $m)) ? max(1, min(4, (int)$m[1])) : 1;
+        $sy = trim((string)$rec['sy']) !== '' ? trim($rec['sy']) : getActiveSchoolYear($pdo);
+
+        $insert->execute([
+            $sid,
+            $name,
+            $department,
+            $year,
+            $gwa,
+            $sy,
+            'Added automatically: approved for ' . $rec['scholarship_type'] . ' in Records.',
+            $app ? (string)($app['address'] ?? '') : '',
+            $app['latitude'] ?? null,
+            $app['longitude'] ?? null,
+            (string)$rec['scholarship_type'],
+        ]);
+        $done[$sid] = true;
+        $added++;
+    }
+
+    if ($added > 0) {
+        logActivity($pdo, 'Scholar Added', 'Scholars', $added . ' student(s) were added automatically to Scholars: their application was approved in Records.');
+    }
+    return $added;
+}

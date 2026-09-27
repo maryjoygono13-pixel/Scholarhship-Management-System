@@ -103,24 +103,34 @@ function findBarangay(string $town, string $barangay): ?array {
 }
 
 /**
- * Map position for a town + barangay: the barangay's own position when it is known, otherwise the
- * town centre with a tiny nudge (100-450 m) so students of the same town don't sit exactly on top of each other.
+ * Map position for a town + barangay: centred on the barangay's own position when it is known,
+ * otherwise the town centre — then, either way, nudged a short distance (about 40-160 m, well
+ * inside a barangay's own territory) so two students of the same barangay get their own spot on
+ * the map instead of stacking on one pin. The nudge is seeded by $studentId (falling back to the
+ * barangay name) so it's deterministic: the same student always lands on the same spot, and
+ * different students spread out around their shared barangay's centre.
  */
-function locationCoordinates(string $municipality, string $barangay = ''): ?array {
+function locationCoordinates(string $municipality, string $barangay = '', string $studentId = ''): ?array {
     $town = resolveMunicipality($municipality);
     if ($town === null) return null;
     [$lat, $lon] = MUNICIPALITIES[$town];
 
     $known = findBarangay($town, $barangay);
     if ($known !== null && $known[1] !== null) {
-        return [round($known[1][0], 6), round($known[1][1], 6)];
+        [$lat, $lon] = $known[1];
     }
 
     $b = strtolower(trim(preg_replace('/\s+/', ' ', $barangay)));
-    if ($b !== '') {
-        $h = crc32($known !== null ? strtolower($known[0]) : $b);
+    $seed = trim($studentId) !== '' ? trim($studentId) : ($known !== null ? strtolower($known[0]) : $b);
+    if ($seed !== '') {
+        $h = crc32(($known !== null ? strtolower($known[0]) : $b) . '|' . $seed);
         $angle = (($h & 0xFFFF) / 65535) * 2 * M_PI;
-        $radius = 0.001 + ((($h >> 16) & 0xFFFF) / 65535) * 0.003;
+        // A known barangay position is already specific, so its own students only need a small
+        // spread to stop overlapping; an unresolved barangay keeps the wider spread it had before
+        // (it's really just nudging away from the town centre, not from a real barangay point).
+        $radius = $known !== null
+            ? 0.0004 + ((($h >> 16) & 0xFFFF) / 65535) * 0.001
+            : 0.001 + ((($h >> 16) & 0xFFFF) / 65535) * 0.003;
         $lat += sin($angle) * $radius;
         $lon += cos($angle) * $radius;
     }

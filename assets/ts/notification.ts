@@ -734,7 +734,7 @@ function renderGmailBar(): void {
   show(gmailConnectBtn, s.configured && !s.connected);
   if (gmailConnectBtn) gmailConnectBtn.textContent = s.needsReauth ? "Reconnect Gmail" : "Connect Gmail";
 
-  if (s.connected && s.lastError) showGmailFlash(s.lastError, "error");
+  if ((s.connected || s.needsReauth) && s.lastError) showGmailFlash(s.lastError, "error");
 }
 
 async function loadGmailStatus(): Promise<void> {

@@ -6,6 +6,9 @@ require_once __DIR__ . '/../includes/activity_logger.php';
 if (!empty($_SESSION['user_logged_in'])) {
     $identifier = trim((string)($_SESSION['user_identifier'] ?? '')) ?: 'Registrar Staff';
     logActivity(getDB(), 'User Logout', 'Authentication', $identifier . ' logged out.');
+} elseif (!empty($_SESSION['student_logged_in'])) {
+    $studentName = trim((string)($_SESSION['student_name'] ?? '')) ?: (string)($_SESSION['student_id'] ?? 'Student');
+    logActivity(getDB(), 'Student Logout', 'Student Portal', $studentName . ' signed out of the Student Portal.');
 }
 
 $_SESSION = array();

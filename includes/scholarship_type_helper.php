@@ -46,3 +46,27 @@ function normalizeScholarshipType(PDO $pdo, string $raw): string {
     }
     return $known[strtolower($v)] ?? $v;
 }
+
+/*
+ * How many applicants currently hold a slot in this scholarship — counted live from the
+ * `applicants` table (matched the same way student_apply.php stores it: the program's
+ * subtype, or its name when it has none, normalized to the same acronym/type key). This is
+ * the source of truth for slot capacity, not a running decrement counter: a counter drifts
+ * out of sync the moment an applicant is deleted/rejected without an equal-and-opposite
+ * increment somewhere, which is exactly what produced stale "0 slots available" programs
+ * that had zero real applicants.
+ */
+function scholarshipTakenCount(PDO $pdo, string $subtype, string $name): int {
+    $type = normalizeScholarshipType($pdo, $subtype !== '' ? $subtype : $name);
+    if ($type === '') return 0;
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM applicants WHERE LOWER(TRIM(scholarship_type)) = LOWER(TRIM(?))");
+    $stmt->execute([$type]);
+    return (int)$stmt->fetchColumn();
+}
+
+// The live slots_available for one `scholarships` row (0 for unlimited — meaningless there).
+function scholarshipSlotsAvailable(PDO $pdo, array $scholarship): int {
+    if (!empty($scholarship['unlimited_slots'])) return 0;
+    $taken = scholarshipTakenCount($pdo, (string)($scholarship['subtype'] ?? ''), (string)($scholarship['name'] ?? ''));
+    return max(0, (int)$scholarship['slots'] - $taken);
+}

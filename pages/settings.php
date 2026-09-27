@@ -22,7 +22,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 (string)($_POST['academic_year'] ?? getActiveSchoolYear($pdo))
             );
             $success = $term['changed']
-                ? 'Active term is now ' . $term['semester'] . ', ' . $term['schoolYear'] . '. ' . $term['moved'] . ' scholar(s) were sent to Renewal & Retention and back to Evaluation.' . (($term['skipped'] ?? 0) > 0 ? ' ' . $term['skipped'] . ' scholar(s) already had a record for this semester and were left as they are.' : '')
+                ? 'Active term is now ' . $term['semester'] . ', ' . $term['schoolYear'] . '. ' . $term['moved'] . ' scholar(s) were sent to Renewal & Retention for reassessment.' . (($term['skipped'] ?? 0) > 0 ? ' ' . $term['skipped'] . ' scholar(s) already had a record for this semester and were left as they are.' : '')
                 : 'Portal configuration saved.';
         } catch (Throwable $e) {
             $errors[] = 'Could not change the active term: ' . $e->getMessage();
@@ -221,7 +221,7 @@ for ($y = $startYear - 2; $y <= $startYear + 3; $y++) {
                             <option value="<?= htmlspecialchars($sem) ?>" <?= $sem === $activeSemester ? 'selected' : '' ?>><?= htmlspecialchars($sem) ?></option>
                         <?php endforeach; ?>
                     </select>
-                    <p class="settings-subtitle" style="margin-top:6px;">Applicants, Records and Renewal &amp; Retention follow this term. Moving to the next term sends approved scholars to Renewal &amp; Retention and back to Evaluation, unless they already have a record for the semester you switch to (then they are left as they are). Going from Summer Term to 1st Semester starts the next academic year.</p>
+                    <p class="settings-subtitle" style="margin-top:6px;">Applicants, Records and Renewal &amp; Retention follow this term. Moving to the next term sends approved scholars to Renewal &amp; Retention for reassessment (they never go back through Evaluation once they have a Record), unless they already have a record for the semester you switch to (then they are left as they are). Going from Summer Term to 1st Semester starts the next academic year.</p>
                 </div>
 
                 <div class="form-group">

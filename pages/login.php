@@ -13,39 +13,27 @@ $error = '';
 
 /*
  * First run: a brand-new database has no accounts (the `users` table is empty), so nobody could
- * ever sign in. While that is the case, only the Create Account form is offered (there is nothing
- * to sign in to yet). Once an account exists, the page offers both forms behind a Sign In /
- * Create Account switch, so anyone can still open a new Registrar account later.
+ * ever sign in. While that is the case, only the account-setup form is offered (there is nothing
+ * to sign in to yet). Once an account exists, creating another Registrar account is done from the
+ * command line (database/create_user.php), not from this public page.
  */
 $needsSetup = ((int)getDB()->query("SELECT COUNT(*) FROM users")->fetchColumn() === 0);
 $setupName = '';
 $setupEmail = '';
 
-// Which tab is showing: stays on Create Account after a failed signup, Sign In after a failed login.
-$activeTab = $needsSetup ? 'create' : 'signin';
+if ($needsSetup && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['setup_account'])) {
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['setup_account'])) {
-
-    $activeTab = 'create';
     $setupName = trim($_POST['setup_name'] ?? '');
     $setupEmail = trim($_POST['setup_email'] ?? '');
     $setupPassword = $_POST['setup_password'] ?? '';
     $setupConfirm = $_POST['setup_confirm'] ?? '';
 
     $pdo = getDB();
-    $emailTaken = false;
-    if ($setupEmail !== '') {
-        $checkStmt = $pdo->prepare("SELECT COUNT(*) FROM users WHERE LOWER(email) = LOWER(?)");
-        $checkStmt->execute([$setupEmail]);
-        $emailTaken = (int)$checkStmt->fetchColumn() > 0;
-    }
 
     if ($setupName === '') {
         $error = 'Please enter your name.';
     } elseif (!filter_var($setupEmail, FILTER_VALIDATE_EMAIL)) {
         $error = 'Please enter a valid email address.';
-    } elseif ($emailTaken) {
-        $error = 'An account with that email already exists. Please sign in instead.';
     } elseif (strlen($setupPassword) < 8) {
         $error = 'The password must be at least 8 characters long.';
     } elseif ($setupPassword !== $setupConfirm) {
@@ -55,7 +43,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['setup_account'])) {
             ->execute([$setupName, $setupEmail, password_hash($setupPassword, PASSWORD_DEFAULT)]);
         $newId = (int)$pdo->lastInsertId();
 
-        // Sign in straight away (config.php closes the session, so reopen it to write).
         session_start();
         session_regenerate_id(true);
         $_SESSION['user_logged_in'] = true;
@@ -64,77 +51,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['setup_account'])) {
         $_SESSION['user_identifier'] = $setupEmail;
         $_SESSION['user_role'] = 'registrar';
 
-        $logMessage = $needsSetup
-            ? $setupName . ' created the first Registrar account.'
-            : $setupName . ' created a new Registrar account.';
-        logActivity($pdo, 'Account Created', 'Authentication', $logMessage, $newId);
+        logActivity($pdo, 'Account Created', 'Authentication', $setupName . ' created the first Registrar account.', $newId);
 
         header("Location: " . SITE_URL . "/dashboard");
         exit();
     }
 }
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['setup_account'])) {
-
-    $activeTab = 'signin';
+if (!$needsSetup && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['identifier'])) {
 
     $identifier = trim($_POST['identifier'] ?? '');
     $password = $_POST['password'] ?? '';
 
     if ($identifier === '' || $password === '') {
-
         $error = 'Please fill in all required fields.';
-
     } else {
-
-        // Find the Registrar account by email.
-        $stmt = getDB()->prepare("
-            SELECT id, name, email, password_hash, role
-            FROM users
-            WHERE LOWER(email) = LOWER(?)
-            LIMIT 1
-        ");
-
+        $stmt = getDB()->prepare("SELECT id, name, email, password_hash, role FROM users WHERE LOWER(email) = LOWER(?) LIMIT 1");
         $stmt->execute([$identifier]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-        // Verify the password and make sure the account is a Registrar.
-        if (
-            $user &&
-            password_verify($password, $user['password_hash']) &&
-            strtolower($user['role']) === 'registrar'
-        ) {
+        if ($user && password_verify($password, $user['password_hash']) && strtolower($user['role']) === 'registrar') {
 
-            /*
-             * Reacquire the session for writing.
-             * config.php closes the session immediately after
-             * reading it to avoid blocking other requests.
-             */
             session_start();
-
-            // Prevent session fixation after successful login.
             session_regenerate_id(true);
-
             $_SESSION['user_logged_in'] = true;
             $_SESSION['user_id'] = $user['id'];
             $_SESSION['user_name'] = $user['name'];
             $_SESSION['user_identifier'] = $user['email'];
             $_SESSION['user_role'] = $user['role'];
 
-            logActivity(
-                getDB(),
-                'User Login',
-                'Authentication',
-                $user['name'] . ' logged in.'
-            );
+            logActivity(getDB(), 'User Login', 'Authentication', $user['name'] . ' logged in.');
 
             header("Location: " . SITE_URL . "/dashboard");
             exit();
-
         } else {
-
-            // Keep the error generic so we don't reveal
-            // whether an email/account exists.
+            // Keep the error generic so we don't reveal whether an email/account exists.
             $error = 'Invalid email or password.';
         }
     }
@@ -196,18 +147,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['setup_account'])) {
         left: 0;
         width: 100%;
         height: 100%;
-        background-image:
-            linear-gradient(
-                rgba(19, 78, 42, 0.45),
-                rgba(15, 45, 26, 0.60)
-            ),
-            url("<?= SITE_BASE ?>/assets/img/cm2.jpg");
-        background-size: cover;
-        background-position: center;
-        background-repeat: no-repeat;
-        filter: blur(8px);
-        transform: scale(1.05);
+        background: url('<?= SITE_BASE ?>/assets/img/login-bg.webp') center center / cover no-repeat;
         z-index: 0;
+    }
+
+    .bg-overlay::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(160deg, rgba(19, 78, 42, 0.82) 0%, rgba(27, 99, 54, 0.78) 45%, rgba(15, 45, 26, 0.88) 100%);
     }
 
     .viewport-wrapper {
@@ -224,6 +172,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['setup_account'])) {
     }
 
     .login-card {
+        position: relative;
         background: rgba(255, 255, 255, 0.95);
         backdrop-filter: blur(12px);
         width: 100%;
@@ -233,6 +182,189 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['setup_account'])) {
         box-shadow: 0 16px 40px rgba(0, 0, 0, 0.25);
         border: 1px solid rgba(255, 255, 255, 0.5);
         text-align: center;
+        animation: cardRiseIn 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+
+    @keyframes cardRiseIn {
+        from { opacity: 0; transform: translateY(24px) scale(0.98); }
+        to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    /* ---------- Split sliding panel (regular sign-in view) ---------- */
+    .auth-shell {
+        position: relative;
+        width: 100%;
+        max-width: 760px;
+        height: 500px;
+        border-radius: 20px;
+        overflow: hidden;
+        box-shadow: 0 24px 60px rgba(0, 0, 0, 0.3);
+        animation: cardRiseIn 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+        transform: scale(1);
+        transition: transform 0.85s cubic-bezier(0.19, 1, 0.22, 1), box-shadow 0.85s cubic-bezier(0.19, 1, 0.22, 1);
+    }
+
+    /* A very slight "settle" dip while the panels glide — barely perceptible on its own, but
+       it's what makes the motion read as smooth momentum instead of a flat linear slide. */
+    .auth-shell.is-sliding {
+        transform: scale(0.99);
+        box-shadow: 0 16px 40px rgba(0, 0, 0, 0.32);
+    }
+
+    .auth-track {
+        display: flex;
+        width: 200%;
+        height: 100%;
+        transition: transform 0.85s cubic-bezier(0.19, 1, 0.22, 1);
+    }
+
+    .auth-shell.show-apply .auth-track {
+        transform: translateX(-50%);
+    }
+
+    .auth-slide {
+        display: flex;
+        width: 50%;
+        height: 100%;
+        flex-shrink: 0;
+    }
+
+    .auth-half {
+        width: 50%;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        padding: 44px 40px;
+        flex-shrink: 0;
+    }
+
+    .auth-half.is-white {
+        background: rgba(255, 255, 255, 0.98);
+        text-align: left;
+    }
+
+    .auth-half.is-accent {
+        background: linear-gradient(160deg, var(--green-900) 0%, var(--green-800) 50%, #0f2d1a 100%);
+        color: #fff;
+        text-align: center;
+        align-items: center;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .auth-half.is-accent::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background-image:
+            radial-gradient(circle at 20% 20%, rgba(255,255,255,0.10) 0, transparent 45%),
+            radial-gradient(circle at 85% 80%, rgba(255,255,255,0.08) 0, transparent 40%);
+    }
+
+    .auth-half.is-accent > * {
+        position: relative;
+        z-index: 1;
+    }
+
+    .auth-half .logo-wrap {
+        margin-bottom: 14px;
+    }
+
+    .auth-half.is-white .logo-wrap {
+        text-align: left;
+    }
+
+    .auth-half h1 {
+        font-size: 22px;
+        font-weight: 700;
+        margin-bottom: 4px;
+    }
+
+    .auth-half.is-white h1 {
+        color: var(--green-900);
+    }
+
+    .auth-half.is-accent h1 {
+        font-size: 24px;
+    }
+
+    .auth-half p.sub {
+        font-size: 13px;
+        margin-bottom: 20px;
+    }
+
+    .auth-half.is-white p.sub {
+        color: #6b7280;
+    }
+
+    .auth-half.is-accent p.sub {
+        color: rgba(255, 255, 255, 0.85);
+        font-size: 13.5px;
+        line-height: 1.6;
+        margin-bottom: 26px;
+        max-width: 260px;
+    }
+
+    .auth-outline-btn {
+        display: inline-block;
+        min-width: 200px;
+        height: 46px;
+        line-height: 44px;
+        padding: 0 24px;
+        background: transparent;
+        color: #fff;
+        font-size: 13.5px;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        border: 1.5px solid rgba(255, 255, 255, 0.85);
+        border-radius: 999px;
+        cursor: pointer;
+        text-decoration: none;
+        transition: background 0.2s ease, transform 0.15s ease;
+        font-family: inherit;
+    }
+
+    .auth-outline-btn:hover {
+        background: rgba(255, 255, 255, 0.15);
+        transform: translateY(-1px);
+    }
+
+    @media (max-width: 720px) {
+        .auth-shell {
+            height: auto;
+            max-width: 420px;
+            transition: none;
+        }
+        .auth-shell.is-sliding {
+            transform: none;
+            box-shadow: 0 24px 60px rgba(0, 0, 0, 0.3);
+        }
+        .auth-track {
+            width: 100%;
+            transition: none;
+        }
+        .auth-shell.show-apply .auth-track {
+            transform: none;
+        }
+        .auth-slide {
+            width: 100%;
+            flex-direction: column;
+        }
+        .auth-slide.slide-apply {
+            display: none;
+        }
+        .auth-shell.show-apply .auth-slide.slide-signin {
+            display: none;
+        }
+        .auth-shell.show-apply .auth-slide.slide-apply {
+            display: flex;
+        }
+        .auth-half {
+            width: 100%;
+            padding: 32px 28px;
+        }
     }
 
     .logo-wrap {
@@ -252,7 +384,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['setup_account'])) {
         margin-bottom: 4px;
     }
 
-    .login-card p {
+    .login-card p.sub {
         font-size: 13px;
         color: #6b7280;
         margin-bottom: 20px;
@@ -293,12 +425,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['setup_account'])) {
         border-radius: 8px;
         font-size: 14px;
         outline: none;
-        transition: border-color 0.2s ease;
+        transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.1s ease;
     }
 
     .form-input:focus {
         border-color: var(--green-700);
         box-shadow: 0 0 0 3px rgba(35, 143, 84, 0.12);
+        transform: translateY(-1px);
     }
 
     .eye-toggle {
@@ -324,48 +457,71 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['setup_account'])) {
         border: none;
         border-radius: 8px;
         cursor: pointer;
-        transition: background 0.2s ease;
+        transition: background 0.2s ease, transform 0.15s ease;
         margin-top: 8px;
     }
 
     .btn-submit:hover {
         background: var(--green-800);
+        transform: translateY(-1px);
     }
 
-    .auth-tabs {
-        display: flex;
-        background: #eef2ef;
-        border-radius: 10px;
-        padding: 4px;
-        margin-bottom: 20px;
+    .btn-submit:active {
+        transform: translateY(0);
     }
 
-    .auth-tab {
-        flex: 1;
-        border: none;
-        background: transparent;
-        padding: 10px 0;
-        font-size: 13.5px;
-        font-weight: 600;
-        color: #6b7280;
-        border-radius: 7px;
-        cursor: pointer;
-        transition: background 0.2s ease, color 0.2s ease;
-        font-family: inherit;
-    }
-
-    .auth-tab.active {
-        background: #ffffff;
-        color: var(--green-900);
-        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
-    }
-
-    .auth-panel {
-        display: none;
-    }
-
-    .auth-panel.active {
+    .forgot-link {
         display: block;
+        text-align: center;
+        margin-top: 14px;
+        font-size: 13px;
+        color: var(--green-800);
+        text-decoration: none;
+        font-weight: 600;
+    }
+
+    .forgot-link:hover {
+        text-decoration: underline;
+    }
+
+    .apply-divider {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin: 22px 0 16px;
+        color: #9ca3af;
+        font-size: 11.5px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    .apply-divider::before,
+    .apply-divider::after {
+        content: "";
+        flex: 1;
+        height: 1px;
+        background: #e5e7eb;
+    }
+
+    .apply-link-btn {
+        display: block;
+        width: 100%;
+        height: 46px;
+        line-height: 46px;
+        text-align: center;
+        background: #ffffff;
+        color: var(--green-800);
+        font-size: 14px;
+        font-weight: 700;
+        border: 1.5px solid var(--green-700);
+        border-radius: 8px;
+        text-decoration: none;
+        transition: background 0.2s ease, transform 0.15s ease;
+    }
+
+    .apply-link-btn:hover {
+        background: #f0f9f2;
+        transform: translateY(-1px);
     }
 
 </style>
@@ -378,6 +534,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['setup_account'])) {
 
 <div class="viewport-wrapper">
 
+<?php if ($needsSetup): ?>
+
 <div class="login-card">
 
     <div class="logo-wrap">
@@ -389,26 +547,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['setup_account'])) {
 
     <h1>Registrar Portal</h1>
 
-    <p><?= $needsSetup ? 'No account exists yet. Create the first Registrar account to get started.' : 'Sign in, or create a new Registrar account' ?></p>
-
-    <?php if (!$needsSetup): ?>
-
-        <div class="auth-tabs">
-            <button type="button" class="auth-tab<?= $activeTab === 'signin' ? ' active' : '' ?>" data-tab="signin" onclick="switchAuthTab('signin')">Sign In</button>
-            <button type="button" class="auth-tab<?= $activeTab === 'create' ? ' active' : '' ?>" data-tab="create" onclick="switchAuthTab('create')">Create Account</button>
-        </div>
-
-    <?php endif; ?>
+    <p class="sub">No account exists yet. Create the first Registrar account to get started.</p>
 
     <?php if (!empty($error)): ?>
-
-        <div class="error-msg">
-            <?= htmlspecialchars($error) ?>
-        </div>
-
+        <div class="error-msg"><?= htmlspecialchars($error) ?></div>
     <?php endif; ?>
-
-    <div class="auth-panel<?= $activeTab === 'create' ? ' active' : '' ?>" data-panel="create">
 
     <form method="POST" action="<?= SITE_BASE ?>/login" id="setupForm" autocomplete="off">
 
@@ -438,109 +581,97 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['setup_account'])) {
 
     </form>
 
-    </div>
+</div>
 
-    <div class="auth-panel<?= $activeTab === 'signin' ? ' active' : '' ?>" data-panel="signin">
+<?php else: ?>
 
-    <form
-        method="POST"
-        action="<?= SITE_BASE ?>/login"
-        id="loginForm"
-    >
+<div class="auth-shell" id="authShell">
+    <div class="auth-track" id="authTrack">
 
-        <div class="form-group">
+        <!-- Slide 1: Sign In (white) | Apply teaser (accent) -->
+        <div class="auth-slide slide-signin">
 
-            <label for="identifier">
-                Email Address
-            </label>
+            <div class="auth-half is-white">
+                <div class="logo-wrap">
+                    <img src="<?= SITE_BASE ?>/assets/img/cmlogoremove.png" alt="Portal Logo" style="width:52px; height:52px; object-fit:contain;">
+                </div>
 
-            <input
-                type="email"
-                id="identifier"
-                name="identifier"
-                class="form-input"
-                placeholder="Enter your registered email"
-                autocomplete="username"
-                required
-            >
+                <h1>Registrar Portal</h1>
+                <p class="sub">Sign in to manage the scholarship system</p>
 
-        </div>
+                <?php if (!empty($error)): ?>
+                    <div class="error-msg"><?= htmlspecialchars($error) ?></div>
+                <?php endif; ?>
 
-        <div class="form-group">
+                <form method="POST" action="<?= SITE_BASE ?>/login" id="loginForm">
 
-            <label for="password">
-                Password
-            </label>
+                    <div class="form-group">
+                        <label for="identifier">Email Address</label>
+                        <input type="email" id="identifier" name="identifier" class="form-input" placeholder="Enter your registered email" autocomplete="username" required>
+                    </div>
 
-            <div class="input-wrapper">
+                    <div class="form-group">
+                        <label for="password">Password</label>
+                        <div class="input-wrapper">
+                            <input type="password" id="password" name="password" class="form-input" placeholder="••••••••" autocomplete="current-password" required>
+                            <button type="button" class="eye-toggle" onclick="togglePassword()" aria-label="Toggle Password Visibility">
+                                <svg id="eyeIcon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/>
+                                    <circle cx="12" cy="12" r="3"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
 
-                <input
-                    type="password"
-                    id="password"
-                    name="password"
-                    class="form-input"
-                    placeholder="••••••••"
-                    autocomplete="current-password"
-                    required
-                >
+                    <button type="submit" class="btn-submit">Sign In</button>
 
-                <button
-                    type="button"
-                    class="eye-toggle"
-                    onclick="togglePassword()"
-                    aria-label="Toggle Password Visibility"
-                >
+                    <a href="<?= SITE_BASE ?>/forgot-password" class="forgot-link">Forgot Password?</a>
 
-                    <svg
-                        id="eyeIcon"
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="20"
-                        height="20"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="2"
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                    >
-                        <path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/>
-                        <circle cx="12" cy="12" r="3"/>
-                    </svg>
+                </form>
+            </div>
 
-                </button>
-
+            <div class="auth-half is-accent">
+                <div class="logo-wrap">
+                    <img src="<?= SITE_BASE ?>/assets/img/cmlogoremove.png" alt="" style="width:48px; height:48px; object-fit:contain;">
+                </div>
+                <h1>New Here?</h1>
+                <p class="sub">Apply for a scholarship using your Student ID — no account or password needed.</p>
+                <button type="button" class="auth-outline-btn" id="goApplyBtn">Apply for a Scholarship</button>
             </div>
 
         </div>
 
-        <button
-            type="submit"
-            class="btn-submit"
-        >
-            Sign In
-        </button>
+        <!-- Slide 2: Welcome-back teaser (accent) | Apply CTA (white) -->
+        <div class="auth-slide slide-apply">
 
-    </form>
+            <div class="auth-half is-accent">
+                <div class="logo-wrap">
+                    <img src="<?= SITE_BASE ?>/assets/img/cmlogoremove.png" alt="" style="width:48px; height:48px; object-fit:contain;">
+                </div>
+                <h1>Welcome Back</h1>
+                <p class="sub">Already a registrar? Sign in to manage the scholarship system.</p>
+                <button type="button" class="auth-outline-btn" id="goSignInBtn">Sign In</button>
+            </div>
+
+            <div class="auth-half is-white">
+                <div class="logo-wrap">
+                    <img src="<?= SITE_BASE ?>/assets/img/cmlogoremove.png" alt="Portal Logo" style="width:52px; height:52px; object-fit:contain;">
+                </div>
+                <h1>Scholarship Application</h1>
+                <p class="sub">Ready to apply? You'll need your Student ID to get started — the form takes just a few minutes.</p>
+                <a href="<?= SITE_BASE ?>/apply" class="btn-submit" style="display:block; text-decoration:none; line-height:46px; text-align:center;">Continue to Application</a>
+            </div>
+
+        </div>
 
     </div>
-
 </div>
+
+<?php endif; ?>
 
 </div>
 
 <script>
-
-// Sign In / Create Account switch: both forms are on the page, this just shows one of them.
-function switchAuthTab(tab) {
-
-    document.querySelectorAll(".auth-tab").forEach((btn) => {
-        btn.classList.toggle("active", btn.dataset.tab === tab);
-    });
-
-    document.querySelectorAll(".auth-panel").forEach((panel) => {
-        panel.classList.toggle("active", panel.dataset.panel === tab);
-    });
-}
 
 function togglePassword() {
 
@@ -569,6 +700,29 @@ function togglePassword() {
 
     }
 
+}
+
+const authShell = document.getElementById("authShell");
+const goApplyBtn = document.getElementById("goApplyBtn");
+const goSignInBtn = document.getElementById("goSignInBtn");
+let slideTimer = null;
+
+// The slide itself is the .show-apply transform transition (see CSS); this just layers on
+// the brief "is-sliding" dip (a hair of scale + deeper shadow) for the whole 0.85s glide, so
+// the motion reads as smooth momentum rather than a flat, mechanical slide.
+function goToSlide(showApply) {
+    if (!authShell) return;
+    authShell.classList.toggle("show-apply", showApply);
+    authShell.classList.add("is-sliding");
+    clearTimeout(slideTimer);
+    slideTimer = setTimeout(() => authShell.classList.remove("is-sliding"), 850);
+}
+
+if (authShell && goApplyBtn) {
+    goApplyBtn.addEventListener("click", () => goToSlide(true));
+}
+if (authShell && goSignInBtn) {
+    goSignInBtn.addEventListener("click", () => goToSlide(false));
 }
 
 </script>

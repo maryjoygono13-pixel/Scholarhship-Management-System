@@ -14,6 +14,18 @@ function initDatabase(): PDO {
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
+    // 1a. Registrar password resets — a short-lived, single-use token emailed to the account's
+    // own address (see pages/forgot-password.php). The token itself is never stored, only its hash.
+    $pdo->exec("CREATE TABLE IF NOT EXISTS password_resets (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        token_hash VARCHAR(255) NOT NULL,
+        expires_at DATETIME NOT NULL,
+        used_at DATETIME DEFAULT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        KEY idx_password_resets_user (user_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
     // 2. Scholarships Table
     $pdo->exec("CREATE TABLE IF NOT EXISTS scholarships (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -133,8 +145,31 @@ function initDatabase(): PDO {
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         semester VARCHAR(50) DEFAULT '1st Semester',
         municipality VARCHAR(255) DEFAULT '',
-        barangay VARCHAR(255) DEFAULT ''
+        barangay VARCHAR(255) DEFAULT '',
+        suffix VARCHAR(20) DEFAULT '',
+        mother_name VARCHAR(255) DEFAULT '',
+        mother_contact VARCHAR(50) DEFAULT '',
+        father_name VARCHAR(255) DEFAULT '',
+        father_contact VARCHAR(50) DEFAULT ''
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+    // Column adds a table might be missing if it already existed before this column was
+    // introduced (CREATE TABLE IF NOT EXISTS is a no-op on an existing table).
+    foreach ([
+        'suffix' => "VARCHAR(20) DEFAULT ''",
+        'mother_name' => "VARCHAR(255) DEFAULT ''",
+        'mother_contact' => "VARCHAR(50) DEFAULT ''",
+        'father_name' => "VARCHAR(255) DEFAULT ''",
+        'father_contact' => "VARCHAR(50) DEFAULT ''",
+    ] as $col => $def) {
+        try {
+            $pdo->exec("ALTER TABLE applicants ADD COLUMN $col $def");
+        } catch (PDOException $e) {
+            if ((int)$e->errorInfo[1] !== 1060) { // 1060 = Duplicate column name
+                throw $e;
+            }
+        }
+    }
 
     // 4. Notifications Table
     $pdo->exec("CREATE TABLE IF NOT EXISTS notifications (
@@ -259,8 +294,18 @@ function initDatabase(): PDO {
         scholarship_type VARCHAR(255) NOT NULL,
         remarks TEXT,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        origin VARCHAR(50) NOT NULL DEFAULT 'approved'
+        origin VARCHAR(50) NOT NULL DEFAULT 'approved',
+        decided_semester VARCHAR(50) DEFAULT NULL,
+        decided_school_year VARCHAR(50) DEFAULT NULL
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+    // `semester`/`school_year` stay fixed at the term the scholar was originally evaluated for
+    // — that is also the Record's own term, and how a Renewal & Retention row is matched back to
+    // it (see api/list_renewal.php). The term a Renew/Terminate decision actually happens in is
+    // tracked separately here instead, so re-assessing a scholar next school year doesn't lose
+    // the row's link to its original Record.
+    $addColumnIfMissing('renewal_retention', 'decided_semester', "VARCHAR(50) DEFAULT NULL");
+    $addColumnIfMissing('renewal_retention', 'decided_school_year', "VARCHAR(50) DEFAULT NULL");
 
     // A scholar terminated from a scholarship can't apply for that same scholarship again
     // (they may still apply for a different one). See includes/renewal_helper.php.

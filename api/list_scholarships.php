@@ -25,9 +25,16 @@ try {
             sendError('Scholarship name and code are required.');
         }
 
+        // Capacity taken is always counted live from actual applicants (scholarshipTakenCount),
+        // never trusted from a stored counter — that counter is the exact thing that drifted out
+        // of sync before (showing "0 available" on programs nobody had actually applied to). The
+        // stored slots_available column is still written, only so any other reader that queries
+        // the table directly sees a sensible number, not because it's the source of truth.
+        $liveAvailable = $unlimited ? $slots : max(0, $slots - scholarshipTakenCount($pdo, $subtype, $name));
+
         if ($id > 0) {
             $stmt = $pdo->prepare("UPDATE scholarships SET name = ?, code = ?, description = ?, type = ?, subtype = ?, gwa_requirement = ?, slots = ?, slots_available = ?, unlimited_slots = ?, coverage = ?, status = ? WHERE id = ?");
-            $stmt->execute([$name, $code, $description, $type, $subtype, $gwaReq, $slots, $slots, $unlimited, $coverage, $status, $id]);
+            $stmt->execute([$name, $code, $description, $type, $subtype, $gwaReq, $slots, $liveAvailable, $unlimited, $coverage, $status, $id]);
             // The sub-type's required GWA is what Evaluation/Renewal enforce,
             // so editing it from the program keeps the two in sync.
             if ($subtype !== '') {
@@ -39,7 +46,7 @@ try {
         } else {
             $stmt = $pdo->prepare("INSERT INTO scholarships (name, code, description, type, subtype, gwa_requirement, slots, slots_available, unlimited_slots, coverage, status)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-            $stmt->execute([$name, $code, $description, $type, $subtype, $gwaReq, $slots, $slots, $unlimited, $coverage, $status]);
+            $stmt->execute([$name, $code, $description, $type, $subtype, $gwaReq, $slots, $liveAvailable, $unlimited, $coverage, $status]);
             $newId = (int)$pdo->lastInsertId();
             logActivity($pdo, 'Scholarship Added', 'Scholarships', $name . ' (' . $code . ') was added.', $newId);
             sendJson(['success' => true, 'id' => $newId, 'message' => 'Scholarship added successfully.']);
@@ -49,7 +56,9 @@ try {
     $stmt = $pdo->query("SELECT * FROM scholarships ORDER BY id DESC");
     $rows = $stmt->fetchAll();
 
-    $data = array_map(function($r) {
+    $data = array_map(function($r) use ($pdo) {
+        $available = scholarshipSlotsAvailable($pdo, $r);
+        $taken = scholarshipTakenCount($pdo, (string)($r['subtype'] ?? ''), (string)$r['name']);
         return [
             'id' => (int)$r['id'],
             'name' => $r['name'],
@@ -61,8 +70,11 @@ try {
             'gwa_requirement' => (float)$r['gwa_requirement'],
             'slots' => (int)$r['slots'],
             'unlimitedSlots' => !empty($r['unlimited_slots']),
-            'slotsAvailable' => (int)$r['slots_available'],
-            'slots_available' => (int)$r['slots_available'],
+            // How many applicants currently hold a slot — counted live, never a stored counter.
+            'slotsTaken' => $taken,
+            'slots_taken' => $taken,
+            'slotsAvailable' => $available,
+            'slots_available' => $available,
             'coverage' => $r['coverage'],
             'status' => $r['status']
         ];

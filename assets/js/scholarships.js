@@ -540,7 +540,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
             <td>
                 <span class="font-mono">
-                    ${s.unlimitedSlots ? "Unlimited" : `${s.slotsAvailable ?? 0} &nbsp;/&nbsp; ${s.slots ?? 0}`}
+                    ${s.unlimitedSlots ? "Unlimited" : `${s.slotsTaken ?? 0} &nbsp;/&nbsp; ${s.slots ?? 0}`}
                 </span>
             </td>
 

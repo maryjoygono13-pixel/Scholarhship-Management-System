@@ -1,10 +1,11 @@
 <?php
 require_once __DIR__ . '/init.php';
 require_once __DIR__ . '/../includes/recipients.php';
-require_once __DIR__ . '/../includes/gmail_client.php';
+require_once __DIR__ . '/../includes/mailer.php';
 
-// Sends the "New notification" as real email through the connected Gmail account
-// and records each recipient in the Sent log with the real result.
+// Sends the "New notification" as real email — through Gmail when it's connected, or SMTP
+// (config/smtp.local.php) when it isn't — and records each recipient in the Sent log with
+// the real result.
 
 const NOTIFICATION_MAX_RECIPIENTS = 100;
 
@@ -36,19 +37,12 @@ try {
         sendError('The subject or message is too long.');
     }
 
-    // Nothing is recorded as "sent" unless Gmail is actually there to send it.
-    if (!gmailIsConfigured()) {
-        gmailFail(new GmailException('not_configured', 'Gmail is not set up yet. Add the Google client ID and secret to config/gmail.local.php, then connect Gmail on the Notifications page.'));
+    // Nothing is recorded as "sent" unless there's actually a way to send it — Gmail
+    // connected, or SMTP configured as a fallback (config/smtp.local.php).
+    if (!appMailIsConfigured($pdo)) {
+        gmailFail(new GmailException('not_connected', 'No way to send email is set up. Connect Gmail on this page, or add SMTP credentials to config/smtp.local.php.'));
     }
     $conn = gmailActiveConnection($pdo);
-    if ($conn === null || $conn['status'] !== 'connected') {
-        gmailFail(new GmailException(
-            $conn === null ? 'not_connected' : 'reauthorize',
-            $conn === null
-                ? 'Gmail is not connected. Use "Connect Gmail" on the Notifications page first.'
-                : 'The Gmail authorization expired. Please reconnect Gmail on the Notifications page.'
-        ));
-    }
 
     $recipients = resolveRecipients($pdo, $mode === 'individual' ? 'individual' : 'segment', $segment, $individualId, $individualKind);
     if (empty($recipients)) {
@@ -87,26 +81,29 @@ try {
             $error = 'No valid email address on file.';
         } else {
             try {
-                $result = gmailSendMessage($pdo, $r['email'], $personalSubject, $body);
+                $result = sendAppMail($pdo, $r['email'], $personalSubject, $body);
             } catch (GmailException $e) {
                 $error = $e->getMessage();
                 // If Gmail itself is unusable, don't hammer it for every remaining recipient.
                 if (in_array($e->kind, ['reauthorize', 'not_connected', 'network'], true)) {
                     $fatal = $error;
                 }
+            } catch (SmtpException $e) {
+                $error = $e->getMessage();
+                $fatal = $error; // an SMTP misconfiguration won't fix itself mid-loop either
             }
         }
 
         $insert->execute([
             $type, $mode, $r['id'], $r['name'], $r['email'], $personalSubject, $body, $deadline,
             $result ? 'sent' : 'failed',
-            $result['account'] ?? $conn['email'], $result['id'] ?? null, $result['threadId'] ?? null, mb_substr($error, 0, 250),
+            $result['account'] ?? ($conn['email'] ?? null), $result['id'] ?? null, $result['threadId'] ?? null, mb_substr($error, 0, 250),
         ]);
         $result ? $sent++ : $failed++;
     }
 
     // Counts only: no recipients' addresses, subject or message text in History.
-    logActivity($pdo, 'Email Sent', 'Notifications', $sent . ' email' . ($sent === 1 ? '' : 's') . ' sent through Gmail' . ($failed ? ' (' . $failed . ' failed)' : '') . '.');
+    logActivity($pdo, 'Email Sent', 'Notifications', $sent . ' email' . ($sent === 1 ? '' : 's') . ' sent' . ($failed ? ' (' . $failed . ' failed)' : '') . '.');
 
     if ($sent === 0) {
         http_response_code(502);

@@ -53,12 +53,18 @@ interface EvaluationApplicant {
   units: number;
   enrolled: boolean;
   docsComplete: boolean;
+  transcriptFile: string;
+  coeFile: string;
+  goodMoralFile: string;
   status: string;
   remarks: string;
   grades: Record<string, number>;
 }
 
 interface Window {
+  SITE_BASE?: string;
+  SITE_URL?: string;
+  API_BASE?: string;
   apiListApplicants: (status?: string) => Promise<ApplicantData[]>;
   apiGetApplicant: (id: number | string) => Promise<ApplicantData>;
   apiSaveApplicant: (formEl: HTMLFormElement, applicantId?: number | string | null) => Promise<ApiResponse>;

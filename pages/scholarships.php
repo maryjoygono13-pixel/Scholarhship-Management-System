@@ -44,7 +44,7 @@ include __DIR__ . '/../includes/header.php';
                         <th>Scholarship Name</th>
                         <th>Type</th>
                         <th style="white-space:nowrap;">GWA</th>
-                        <th style="white-space:nowrap; min-width:120px;">Slots</th>
+                        <th style="white-space:nowrap; min-width:120px;">Slots<div style="font-size:10px; font-weight:400; color:#9ca3af;">Applied / Total</div></th>
                         <th>Status</th>
                         <th style="text-align:right;">Actions</th>
                     </tr>

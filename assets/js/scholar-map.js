@@ -311,9 +311,9 @@ async function loadStudentLocations(map) {
                                 font-family: monospace;
                                 font-weight:700;
                             ">
-                                ${Number(
-                                    student.gwa || 1.50
-                                ).toFixed(2)}
+                                ${Number(student.gwa) > 0
+                                    ? Number(student.gwa).toFixed(2)
+                                    : "No grades yet"}
                             </span>
                         </div>
 

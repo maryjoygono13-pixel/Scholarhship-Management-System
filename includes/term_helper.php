@@ -58,6 +58,31 @@ function nextSchoolYear(string $sy): string {
     return $sy;
 }
 
+// "2026-2027" -> "2025-2026"
+function previousSchoolYear(string $sy): string {
+    if (preg_match('/^\s*(\d{4})\s*-\s*(\d{4})\s*$/', $sy, $m)) {
+        return ((int)$m[1] - 1) . '-' . ((int)$m[2] - 1);
+    }
+    return $sy;
+}
+
+/*
+ * The term right after the given one — 1st Semester -> 2nd Semester -> Summer Term -> the
+ * next school year's 1st Semester. Used to show scholars WHEN a renew/terminate decision
+ * on their term actually takes effect (the next term), not the term they were evaluated in.
+ * Returns [semester, schoolYear].
+ */
+function nextTerm(string $semester, string $schoolYear): array {
+    $semester = normalizeSemesterName($semester);
+    $schoolYear = trim($schoolYear);
+    $idx = array_search($semester, TERM_SEMESTERS, true);
+    if ($idx === false) $idx = 0;
+    if ($idx === count(TERM_SEMESTERS) - 1) {
+        return [TERM_SEMESTERS[0], nextSchoolYear($schoolYear)];
+    }
+    return [TERM_SEMESTERS[$idx + 1], $schoolYear];
+}
+
 /*
  * Switches the active term and rolls scholars forward. Returns:
  *   ['changed' => bool, 'moved' => int, 'semester' => string, 'schoolYear' => string]
@@ -116,17 +141,6 @@ function rollScholarsForward(PDO $pdo, string $oldSemester, string $newSemester,
     $skipped = 0;
     $records = $pdo->query("SELECT * FROM records WHERE LOWER(TRIM(status)) = 'approved' ORDER BY id")->fetchAll(PDO::FETCH_ASSOC);
 
-    $findRenewal = $pdo->prepare("SELECT id FROM renewal_retention WHERE student_id = ? AND school_year = ? AND semester = ?");
-    $insertRenewal = $pdo->prepare("
-        INSERT INTO renewal_retention (student_id, name, gwa, failing_grades, enrolled, status, school_year, semester, scholarship_type, remarks)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ");
-    $findApplicantById = $pdo->prepare("SELECT id, gwa, gwa_req, failing_grades, enrolled, status FROM applicants WHERE id = ?");
-    $findApplicantByStudent = $pdo->prepare("SELECT id, gwa, gwa_req, failing_grades, enrolled, status FROM applicants WHERE student_id = ? ORDER BY id DESC LIMIT 1");
-    $backToEvaluation = $pdo->prepare("UPDATE applicants SET status = 'review', semester = ?, school_year = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?");
-
-    $gradeStats = getSemesterGradeStats($pdo, array_column($records, 'student_id'));
-
     $seen = [];
     foreach ($records as $rec) {
         // Only scholars approved in the term that is ending.
@@ -137,16 +151,6 @@ function rollScholarsForward(PDO $pdo, string $oldSemester, string $newSemester,
         if (isset($seen[$studentKey])) continue;
         $seen[$studentKey] = true;
 
-        $applicant = null;
-        if ((int)($rec['applicant_id'] ?? 0) > 0) {
-            $findApplicantById->execute([(int)$rec['applicant_id']]);
-            $applicant = $findApplicantById->fetch(PDO::FETCH_ASSOC) ?: null;
-        }
-        if (!$applicant) {
-            $findApplicantByStudent->execute([$rec['student_id']]);
-            $applicant = $findApplicantByStudent->fetch(PDO::FETCH_ASSOC) ?: null;
-        }
-
         // Already evaluated for the term we are switching to (e.g. going back to 1st/2nd
         // Semester, which they have a record for): don't send them through again.
         if (hasRecordForTerm($pdo, (string)$rec['student_id'], (string)$rec['scholarship_type'], $newSemester, $newSchoolYear, (int)$rec['id'])) {
@@ -154,17 +158,13 @@ function rollScholarsForward(PDO $pdo, string $oldSemester, string $newSemester,
             continue;
         }
 
-        // 1. Renewal & Retention (once per scholar per term). Scholars approved under the
-        //    current flow are already there; this covers older approved records.
+        // Renewal & Retention (once per scholar per term) is the ONLY place a scholar's
+        // ongoing eligibility is tracked from here on — they never go back through Evaluation
+        // once they have a Record; Evaluation is for a first-time application only. Renewal &
+        // Retention already re-assesses them against each new term's GWA on its own (see
+        // isRenewalActionable / renewalPreviousTerm in includes/renewal_helper.php).
         $recordSy = trim((string)$rec['sy']) !== '' ? trim($rec['sy']) : $newSchoolYear;
         sendRecordToRenewal($pdo, $rec, 'pending', 'Sent from Records at the end of ' . $oldSemester . ' ' . $recordSy . '. Renew or terminate by GWA.');
-
-        // 2. Back to Evaluation for the new term (grades are kept).
-        if ($applicant && strtolower((string)$applicant['status']) === 'approved') {
-            $backToEvaluation->execute([$newSemester, $newSchoolYear, (int)$applicant['id']]);
-            // The new term starts with its own GWA: 0 until that semester's grades are imported.
-            recalculateApplicantGwa($pdo, (string)$rec['student_id'], true);
-        }
         $moved++;
     }
     return ['moved' => $moved, 'skipped' => $skipped];

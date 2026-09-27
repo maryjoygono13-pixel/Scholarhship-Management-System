@@ -181,7 +181,7 @@
                     $latVal = null;
                     $lonVal = null;
                     if ($municipalityVal !== '') {
-                        [$latVal, $lonVal] = locationCoordinates($municipalityVal, $barangayVal);
+                        [$latVal, $lonVal] = locationCoordinates($municipalityVal, $barangayVal, $studentId);
                         $addressVal = composeAddress($barangayVal, $municipalityVal);
                     }
 

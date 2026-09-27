@@ -5,6 +5,17 @@ function renewalStatusLabel(r: any): string {
   if (s === "terminated") return "Terminated";
   return "Pending";
 }
+// "Met"/"Not met" only mean something once a GWA is actually on file — a GWA of 0.00 is no
+// grades yet (e.g. a new first-year scholar), not a passed check, so it gets its own label.
+function gwaMetLabel(r: any): string {
+  if (!(r.gwa > 0)) return "No grades yet";
+  return r.meetsGwa === false ? "Not met" : "Met";
+}
+function gwaMetColor(r: any): string {
+  if (!(r.gwa > 0)) return "#6b7280";
+  return r.meetsGwa === false ? "#be123c" : "#15803d";
+}
+
 function normalizeSemesterValue(val: string | undefined | null): string {
   const v = (val || "").toLowerCase();
   if (v.includes("summer")) return "Summer Term";
@@ -119,10 +130,10 @@ document.addEventListener("DOMContentLoaded", () => {
         <td><strong class="font-mono">${r.studentId}</strong></td>
         <td>${r.name}</td>
         <td>${r.scholarshipType}</td>
-        <td><span class="font-mono" style="color:${r.meetsGwa === false ? '#be123c' : 'inherit'};">${r.gwa.toFixed(2)}</span><div style="font-size:11px; color:#6b7280;">Req. ≤ ${Number(r.gwaRequirement).toFixed(2)}</div></td>
-        <td>${r.failingGrades > 0 ? `<span class="font-mono" style="color:red;">${r.failingGrades} Failing</span>` : "Passed All"}</td>
+        <td><span class="font-mono" style="color:${r.meetsGwa === false ? '#be123c' : 'inherit'};">${r.gwa.toFixed(2)}</span><div style="font-size:11px; color:#6b7280;">${r.gwaSemester || r.semester || "1st Semester"} GWA · Req. ≤ ${Number(r.gwaRequirement).toFixed(2)}</div></td>
+        <td>${r.failingGrades > 0 ? `<span class="font-mono" style="color:red;">${r.failingGrades} Failing</span>` : (r.gwa > 0 ? "Passed All" : "No grades yet")}</td>
         <td>${r.enrolled ? "Enrolled" : "Not Enrolled"}</td>
-        <td><span class="font-mono">${r.semester || "1st Semester"}</span></td>
+        <td><span class="font-mono">${r.decisionSemester || r.semester || "1st Semester"}</span>${r.decisionSchoolYear && r.decisionSchoolYear !== r.schoolYear ? `<div style="font-size:11px; color:#6b7280;">${r.decisionSchoolYear}</div>` : ""}</td>
         <td><span class="status-badge ${statusBadge}">${renewalStatusLabel(r)}</span>${r.locked ? '<div style="font-size:11px; color:#6b7280; margin-top:2px;">Locked · view only</div>' : ""}</td>
         <td class="actions-cell">
           <button type="button" class="btn-icon-action edit" title="Edit / Review Scholar" onclick="editRenewal(event, ${r.id})">
@@ -186,9 +197,10 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     if (modalRemarksText) modalRemarksText.textContent = selectedRecord.remarks || "No remarks logged.";
 
-    // Read-only: the term follows the Active Semester in Settings.
+    // Read-only: shows the term a renew/terminate decision here takes effect in — the
+    // term right after the one the scholar was evaluated for, not that term itself.
     const modalSemesterBadge = document.getElementById("modalSemesterBadge");
-    if (modalSemesterBadge) modalSemesterBadge.textContent = normalizeSemesterValue(selectedRecord.semester);
+    if (modalSemesterBadge) modalSemesterBadge.textContent = normalizeSemesterValue(selectedRecord.decisionSemester || selectedRecord.semester);
 
     if (modalCriteria) {
       modalCriteria.innerHTML = `
@@ -198,12 +210,12 @@ document.addEventListener("DOMContentLoaded", () => {
             <span class="detail-value highlight">${selectedRecord.scholarshipType}</span>
           </div>
           <div class="detail-item">
-            <span class="detail-label">Current GWA</span>
+            <span class="detail-label">Current GWA (${selectedRecord.gwaSemester || selectedRecord.semester || "1st Semester"})</span>
             <span class="detail-value mono font-mono">${selectedRecord.gwa.toFixed(2)}</span>
           </div>
           <div class="detail-item">
             <span class="detail-label">Required GWA</span>
-            <span class="detail-value font-mono" style="color:${selectedRecord.meetsGwa === false ? '#be123c' : '#15803d'};">≤ ${Number(selectedRecord.gwaRequirement).toFixed(2)} — ${selectedRecord.meetsGwa === false ? 'Not met' : 'Met'}</span>
+            <span class="detail-value font-mono" style="color:${gwaMetColor(selectedRecord)};">≤ ${Number(selectedRecord.gwaRequirement).toFixed(2)} — ${gwaMetLabel(selectedRecord)}</span>
           </div>
           <div class="detail-item">
             <span class="detail-label">Failing Grades</span>
@@ -221,13 +233,14 @@ document.addEventListener("DOMContentLoaded", () => {
     if (lockNote) {
       const r = selectedRecord;
       let note = "";
-      if (r.locked) note = "Locked: view only. This entry can be renewed or terminated once the Active Semester moves past " + r.semester + " (Settings > Portal Configuration).";
-      else if (r.status === "eligible") note = "Already renewed.";
-      else if (r.status === "terminated") note = "Already terminated.";
+      if (r.status === "eligible" && r.locked) note = "Renewed for " + (r.decidedSchoolYear || r.schoolYear) + ". Locked until a new Academic Year begins (Settings > Portal Configuration), then this can be reassessed.";
+      else if (r.status === "terminated" && r.locked) note = "Terminated for " + (r.decidedSchoolYear || r.schoolYear) + ". Locked until a new Academic Year begins (Settings > Portal Configuration).";
+      else if (r.status === "eligible" || r.status === "terminated") note = "A new Academic Year has begun — this entry can now be reassessed (Renew or Terminate).";
+      else if (r.locked) note = "Locked: view only. This entry can be renewed or terminated once the Active Semester moves past " + r.semester + " (Settings > Portal Configuration).";
       else if (r.origin === "rejected") note = "Rejected in Evaluation: this entry can only be terminated (closed). The applicant can still apply again.";
-      else if (!(r.gwa > 0)) note = "No grades are recorded for " + r.semester + " yet. Import the academic records in Data Management to decide.";
-      else if (r.canRenew) note = "GWA meets the requirement: this scholar can be renewed.";
-      else if (r.canTerminate) note = "GWA does not meet the requirement: this scholar can be terminated and will not be able to apply for " + r.scholarshipType + " again.";
+      else if (!(r.gwa > 0)) note = "No grades are recorded for " + (r.gwaSemester || r.semester) + " yet — Renew or Terminate can still be decided manually.";
+      else if (r.meetsGwa) note = "GWA meets the requirement — Renew or Terminate can be decided manually.";
+      else note = "GWA does not meet the requirement — Renew or Terminate can be decided manually.";
       lockNote.textContent = note;
       lockNote.style.display = note ? "block" : "none";
     }
@@ -262,10 +275,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
   async function updateStatus(action: string): Promise<void> {
     if (!selectedRecord) return;
-    if (action === "renew" && selectedRecord.meetsGwa === false) {
-      alert(`Cannot renew: GWA ${selectedRecord.gwa.toFixed(2)} does not meet the required ${Number(selectedRecord.gwaRequirement).toFixed(2)} for ${selectedRecord.scholarshipType}.`);
-      return;
-    }
         if (action === "terminate" && selectedRecord.origin !== "rejected" &&
         !confirm("Terminate " + selectedRecord.name + " from " + selectedRecord.scholarshipType + "?\n\nThey will not be able to apply for this scholarship again (a different scholarship is still allowed).")) {
       return;
@@ -343,8 +352,8 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     const headers = [
-      "Student ID", "Name", "Scholarship Type", "GWA", "Required GWA", "Meets GWA",
-      "Failing Grades", "Enrollment", "School Year", "Semester", "Status", "Remarks"
+      "Student ID", "Name", "Scholarship Type", "GWA", "GWA Semester", "Required GWA", "Meets GWA",
+      "Failing Grades", "Enrollment", "School Year", "Decision Semester", "Status", "Remarks"
     ];
     const lines = [headers.map(csvEscape).join(",")];
 
@@ -354,12 +363,13 @@ document.addEventListener("DOMContentLoaded", () => {
         r.name,
         r.scholarshipType,
         Number(r.gwa).toFixed(2),
+        r.gwaSemester || r.semester || "1st Semester",
         Number(r.gwaRequirement).toFixed(2),
-        r.meetsGwa === false ? "No" : "Yes",
+        !(r.gwa > 0) ? "No grades yet" : (r.meetsGwa === false ? "No" : "Yes"),
         r.failingGrades,
         r.enrolled ? "Enrolled" : "Not Enrolled",
         r.schoolYear,
-        r.semester,
+        r.decisionSemester || r.semester,
         r.status,
         r.remarks || "",
       ].map(csvEscape).join(","));

@@ -39,6 +39,10 @@ function sendRecordToRenewal(PDO $pdo, array $rec, ?string $status = 'pending', 
     $exists->execute([$sid, $sy, $semester, (string)$rec['scholarship_type']]);
     if ($exists->fetchColumn()) return null;
 
+    // A registrar explicitly deleted this exact entry before — respect that instead of
+    // silently recreating it the next time records/term-rollover runs (see delete_renewal.php).
+    if (wasRenewalDeleted($pdo, $sid, $sy, $semester, (string)$rec['scholarship_type'])) return null;
+
     $applicant = null;
     if ((int)($rec['applicant_id'] ?? 0) > 0) {
         $stmt = $pdo->prepare("SELECT gwa, gwa_req, failing_grades, enrolled FROM applicants WHERE id = ?");
@@ -85,16 +89,53 @@ function sendRecordToRenewal(PDO $pdo, array $rec, ?string $status = 'pending', 
 }
 
 /*
+ * Whether a registrar explicitly deleted the Renewal & Retention entry for this exact
+ * student + term + scholarship (recorded in deleted_items by delete_renewal.php). Prevents
+ * sendRecordToRenewal() from silently recreating something that was deliberately removed.
+ */
+function wasRenewalDeleted(PDO $pdo, string $studentId, string $schoolYear, string $semester, string $scholarshipType): bool {
+    $stmt = $pdo->prepare("SELECT item_data FROM deleted_items WHERE item_type = 'renewal'");
+    $stmt->execute();
+    $sem = normalizeSemesterName($semester);
+    $typeKey = strtolower(trim($scholarshipType));
+    foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $json) {
+        $d = json_decode((string)$json, true);
+        if (!is_array($d)) continue;
+        if (trim((string)($d['student_id'] ?? '')) !== trim($studentId)) continue;
+        if (trim((string)($d['school_year'] ?? '')) !== trim($schoolYear)) continue;
+        if (normalizeSemesterName((string)($d['semester'] ?? '')) !== $sem) continue;
+        if (strtolower(trim((string)($d['scholarship_type'] ?? ''))) !== $typeKey) continue;
+        return true;
+    }
+    return false;
+}
+
+/*
  * A renewal row's GWA and failing count, taken live from the imported grades of its
  * own semester (so grades imported after the row was created still count), falling
  * back to the figures stored on the row.
  */
-function liveRenewalFigures(array $row, array $gradeStats): array {
-    $st = $gradeStats[(string)$row['student_id']][normalizeSemesterName($row['semester'])] ?? null;
+function liveRenewalFigures(array $row, array $gradeStats, ?string $semester = null): array {
+    $sem = normalizeSemesterName($semester ?? (string)$row['semester']);
+    $st = $gradeStats[(string)$row['student_id']][$sem] ?? null;
     return [
         'gwa' => $st ? $st['gwa'] : (float)$row['gwa'],
         'failing' => $st ? $st['failing'] : (int)$row['failing_grades'],
     ];
+}
+
+/*
+ * Renewal & Retention's own GWA-basis cycle — a strict 1st <-> 2nd Semester alternation
+ * across the year boundary. Summer Term is not part of this cycle: a renewal decision's basis
+ * is always the most recently completed REGULAR semester, and Summer terms are too sparsely
+ * enrolled to be a reliable renewal basis on their own.
+ */
+function renewalPreviousTerm(string $semester, string $schoolYear): array {
+    $schoolYear = trim($schoolYear);
+    if (normalizeSemesterName($semester) === '1st Semester') {
+        return ['2nd Semester', previousSchoolYear($schoolYear)];
+    }
+    return ['1st Semester', $schoolYear];
 }
 
 /*
@@ -117,28 +158,10 @@ function syncRecordWithRenewal(PDO $pdo, array $ren, string $action): ?string {
 
     $pdo->prepare("UPDATE records SET status = ? WHERE id = ?")->execute([$newStatus, $record['id']]);
 
-    // Renewed after their term had already ended: go back to Evaluation for the current
-    // term now, since the term switch has passed them by.
-    if ($action === 'renew' && ($sem !== getActiveSemester($pdo) || trim((string)$ren['school_year']) !== getActiveSchoolYear($pdo))) {
-        $app = null;
-        if ((int)($record['applicant_id'] ?? 0) > 0) {
-            $stmt = $pdo->prepare("SELECT id, status FROM applicants WHERE id = ?");
-            $stmt->execute([(int)$record['applicant_id']]);
-            $app = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
-        }
-        if (!$app) {
-            $stmt = $pdo->prepare("SELECT id, status FROM applicants WHERE student_id = ? ORDER BY id DESC LIMIT 1");
-            $stmt->execute([$record['student_id']]);
-            $app = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
-        }
-        // ...unless they already have a record for the current term.
-        if ($app && strtolower((string)$app['status']) === 'approved'
-            && !hasRecordForTerm($pdo, (string)$record['student_id'], (string)$ren['scholarship_type'], getActiveSemester($pdo), getActiveSchoolYear($pdo), (int)$record['id'])) {
-            $pdo->prepare("UPDATE applicants SET status = 'review', semester = ?, school_year = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
-                ->execute([getActiveSemester($pdo), getActiveSchoolYear($pdo), $app['id']]);
-            recalculateApplicantGwa($pdo, (string)$record['student_id'], true);
-        }
-    }
+    // A renewed scholar never goes back through Evaluation — once they have a Record, all
+    // further eligibility tracking (including each new term's GWA re-check) happens here in
+    // Renewal & Retention, via isRenewalActionable()/renewalPreviousTerm(). Evaluation is only
+    // for a first-time application.
 
     return $newStatus;
 }
@@ -165,6 +188,35 @@ function isRenewalLocked(PDO $pdo, array $row): bool {
     return strtolower(trim((string)$row['status'])) === 'pending'
         && normalizeSemesterName($row['semester']) === getActiveSemester($pdo)
         && trim((string)$row['school_year']) === getActiveSchoolYear($pdo);
+}
+
+/*
+ * Whether a Renewal & Retention row can be decided (Renew / Terminate) right now.
+ *   - Still pending/at-risk: only once the Active Semester has moved past the row's own term
+ *     (see isRenewalLocked).
+ *   - Already decided (renewed/terminated): scholarships are re-assessed every academic year,
+ *     not once and forever — the SAME row is locked for the rest of the school year the
+ *     decision was made in, then opens back up for reassessment the moment a brand-new
+ *     Academic Year begins in Settings > Portal Configuration (even if the Active Semester
+ *     itself was only just moved on within the same year, it stays locked until the year
+ *     actually rolls over).
+ */
+function isRenewalActionable(PDO $pdo, array $row): bool {
+    $status = strtolower(trim((string)$row['status']));
+    if (in_array($status, ['pending', 'at-risk'], true)) {
+        return !isRenewalLocked($pdo, $row);
+    }
+    if (in_array($status, ['eligible', 'terminated'], true)) {
+        // Compared against the school year the decision itself was made in (decided_school_year)
+        // — NOT the row's origin school_year, which stays fixed to the original Record and would
+        // otherwise make this look "reassessable" forever after the very first decision.
+        // Older rows decided before this column existed fall back to the origin year.
+        $decidedYear = trim((string)($row['decided_school_year'] ?? '')) !== ''
+            ? trim((string)$row['decided_school_year'])
+            : trim((string)$row['school_year']);
+        return $decidedYear !== getActiveSchoolYear($pdo);
+    }
+    return false;
 }
 
 // Lower-cased acronym form of a scholarship type, so "CMSP", "cmsp" and the long name compare equal.

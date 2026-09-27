@@ -105,17 +105,12 @@ try {
             $grades[$g['subject_code']] = (float)$g['grade'];
         }
 
-        // Prefer the applicant's structured name (so the table can show a
-        // middle initial and the detail view can show the full middle
-        // name); fall back to the record's own flat name when there's no
-        // matching applicant to pull first/middle/last from.
-        if ($app && !empty($app['first_name'])) {
-            $shortName = buildShortName($app['first_name'], $app['middle_name'] ?? '', $app['last_name']);
-            $fullName = buildFullName($app['first_name'], $app['middle_name'] ?? '', $app['last_name']);
-        } else {
-            $shortName = $r['name'];
-            $fullName = $r['name'];
-        }
+        // The record's own name always wins for display — it's what the Edit Record form shows
+        // and saves, so whatever a registrar types there must be what shows up here. (This used to
+        // prefer the linked applicant's structured name for a middle initial, but that meant an
+        // edited record name never actually appeared, which was the wrong tradeoff.)
+        $shortName = $r['name'];
+        $fullName = $r['name'];
 
         return [
             'id' => (int)$r['id'],
@@ -123,10 +118,18 @@ try {
             'student_id' => $r['student_id'],
             'name' => $shortName,
             'fullName' => $fullName,
+            // The record's own name as stored in `records`, straight from the row — used to
+            // pre-fill the Edit form so saving never overwrites it with a same-Student-ID
+            // applicant's (possibly different/mismatched) name.
+            'recordName' => $r['name'],
             'scholarshipType' => $r['scholarship_type'],
             'scholarship_type' => $r['scholarship_type'],
             'status' => $r['status'],
             'semester' => $r['semester'],
+            // The Semester column follows the Active Semester in Settings > Portal
+            // Configuration live, the same way Renewal & Retention's does — not the term the
+            // record was originally evaluated in (that's still `semester`, used for matching).
+            'currentSemester' => getActiveSemester($pdo),
             'sy' => $r['sy'],
             'renewalStatus' => strtolower(trim((string)$r['status'])) === 'rejected' ? null : ($sentToRenewal[trim($r['student_id']) . '|' . trim($r['sy']) . '|' . $recordSem . '|' . strtolower(trim((string)$r['scholarship_type']))] ?? null),
             'sentToRenewal' => strtolower(trim((string)$r['status'])) !== 'rejected' && isset($sentToRenewal[trim($r['student_id']) . '|' . trim($r['sy']) . '|' . $recordSem . '|' . strtolower(trim((string)$r['scholarship_type']))]),

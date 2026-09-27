@@ -87,10 +87,15 @@ try {
                 'gwaReq' => resolveGwaRequirement($pdo, (string)$r['scholarship_type'], (float)$r['gwa_req']),
 
                 'failingGrades' => (int)$r['failing_grades'],
-                'units' => (int)$r['units'],
+                // Every subject on file for this student is worth 3 units — not a stored,
+                // independently-editable number that can drift from what's actually graded.
+                'units' => count($gradesMap[$r['student_id']] ?? []) * 3,
 
                 'enrolled' => (bool)$r['enrolled'],
                 'docsComplete' => (bool)$r['docs_complete'],
+                'transcriptFile' => $r['transcript_file'] ?? '',
+                'coeFile' => $r['coe_file'] ?? '',
+                'goodMoralFile' => $r['good_moral_file'] ?? '',
 
                 // Shown as non-compliant here in Evaluation only (GWA requirement not met); the
                 // applicant's real status is untouched, so the Applicants page keeps showing it.
@@ -133,22 +138,8 @@ try {
         $status = $payload['status'] ?? null;
         $remarks = $payload['remarks'] ?? null;
 
-        // An applicant can only be approved if their GWA meets the requirement
-        // of the scholarship type/sub-type they applied for.
-        if ($status !== null && strtolower($status) === 'approved') {
-            $chk = $pdo->prepare("SELECT gwa, gwa_req, scholarship_type FROM applicants WHERE id = ?");
-            $chk->execute([$id]);
-            $cand = $chk->fetch();
-            if ($cand) {
-                $required = resolveGwaRequirement($pdo, (string)$cand['scholarship_type'], (float)$cand['gwa_req']);
-                if ((float)$cand['gwa'] <= 0) {
-                    sendError('Cannot approve: no grades are recorded for the current semester yet. Import the academic records in Data Management first.', 422);
-                }
-                if ((float)$cand['gwa'] > $required) {
-                    sendError('Cannot approve: GWA ' . number_format((float)$cand['gwa'], 2) . ' does not meet the required ' . number_format($required, 2) . ' for ' . $cand['scholarship_type'] . '.', 422);
-                }
-            }
-        }
+        // Approval no longer requires the GWA to meet the requirement — staff can approve
+        // regardless of GWA status (missing grades, non-compliant, or below requirement).
 
         // "Non-compliant" is only a view in Evaluation, never a saved status. The page echoes it back
         // when saving remarks, so just leave the real status as it is.

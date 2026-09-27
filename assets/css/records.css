@@ -121,19 +121,6 @@ select {
     background: var(--green-800, #1b6336);
 }
 
-/* Marks a record whose scholar was already sent to Renewal & Retention for that term. */
-.sent-tag {
-    display: inline-block;
-    margin-left: 6px;
-    padding: 2px 8px;
-    border-radius: 99px;
-    background: #eef6f0;
-    border: 1px solid #cfe6d6;
-    color: #134e2a;
-    font-size: 11px;
-    font-weight: 600;
-    white-space: nowrap;
-}
 .page{
     max-width: 1120px;
     margin: 0 auto;
@@ -311,4 +298,22 @@ select {
 
 .table-header-toolbar .search-wrap input { width: 100%; }
 
-.table-header-toolbar select { padding: 0 32px 0 12px; }
+/* Every filter dropdown is the same fixed width, so the row stays evenly lined up
+   instead of each box stretching to fit whichever option happens to be selected
+   (a long scholarship type name, for instance, used to blow its own box out wide). */
+.table-header-toolbar .select-wrap {
+  flex: 0 0 168px;
+  width: 168px;
+}
+
+.table-header-toolbar select {
+  width: 100%;
+  padding: 0 32px 0 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+  .table-header-toolbar .select-wrap { flex: 1 1 140px; width: auto; }
+}

@@ -62,16 +62,10 @@ document.addEventListener("DOMContentLoaded", () => {
     return (v.includes("2") || v.includes("second")) ? "2nd" : "1st";
   }
 
-  // Where this record's scholar stands in Renewal & Retention for the same term.
-  function renewalTagHtml(r: any): string {
-    const labels: Record<string, string> = {
-      "pending": "In Renewal",
-      "eligible": "Renewed",
-      "at-risk": "Flagged",
-      "terminated": "Terminated",
-    };
-    const label = r.renewalStatus ? labels[r.renewalStatus] : "";
-    return label ? ' <span class="sent-tag" title="Renewal &amp; Retention status for this term: ' + r.renewalStatus + '">' + label + '</span>' : "";
+  // "approved"/"rejected"/"pending" (as stored) -> the wording shown on the Status badge.
+  function recordStatusLabel(status: string): string {
+    const labels: Record<string, string> = { approved: "Approved", rejected: "Declined", pending: "Pending" };
+    return labels[(status || "").toLowerCase()] || status;
   }
 
   function populateSchoolYearFilter(): void {
@@ -187,8 +181,8 @@ document.addEventListener("DOMContentLoaded", () => {
         <td><strong class="font-mono">${r.studentId}</strong></td>
         <td>${r.name}</td>
         <td>${typeAcronym(r.scholarshipType)}</td>
-        <td><span class="status-badge ${badgeClass}">${r.status}</span></td>
-        <td>${r.semester}${renewalTagHtml(r)}</td>
+        <td><span class="status-badge ${badgeClass}">${recordStatusLabel(r.status)}</span></td>
+        <td>${r.currentSemester || r.semester}</td>
         <td><span class="font-mono">${r.sy}</span></td>
         <td><span class="font-mono">${dateOnly(r.dateEvaluated)}</span></td>
         <td class="actions-cell">
@@ -346,7 +340,7 @@ document.addEventListener("DOMContentLoaded", () => {
         '<div class="view-detail-grid">' +
         '<div class="detail-item"><span class="detail-label">Enrollment Status</span><span class="detail-value highlight">' + (hasAcademic ? (r.enrolled ? "Validated & Official" : "Unconfirmed") : "Not available") + '</span></div>' +
         '<div class="detail-item"><span class="detail-label">School Year</span><span class="detail-value font-mono">' + esc(r.sy) + '</span></div>' +
-        '<div class="detail-item"><span class="detail-label">Semester</span><span class="detail-value">' + esc(r.semester) + '</span></div>' +
+        '<div class="detail-item"><span class="detail-label">Semester</span><span class="detail-value">' + esc(r.currentSemester || r.semester) + '</span></div>' +
         '<div class="detail-item full-width"><span class="detail-label">Degree Program</span><span class="detail-value">' + esc(formatDeptLine(r.program, r.major, r.yearLevel)) + '</span></div>' +
         '</div></div>';
     }
@@ -361,7 +355,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const statusClass = r.status === 'approved' ? 'badge-approved' : 'badge-rejected';
     return '<div class="section"><h3>Scholarship Committee Decision</h3>' +
       '<div class="view-detail-grid">' +
-      '<div class="detail-item"><span class="detail-label">Outcome</span><span class="status-badge ' + statusClass + '">' + esc(r.status) + '</span></div>' +
+      '<div class="detail-item"><span class="detail-label">Outcome</span><span class="status-badge ' + statusClass + '">' + esc(recordStatusLabel(r.status)) + '</span></div>' +
       '<div class="detail-item"><span class="detail-label">Date Evaluated</span><span class="detail-value font-mono">' + esc(dateOnly(r.dateEvaluated)) + '</span></div>' +
       '<div class="detail-item full-width"><span class="detail-label">Remarks</span><span class="detail-value remarks">' + (r.remarks ? esc(r.remarks) : 'No remarks recorded.') + '</span></div>' +
       '</div></div>';
@@ -379,11 +373,11 @@ document.addEventListener("DOMContentLoaded", () => {
     recViewBody.innerHTML =
       '<div class="profile">' +
       '<div class="profile-top"><div class="avatar">' + initials(r.name) + '</div>' +
-      '<div><div class="record-profile-name">' + esc(r.fullName || r.name) + ' <span class="status-badge ' + statusClass + '">' + esc(r.status) + '</span></div>' +
+      '<div><div class="record-profile-name">' + esc(r.fullName || r.name) + ' <span class="status-badge ' + statusClass + '">' + esc(recordStatusLabel(r.status)) + '</span></div>' +
       '<div class="profile-id font-mono">' + esc(r.studentId) + '</div></div></div>' +
       '<div class="profile-meta">' +
       '<span>' + esc(typeAcronym(r.scholarshipType)) + ' Scholarship</span>' +
-      '<span>' + esc(r.semester) + ' &middot; <span class="font-mono">' + esc(r.sy) + '</span></span>' +
+      '<span>' + esc(r.currentSemester || r.semester) + ' &middot; <span class="font-mono">' + esc(r.sy) + '</span></span>' +
       '<span>' + esc(formatDeptLine(r.program, r.major, r.yearLevel)) + '</span>' +
       '</div>' +
       '</div>' +
@@ -419,7 +413,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (recFormTitle) recFormTitle.textContent = "Edit Evaluation Record";
     if (recId) recId.value = String(editItem.id);
     if (recStudentId) recStudentId.value = editItem.studentId;
-    if (recName) recName.value = editItem.fullName || editItem.name;
+    if (recName) recName.value = editItem.recordName || editItem.fullName || editItem.name;
     if (recType) recType.value = editItem.scholarshipType;
     if (recStatus) recStatus.value = editItem.status;
     if (recRemarks) recRemarks.value = editItem.remarks || '';
