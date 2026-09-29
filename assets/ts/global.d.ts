@@ -36,6 +36,30 @@ interface ApiResponse<T = any> {
   total?: number;
 }
 
+interface EvalCriterionItem {
+  id: number;
+  type: string;
+  label: string;
+  operator: string;
+  value: string;
+  value2: string | null;
+  required: boolean;
+  status: "pass" | "fail" | "pending";
+  autoChecked: boolean;
+  actualValue: any;
+  remarks: string;
+}
+
+interface EvalDocumentItem {
+  id: number;
+  type: string;
+  label: string;
+  description: string;
+  required: boolean;
+  filename: string;
+  submitted: boolean;
+}
+
 interface EvaluationApplicant {
   id: string;
   name: string;
@@ -59,6 +83,10 @@ interface EvaluationApplicant {
   status: string;
   remarks: string;
   grades: Record<string, number>;
+  criteria: EvalCriterionItem[];
+  documents: EvalDocumentItem[];
+  specialQualification: string;
+  specialQualificationLabel: string;
 }
 
 interface Window {

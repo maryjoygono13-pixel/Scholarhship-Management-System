@@ -20,6 +20,10 @@ try {
         }
         $coverage = trim($_POST['coverage'] ?? '');
         $status = trim($_POST['status'] ?? 'active');
+        $educationLevel = trim($_POST['education_level'] ?? 'Collegiate') ?: 'Collegiate';
+        $schoolYear = trim($_POST['school_year'] ?? '');
+        $applicationStart = trim($_POST['application_start'] ?? '') ?: null;
+        $applicationDeadline = trim($_POST['application_deadline'] ?? '') ?: null;
 
         if (empty($name) || empty($code)) {
             sendError('Scholarship name and code are required.');
@@ -33,8 +37,8 @@ try {
         $liveAvailable = $unlimited ? $slots : max(0, $slots - scholarshipTakenCount($pdo, $subtype, $name));
 
         if ($id > 0) {
-            $stmt = $pdo->prepare("UPDATE scholarships SET name = ?, code = ?, description = ?, type = ?, subtype = ?, gwa_requirement = ?, slots = ?, slots_available = ?, unlimited_slots = ?, coverage = ?, status = ? WHERE id = ?");
-            $stmt->execute([$name, $code, $description, $type, $subtype, $gwaReq, $slots, $liveAvailable, $unlimited, $coverage, $status, $id]);
+            $stmt = $pdo->prepare("UPDATE scholarships SET name = ?, code = ?, description = ?, type = ?, subtype = ?, gwa_requirement = ?, slots = ?, slots_available = ?, unlimited_slots = ?, coverage = ?, status = ?, education_level = ?, school_year = ?, application_start = ?, application_deadline = ? WHERE id = ?");
+            $stmt->execute([$name, $code, $description, $type, $subtype, $gwaReq, $slots, $liveAvailable, $unlimited, $coverage, $status, $educationLevel, $schoolYear, $applicationStart, $applicationDeadline, $id]);
             // The sub-type's required GWA is what Evaluation/Renewal enforce,
             // so editing it from the program keeps the two in sync.
             if ($subtype !== '') {
@@ -44,9 +48,9 @@ try {
             logActivity($pdo, 'Scholarship Updated', 'Scholarships', $name . ' (' . $code . ') was updated.', $id);
             sendJson(['success' => true, 'id' => $id, 'message' => 'Scholarship updated successfully.']);
         } else {
-            $stmt = $pdo->prepare("INSERT INTO scholarships (name, code, description, type, subtype, gwa_requirement, slots, slots_available, unlimited_slots, coverage, status)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-            $stmt->execute([$name, $code, $description, $type, $subtype, $gwaReq, $slots, $liveAvailable, $unlimited, $coverage, $status]);
+            $stmt = $pdo->prepare("INSERT INTO scholarships (name, code, description, type, subtype, gwa_requirement, slots, slots_available, unlimited_slots, coverage, status, education_level, school_year, application_start, application_deadline)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            $stmt->execute([$name, $code, $description, $type, $subtype, $gwaReq, $slots, $liveAvailable, $unlimited, $coverage, $status, $educationLevel, $schoolYear, $applicationStart, $applicationDeadline]);
             $newId = (int)$pdo->lastInsertId();
             logActivity($pdo, 'Scholarship Added', 'Scholarships', $name . ' (' . $code . ') was added.', $newId);
             sendJson(['success' => true, 'id' => $newId, 'message' => 'Scholarship added successfully.']);
@@ -76,7 +80,11 @@ try {
             'slotsAvailable' => $available,
             'slots_available' => $available,
             'coverage' => $r['coverage'],
-            'status' => $r['status']
+            'status' => $r['status'],
+            'educationLevel' => $r['education_level'] ?? 'Collegiate',
+            'schoolYear' => $r['school_year'] ?? '',
+            'applicationStart' => $r['application_start'] ?? '',
+            'applicationDeadline' => $r['application_deadline'] ?? '',
         ];
     }, $rows);
 

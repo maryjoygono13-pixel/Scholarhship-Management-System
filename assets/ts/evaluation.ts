@@ -62,6 +62,10 @@ function normalizeEval(record: any): EvaluationApplicant {
     status: String(record.status ?? "review"),
     remarks: String(record.remarks ?? ""),
     grades: record.grades && typeof record.grades === "object" ? record.grades : {},
+    criteria: Array.isArray(record.criteria) ? record.criteria : [],
+    documents: Array.isArray(record.documents) ? record.documents : [],
+    specialQualification: String(record.specialQualification ?? ""),
+    specialQualificationLabel: String(record.specialQualificationLabel ?? ""),
   };
 }
 
@@ -82,7 +86,7 @@ function normalizeEval(record: any): EvaluationApplicant {
     return d.innerHTML;
   }
   function gwaColor(gwa: number, req: number): string {
-    if (gwa <= req) return "var(--green)";
+    if (req <= 0 || gwa <= req) return "var(--green)";
     if (gwa <= req + 0.5) return "var(--amber)";
     return "var(--red)";
   }
@@ -94,7 +98,7 @@ function normalizeEval(record: any): EvaluationApplicant {
   }
   function semesterSummaryCard(label: string, v: number | null, req: number): string {
     const has = v != null;
-    const pass = has && (v as number) <= req;
+    const pass = has && (req <= 0 || (v as number) <= req);
     return '<div class="summary-card"><div class="big font-mono" style="color:' + (has ? gwaColor(v as number, req) : "var(--ink-soft)") + '">' + fmtGwa(v) + '</div><div class="lbl">' + label + '</div><div class="sub" style="color:' + (!has ? "var(--ink-soft)" : pass ? "var(--green)" : "var(--red)") + '">' + (!has ? "NO GRADES YET" : pass ? "PASSED" : "FAILED") + "</div></div>";
   }
   // A heads-up shown next to Approve when the GWA on file doesn't meet the requirement — it no
@@ -102,7 +106,7 @@ function normalizeEval(record: any): EvaluationApplicant {
   // GWA yet) isn't a warning at all; their eligibility follows their Grade 12 record instead.
   function approveBlockReason(a: EvaluationApplicant): string {
     if (a.status === "non-compliant") return "Note: " + a.semester + " GWA " + Number(a.gwa).toFixed(2) + " is above the required " + Number(a.gwaReq).toFixed(2) + " for " + a.type + ".";
-    if (a.gwa > 0 && a.gwa > a.gwaReq) return "Note: " + a.semester + " GWA " + Number(a.gwa).toFixed(2) + " is above the required " + Number(a.gwaReq).toFixed(2) + " for " + a.type + ".";
+    if (a.gwaReq > 0 && a.gwa > 0 && a.gwa > a.gwaReq) return "Note: " + a.semester + " GWA " + Number(a.gwa).toFixed(2) + " is above the required " + Number(a.gwaReq).toFixed(2) + " for " + a.type + ".";
     return "";
   }
   function approveBlockNote(a: EvaluationApplicant): string {
@@ -163,12 +167,13 @@ function normalizeEval(record: any): EvaluationApplicant {
     pass: boolean;
   }
 
+  // Fallback only — used when a scholarship has no configured criteria at all (shouldn't
+  // happen for any real program after migration, but keeps the panel from ever rendering
+  // blank). Real eligibility now comes from a.criteria (the scholarship's own configured
+  // rules, evaluated server-side — see includes/scholarship_criteria_helper.php).
   function computeChecklist(a: EvaluationApplicant): ChecklistItem[] {
     const hasGwa = a.gwa > 0;
-    // No grades yet isn't a failure — a new first-year applicant has no college semester GWA
-    // to check (their eligibility is based on their Grade 12 record instead). Only an actual
-    // recorded GWA above the requirement counts against them.
-    const gwaPass = !hasGwa || a.gwa <= a.gwaReq;
+    const gwaPass = !hasGwa || a.gwaReq <= 0 || a.gwa <= a.gwaReq;
     const failPass = Number(a.failingGrades) === 0;
     return [
       { label: "Currently Enrolled", value: a.enrolled ? "Enrolled" : "Not Enrolled", pass: a.enrolled },
@@ -176,6 +181,72 @@ function normalizeEval(record: any): EvaluationApplicant {
       { label: "No Failing Grade", value: failPass ? "Passed" : "Failed", pass: failPass },
       { label: "Complete Documents", value: a.docsComplete ? "Complete" : "Missing", pass: a.docsComplete },
     ];
+  }
+
+  function criterionStatusColor(status: string): string {
+    return status === "pass" ? "var(--green)" : status === "fail" ? "var(--red)" : "var(--amber)";
+  }
+  function criterionStatusIcon(status: string): string {
+    if (status === "pass") return '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>';
+    if (status === "fail") return '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+    return '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="3"><circle cx="12" cy="12" r="9"/></svg>';
+  }
+  function criterionStatusBg(status: string): string {
+    return status === "pass" ? "var(--green-bg)" : status === "fail" ? "var(--red-bg)" : "#fef3c7";
+  }
+  function criterionValueLabel(c: EvalCriterionItem): string {
+    // Poverty Threshold: show the income the applicant declared alongside the result.
+    if (c.type === "poverty_threshold" && c.actualValue != null && (c.status === "pass" || c.status === "fail"))
+      return (c.status === "pass" ? "Passed" : "Failed") + " · income ₱" + Number(c.actualValue).toLocaleString("en-PH", { minimumFractionDigits: 2 });
+    if (c.status === "pass") return "Passed";
+    if (c.status === "fail") return "Failed";
+    if (c.autoChecked) return c.remarks || "Pending Data";
+    return "Manual Verification Required";
+  }
+
+  // Renders one configured eligibility criterion row. Auto-checkable criteria (GWA, No
+  // Failing Grades, enrollment, ...) show a live computed Pass/Fail. Everything else shows
+  // "Manual Verification Required" with inline Pass/Fail/Pending buttons for the registrar —
+  // per the requirement that the system never auto-approves on criteria it can't itself check.
+  // What the applicant declared on the Apply page (Talent / Community Service / Other
+  // Discounts). Shown for the registrar to verify — never counted toward eligibility.
+  function declaredQualificationHtml(a: EvaluationApplicant): string {
+    if (!a.specialQualification) return "";
+    return (
+      '<div class="section"><h3>' + esc(a.specialQualificationLabel || "Declared Qualification") + "</h3>" +
+      '<div class="req-row"><div class="req-left">' + esc(a.specialQualification) + "</div>" +
+      '<div class="req-val" style="color:var(--ink-soft)">Declared by applicant — verify with documents</div></div></div>'
+    );
+  }
+
+  function renderCriterionRow(c: EvalCriterionItem): string {
+    const manualControls = c.autoChecked
+      ? ""
+      : '<div style="display:flex; gap:6px; margin:2px 0 10px 34px;">' +
+        (["pass", "fail", "pending"] as const)
+          .map(
+            (v) =>
+              '<button type="button" class="btn-secondary" style="height:26px; padding:0 10px; font-size:11.5px;' +
+              (c.status === v ? " border-color:" + criterionStatusColor(v) + "; color:" + criterionStatusColor(v) + ";" : "") +
+              '" data-crit-mark="' + c.id + '" data-mark-value="' + v + '">Mark ' + v[0].toUpperCase() + v.slice(1) + "</button>"
+          )
+          .join("") +
+        "</div>";
+    return (
+      '<div class="req-row"><div class="req-left"><span class="req-icon" style="background:' + criterionStatusBg(c.status) + '">' +
+      criterionStatusIcon(c.status) + "</span>" + esc(c.label) + (c.required ? "" : ' <span style="color:var(--ink-soft); font-weight:400;">(optional)</span>') +
+      '</div><div class="req-val" style="color:' + criterionStatusColor(c.status) + '">' + criterionValueLabel(c) + "</div></div>" +
+      manualControls
+    );
+  }
+
+  // A required criterion that failed or is still pending keeps the applicant out of
+  // "ELIGIBLE" — an optional one never blocks it either way.
+  function isEligible(a: EvaluationApplicant): boolean {
+    if (a.criteria.length > 0) {
+      return a.criteria.every((c) => !c.required || c.status === "pass");
+    }
+    return computeChecklist(a).every((c) => c.pass);
   }
 
   function statusBadge(status: string): string {
@@ -365,8 +436,24 @@ function normalizeEval(record: any): EvaluationApplicant {
   }
 
   function getTabBodyHtml(a: EvaluationApplicant): string {
-    const checklist = computeChecklist(a);
-    const eligible = checklist.every((c) => c.pass);
+    const eligible = isEligible(a);
+    // The scholarship's own configured criteria (registrar-defined per program) when there
+    // are any, otherwise the fixed 4-item fallback.
+    const requirementsHtml =
+      a.criteria.length > 0
+        ? a.criteria.map(renderCriterionRow).join("")
+        : computeChecklist(a)
+            .map(
+              (c) =>
+                '<div class="req-row"><div class="req-left"><span class="req-icon" style="background:' +
+                (c.pass ? "var(--green-bg)" : "var(--red-bg)") +
+                '">' +
+                (c.pass
+                  ? '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>'
+                  : '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>') +
+                "</span>" + esc(c.label) + '</div><div class="req-val" style="color:' + (c.pass ? "var(--green)" : "var(--red)") + '">' + c.value + "</div></div>"
+            )
+            .join("");
 
     if (activeTab === "overview") {
       return (
@@ -376,19 +463,9 @@ function normalizeEval(record: any): EvaluationApplicant {
         '<div class="summary-card"><div class="big font-mono">' + a.failingGrades + '</div><div class="lbl">Failing Grades</div><div class="sub" style="color:var(--ink-soft)">' + (Number(a.failingGrades) === 0 ? "None" : "Review") + "</div></div>" +
         '<div class="summary-card"><div class="big font-mono">' + computeCurriculumUnits(a) + '</div><div class="lbl">Units Earned</div><div class="sub" style="color:var(--ink-soft)">Units</div></div>' +
         "</div></div>" +
-        '<div class="section"><h3>Requirements Checklist</h3>' +
-        checklist
-          .map(
-            (c) =>
-              '<div class="req-row"><div class="req-left"><span class="req-icon" style="background:' +
-              (c.pass ? "var(--green-bg)" : "var(--red-bg)") +
-              '">' +
-              (c.pass
-                ? '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>'
-                : '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>') +
-              "</span>" + esc(c.label) + '</div><div class="req-val" style="color:' + (c.pass ? "var(--green)" : "var(--red)") + '">' + c.value + "</div></div>"
-          )
-          .join("") +
+        declaredQualificationHtml(a) +
+        '<div class="section"><h3>Eligibility Criteria</h3>' +
+        requirementsHtml +
         "</div>" +
         '<div class="section"><h3>Evaluation Result</h3>' +
         '<div class="result-big" style="color:' + (eligible ? "var(--green)" : "var(--blue)") + '">' + (eligible ? "ELIGIBLE" : "PENDING") + "</div>" +
@@ -427,7 +504,7 @@ function normalizeEval(record: any): EvaluationApplicant {
         '<div class="section"><h3>Academic Subject Breakdown</h3>' +
         breakdownHtml +
         '<div style="padding:14px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; display:flex; justify-content:space-between; align-items:center;">' +
-        '<span style="font-size:13px; font-weight:600; color:#334155;">GWA per semester (required \u2264 ' + Number(a.gwaReq).toFixed(2) + ')</span>' +
+        '<span style="font-size:13px; font-weight:600; color:#334155;">GWA per semester (' + (a.gwaReq > 0 ? 'required \u2264 ' + Number(a.gwaReq).toFixed(2) : 'no GWA requirement') + ')</span>' +
         '<span class="font-mono" style="font-size:14px; font-weight:700; color:var(--green);">1st: ' + fmtGwa(a.semesterGwa.first) + ' &nbsp;|&nbsp; 2nd: ' + fmtGwa(a.semesterGwa.second) + '</span>' +
         '</div></div>'
       );
@@ -453,12 +530,12 @@ function normalizeEval(record: any): EvaluationApplicant {
 
     if (activeTab === "documents") {
       const uploadsBase = (window.SITE_BASE || "") + "/uploads/";
-      const docRow = (label: string, filename: string): string => {
+      const docRow = (label: string, filename: string, required: boolean): string => {
         if (!filename) {
           return (
             '<div class="doc-row">' +
-            '<div class="doc-row-info"><div class="doc-row-label">' + esc(label) + '</div><div class="doc-row-meta">Not submitted</div></div>' +
-            '<span class="badge badge-rejected">Missing</span>' +
+            '<div class="doc-row-info"><div class="doc-row-label">' + esc(label) + (required ? "" : ' <span style="color:var(--ink-soft); font-weight:400;">(optional)</span>') + '</div><div class="doc-row-meta">Not submitted</div></div>' +
+            '<span class="badge ' + (required ? "badge-rejected" : "badge-pending") + '">' + (required ? "Missing" : "Optional") + '</span>' +
             '</div>'
           );
         }
@@ -471,13 +548,19 @@ function normalizeEval(record: any): EvaluationApplicant {
           '</div>'
         );
       };
+      // The scholarship's own configured document list when there is one, otherwise the
+      // fixed 3-document fallback (a scholarship should always have one after migration).
+      const rowsHtml =
+        a.documents.length > 0
+          ? a.documents.map((d) => docRow(d.label, d.filename, d.required)).join("")
+          : docRow("Official Transcript of Records (TOR)", a.transcriptFile, true) +
+            docRow("Certificate of Enrollment (COE)", a.coeFile, true) +
+            docRow("Certificate of Good Moral Character", a.goodMoralFile, true);
       return (
         '<div class="section"><h3>Submitted Verification Documents</h3>' +
         '<p style="font-size:12.5px; color:#6b7280; margin-bottom:14px;">Uploaded by the applicant through the public Apply page. Review each image before approving or rejecting this application.</p>' +
         '<div style="display:flex; flex-direction:column; gap:10px;">' +
-        docRow("Official Transcript of Records (TOR)", a.transcriptFile) +
-        docRow("Certificate of Enrollment (COE)", a.coeFile) +
-        docRow("Certificate of Good Moral Character", a.goodMoralFile) +
+        rowsHtml +
         '</div></div>'
       );
     }
@@ -490,6 +573,42 @@ function normalizeEval(record: any): EvaluationApplicant {
       '<div class="detail-item full-width"><span class="detail-label">Committee Recommendation</span><span class="detail-value remarks">Applicant meets all requirements and exhibits exceptional academic performance for continuation of scholarship grant.</span></div>' +
       '</div></div>'
     );
+  }
+
+  // Wires up the Mark Pass/Fail/Pending buttons for non-auto-checkable criteria (see
+  // renderCriterionRow). Re-run after every re-render of #evalTabContainer, since a fresh
+  // innerHTML has no listeners of its own.
+  function wireCriterionMarkButtons(a: EvaluationApplicant): void {
+    const panel = document.getElementById("rightPanel");
+    if (!panel) return;
+    panel.querySelectorAll<HTMLButtonElement>("[data-crit-mark]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const critId = btn.getAttribute("data-crit-mark");
+        const markValue = btn.getAttribute("data-mark-value");
+        if (!critId || !markValue) return;
+        btn.disabled = true;
+        try {
+          const apiPath = (typeof window !== "undefined" && window.API_BASE) ? window.API_BASE : "api";
+          const res = await fetch(`${apiPath}/save_criteria_review.php`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ applicantId: a.id, criterionId: critId, status: markValue }),
+          });
+          const json = await res.json();
+          if (json.success) {
+            await loadApplicants();
+            renderRightPanel();
+            showToast("Criterion marked " + markValue + ".", "success");
+          } else {
+            showToast(json.message || "Could not save mark.", "error");
+            btn.disabled = false;
+          }
+        } catch (e) {
+          showToast("Server error — could not save mark.", "error");
+          btn.disabled = false;
+        }
+      });
+    });
   }
 
   function renderRightPanel(): void {
@@ -542,9 +661,11 @@ function normalizeEval(record: any): EvaluationApplicant {
           if (container) container.innerHTML = getTabBodyHtml(a);
           panel.querySelectorAll(".tab").forEach((t) => t.classList.remove("active"));
           btn.classList.add("active");
+          wireCriterionMarkButtons(a);
         }
       });
     });
+    wireCriterionMarkButtons(a);
     panel.querySelectorAll<HTMLElement>("[data-decide]").forEach((btn) => {
       btn.addEventListener("click", async () => {
         const decision = btn.getAttribute("data-decide");

@@ -63,7 +63,7 @@ try {
 
     // Look up the applicant behind each record (if any) for richer academic details.
     $appStmt = $pdo->prepare("
-        SELECT first_name, middle_name, last_name, program, major, year_level, semester, gwa, gwa_req, failing_grades, units, enrolled, docs_complete
+        SELECT id, birthdate, age, first_name, middle_name, last_name, program, major, year_level, semester, gwa, gwa_req, failing_grades, units, enrolled, docs_complete
         FROM applicants
         WHERE id = ? OR student_id = ?
         ORDER BY id DESC
@@ -82,9 +82,18 @@ try {
         $sentToRenewal[trim($ren['student_id']) . '|' . trim($ren['school_year']) . '|' . normalizeSemesterName($ren['semester']) . '|' . strtolower(trim((string)$ren['scholarship_type']))] = strtolower(trim((string)$ren['status']));
     }
 
-    $data = array_map(function($r) use ($appStmt, $gradeStmt, $semesterStats, $sentToRenewal, $pdo) {
+    $ageUpdate = $pdo->prepare("UPDATE applicants SET age = ? WHERE id = ?");
+
+    $data = array_map(function($r) use ($appStmt, $gradeStmt, $semesterStats, $sentToRenewal, $pdo, $ageUpdate) {
         $appStmt->execute([(int)($r['applicant_id'] ?? 0), $r['student_id']]);
         $app = $appStmt->fetch();
+
+        // Age always follows the birthdate, so it goes up on the scholar's birthday. The
+        // stored applicants.age is brought up to date too whenever it has fallen behind.
+        $age = $app ? computeAge($app['birthdate'] ?? '') : null;
+        if ($age !== null && ($app['age'] === null || (int)$app['age'] !== $age)) {
+            $ageUpdate->execute([$age, (int)$app['id']]);
+        }
 
         $recordSem = normalizeSemesterName($r['semester']);
         $termStats = $semesterStats[(string)$r['student_id']][$recordSem] ?? null;
@@ -122,6 +131,8 @@ try {
             // pre-fill the Edit form so saving never overwrites it with a same-Student-ID
             // applicant's (possibly different/mismatched) name.
             'recordName' => $r['name'],
+            'age' => $age,
+            'birthdate' => $app['birthdate'] ?? '',
             'scholarshipType' => $r['scholarship_type'],
             'scholarship_type' => $r['scholarship_type'],
             'status' => $r['status'],

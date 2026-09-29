@@ -110,14 +110,21 @@ body { background: #f4f7f5; min-height: 100vh; position: relative; overflow-x: h
 .ap-flash { padding: 12px 14px; border-radius: 8px; font-size: 13.5px; margin-bottom: 18px; }
 .ap-flash.error { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
 
-.ap-success { text-align: center; padding: 40px 20px; animation: apRiseIn 0.4s ease both; }
+.ap-success { text-align: center; padding: 40px 20px; max-width: 460px; margin: 0 auto; animation: apRiseIn 0.4s ease both; }
 .ap-success-icon {
     width: 64px; height: 64px; margin: 0 auto 16px; border-radius: 50%;
     background: #d1fae5; color: #065f46; font-size: 30px; font-weight: 700;
     display: flex; align-items: center; justify-content: center;
 }
-.ap-success h2 { font-size: 18px; color: var(--green-900); margin-bottom: 8px; line-height: 1.4; }
-.ap-success p { font-size: 13.5px; color: #6b7280; }
+.ap-success h2 { font-size: 19px; color: var(--green-900); margin-bottom: 14px; line-height: 1.4; }
+.ap-success p { font-size: 13.5px; color: #6b7280; line-height: 1.65; }
+.ap-success p + p { margin-top: 12px; }
+.ap-success-note { font-weight: 600; color: var(--green-800) !important; }
+@media (max-width: 480px) {
+    .ap-success { padding: 32px 12px; }
+    .ap-success h2 { font-size: 17px; }
+    .ap-success-btn { width: 100%; min-width: 0; }
+}
 
 .ap-section { margin-bottom: 26px; }
 .ap-section h3 { font-size: 14.5px; color: var(--green-900); margin-bottom: 4px; }
@@ -179,3 +186,10 @@ body { background: #f4f7f5; min-height: 100vh; position: relative; overflow-x: h
 .ap-btn-secondary:active { transform: translateY(0); }
 
 .ap-success-btn { display: inline-block; width: auto; min-width: 220px; margin-top: 8px; text-decoration: none; line-height: 48px; padding: 0 28px; }
+
+/* Application period status on each program */
+.ap-program-period { font-size: 11.5px; margin-top: 3px; color: #6b7280; }
+.ap-period-open { color: #065f46; }
+.ap-period-closed { color: #991b1b; }
+.ap-period-not_yet_open { color: #92400e; }
+.ap-badge-soon { background: #fef3c7; color: #92400e; }

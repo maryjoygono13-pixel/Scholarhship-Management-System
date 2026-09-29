@@ -37,6 +37,29 @@ function resolveGwaRequirement(PDO $pdo, string $scholarshipType, ?float $fallba
     return findGwaRequirement($pdo, $scholarshipType) ?? ($fallback && $fallback > 0 ? $fallback : DEFAULT_GWA_REQUIREMENT);
 }
 
+/*
+ * The GWA a scholar must keep to be RENEWED — a scholarship's `scholarship_renewal_rules.min_gwa`
+ * overrides its normal requirement when set (a program can ask for a stricter GWA to keep the
+ * grant than it did to first receive it); otherwise this is identical to resolveGwaRequirement().
+ */
+function resolveRenewalGwaRequirement(PDO $pdo, string $scholarshipType, ?float $fallback = null): float {
+    if (function_exists('resolveScholarshipIdForType') && function_exists('getScholarshipRenewalRules')) {
+        $scholarshipId = resolveScholarshipIdForType($pdo, $scholarshipType);
+        if ($scholarshipId) {
+            $rules = getScholarshipRenewalRules($pdo, $scholarshipId);
+            if ($rules && $rules['min_gwa'] !== null && (float)$rules['min_gwa'] > 0) {
+                return (float)$rules['min_gwa'];
+            }
+        }
+    }
+    return resolveGwaRequirement($pdo, $scholarshipType, $fallback);
+}
+
+// A requirement of 0 means the scholarship has no GWA requirement, so any GWA meets it.
+function gwaMeetsRequirement(float $gwa, float $required): bool {
+    return $required <= 0 || $gwa <= $required;
+}
+
 const STATUS_NON_COMPLIANT = 'non-compliant';
 
 /*
@@ -48,5 +71,5 @@ function isGwaRequirementUnmet(PDO $pdo, array $applicant): bool {
     $gwa = (float)($applicant['gwa'] ?? 0);
     if ($gwa <= 0) return false;
     $required = resolveGwaRequirement($pdo, (string)($applicant['scholarship_type'] ?? ''), (float)($applicant['gwa_req'] ?? 0));
-    return $gwa > $required;
+    return !gwaMeetsRequirement($gwa, $required);
 }

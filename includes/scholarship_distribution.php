@@ -120,7 +120,7 @@ function getScholarshipDistribution(PDO $pdo, ?string $schoolYear = null): array
             foreach (['Summer Term', '2nd Semester', '1st Semester'] as $sem) {
                 if (isset($gradeStats[$sid][$sem])) { $gwa = $gradeStats[$sid][$sem]['gwa']; break; }
             }
-            if ($gwa > resolveGwaRequirement($pdo, (string)$sc['scholarship_type'])) continue;
+            if (!gwaMeetsRequirement((float)$gwa, resolveGwaRequirement($pdo, (string)$sc['scholarship_type']))) continue;
 
             $type = $resolve((string)$sc['scholarship_type']);
             $counts[$type]['s:' . $sid] = true;   // same key as a record, so nobody is counted twice per type

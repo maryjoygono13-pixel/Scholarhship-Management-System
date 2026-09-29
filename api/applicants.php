@@ -54,7 +54,19 @@ try {
         // Each semester's own GWA / failing count, from the imported academic records.
         $semesterStats = getSemesterGradeStats($pdo, $studentIds);
 
-        $data = array_map(function ($r) use ($gradesMap, $pdo, $semesterStats) {
+        // The question's label ("Special Field / Area of Involvement" or "Scholarship / Discount
+        // Qualification") follows the program's type, looked up only when an answer exists.
+        $typeStmt = $pdo->prepare("SELECT type FROM scholarships WHERE id = ?");
+        $specialQualificationLabel = function (array $r) use ($pdo, $typeStmt): string {
+            if (trim((string)($r['special_qualification'] ?? '')) === '') return '';
+            $sid = resolveScholarshipIdForType($pdo, (string)$r['scholarship_type']);
+            $type = (string)$r['scholarship_type'];
+            if ($sid) { $typeStmt->execute([$sid]); $type = (string)($typeStmt->fetchColumn() ?: $type); }
+            $cfg = specialQualificationConfig($type);
+            return $cfg ? $cfg['label'] : 'Declared Qualification';
+        };
+
+        $data = array_map(function ($r) use ($gradesMap, $pdo, $semesterStats, $specialQualificationLabel) {
             $stats = $semesterStats[(string)$r['student_id']] ?? [];
             $currentSem = normalizeSemesterName($r['semester'] ?? '');
             // Scholars with no grades on file yet but a stored GWA (entered before
@@ -101,6 +113,16 @@ try {
                 // applicant's real status is untouched, so the Applicants page keeps showing it.
                 'status' => isGwaRequirementUnmet($pdo, $r) ? STATUS_NON_COMPLIANT : $r['status'],
                 'remarks' => $r['remarks'] ?? '',
+                // Declared on the Apply page (Talent / Community Service / Other Discounts) —
+                // informational only, verified by the registrar against the documents.
+                'specialQualification' => formatSpecialQualification($r['special_qualification'] ?? '', $r['special_qualification_other'] ?? ''),
+                'specialQualificationLabel' => $specialQualificationLabel($r),
+
+                // The scholarship's own configured eligibility criteria and required documents
+                // (registrar-defined on the Scholarships page), evaluated live against this
+                // applicant. Additive — every field above is unchanged for any other reader.
+                'criteria' => evaluateApplicantCriteria($pdo, $r),
+                'documents' => evaluateApplicantDocuments($pdo, $r),
 
                 'grades' => (object)($gradesMap[$r['student_id']] ?? [])
             ];

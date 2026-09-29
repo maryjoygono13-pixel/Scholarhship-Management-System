@@ -54,7 +54,7 @@ try {
             }
 
             if (empty($items)) {
-                sendError('Please add at least one sub-type.');
+                sendError('Please add at least one program.');
             }
 
             $existingStmt = $pdo->prepare("SELECT id, name, gwa_requirement FROM scholarship_subtypes WHERE type_id = ? AND LOWER(name) = LOWER(?)");
@@ -66,12 +66,17 @@ try {
                 $gwaRaw = $item['gwa_requirement'] ?? null;
 
                 if ($name === '') {
-                    sendError('Every sub-type needs a name.');
+                    sendError('Every program needs a name.');
                 }
-                if ($gwaRaw === null || $gwaRaw === '' || !is_numeric($gwaRaw) || (float)$gwaRaw <= 0) {
+                // GWA is optional here — the program's own GWA Requirement is
+                // synced onto the sub-type when the scholarship is saved.
+                if ($gwaRaw === null || $gwaRaw === '') {
+                    $gwa = 0.0; // no GWA requirement
+                } elseif (!is_numeric($gwaRaw) || (float)$gwaRaw <= 0) {
                     sendError('"' . $name . '" needs a valid GWA requirement greater than 0.');
+                } else {
+                    $gwa = round((float)$gwaRaw, 2);
                 }
-                $gwa = round((float)$gwaRaw, 2);
 
                 $existingStmt->execute([$typeId, $name]);
                 $found = $existingStmt->fetch();
@@ -83,7 +88,7 @@ try {
 
                 $insert->execute([$typeId, $name, $gwa]);
                 $newId = (int)$pdo->lastInsertId();
-                logActivity($pdo, 'Scholarship Sub-type Added', 'Scholarships', 'New sub-type "' . $name . '" (GWA ' . $gwa . ') was added under "' . $typeName . '".', $newId);
+                logActivity($pdo, 'Scholarship Program Added', 'Scholarships', 'New program "' . $name . '"' . ($gwa > 0 ? ' (GWA ' . $gwa . ')' : '') . ' was added under "' . $typeName . '".', $newId);
                 $results[] = ['id' => $newId, 'name' => $name, 'gwaRequirement' => $gwa, 'existing' => false];
             }
 
@@ -99,20 +104,24 @@ try {
             $gwaRaw = $payload['gwa_requirement'] ?? null;
 
             if ($id <= 0) {
-                sendError('Invalid sub-type.');
+                sendError('Invalid program.');
             }
             if ($name === '') {
-                sendError('Please enter a sub-type name.');
+                sendError('Please enter a program name.');
             }
-            if ($gwaRaw === null || $gwaRaw === '' || !is_numeric($gwaRaw) || (float)$gwaRaw <= 0) {
-                sendError('Please enter a valid GWA requirement greater than 0.');
+            // Blank = no GWA requirement.
+            if ($gwaRaw === null || $gwaRaw === '') {
+                $gwa = 0.0;
+            } elseif (!is_numeric($gwaRaw) || (float)$gwaRaw <= 0) {
+                sendError('Please enter a valid GWA requirement greater than 0, or leave it blank.');
+            } else {
+                $gwa = round((float)$gwaRaw, 2);
             }
-            $gwa = round((float)$gwaRaw, 2);
 
             $stmt = $pdo->prepare("UPDATE scholarship_subtypes SET name = ?, gwa_requirement = ? WHERE id = ?");
             $stmt->execute([$name, $gwa, $id]);
 
-            logActivity($pdo, 'Scholarship Sub-type Updated', 'Scholarships', 'Sub-type "' . $name . '" was updated (GWA ' . $gwa . ').', $id);
+            logActivity($pdo, 'Scholarship Program Updated', 'Scholarships', 'Program "' . $name . '" was updated' . ($gwa > 0 ? ' (GWA ' . $gwa . ')' : '') . '.', $id);
 
             sendJson(['success' => true, 'id' => $id, 'name' => $name, 'gwaRequirement' => $gwa]);
         }
@@ -120,7 +129,7 @@ try {
         if ($action === 'delete_subtype') {
             $id = (int)($payload['id'] ?? 0);
             if ($id <= 0) {
-                sendError('Invalid sub-type.');
+                sendError('Invalid program.');
             }
 
             $nameStmt = $pdo->prepare("SELECT name FROM scholarship_subtypes WHERE id = ?");
@@ -131,7 +140,7 @@ try {
             $stmt->execute([$id]);
 
             if ($name) {
-                logActivity($pdo, 'Scholarship Sub-type Deleted', 'Scholarships', 'Sub-type "' . $name . '" was deleted.', $id);
+                logActivity($pdo, 'Scholarship Program Deleted', 'Scholarships', 'Program "' . $name . '" was deleted.', $id);
             }
 
             sendJson(['success' => true]);

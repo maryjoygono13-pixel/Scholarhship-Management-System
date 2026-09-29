@@ -78,7 +78,7 @@ try {
         }
         // No imported grades yet: fall back to the GWA stored on the scholar.
         $gwa = $standingSemester ? $stats[$standingSemester]['gwa'] : (float)$s['gwa'];
-        $maintains = $gwa <= $required;
+        $maintains = gwaMeetsRequirement((float)$gwa, (float)$required);
 
         // MERIT-BASED Academic: 2.00 or worse in any semester of this school year removes the
         // scholar until the next school year, even if a later semester is back within 1.50.

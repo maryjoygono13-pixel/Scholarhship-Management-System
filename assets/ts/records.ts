@@ -164,7 +164,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     tableBody.innerHTML = "";
     if (filtered.length === 0) {
-      tableBody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding: 24px; color: #6b7280;">No records found.</td></tr>`;
+      tableBody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding: 24px; color: #6b7280;">No records found.</td></tr>`;
       renderPaginationBar(0);
       return;
     }
@@ -180,6 +180,7 @@ document.addEventListener("DOMContentLoaded", () => {
       tr.innerHTML = `
         <td><strong class="font-mono">${r.studentId}</strong></td>
         <td>${r.name}</td>
+        <td>${r.age != null ? r.age : "—"}</td>
         <td>${typeAcronym(r.scholarshipType)}</td>
         <td><span class="status-badge ${badgeClass}">${recordStatusLabel(r.status)}</span></td>
         <td>${r.currentSemester || r.semester}</td>
@@ -272,7 +273,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const passBg = "#dcfce7", failBg = "#ffe4e6";
 
     if (tab === "overview") {
-      const gwaPass = hasAcademic && Number(r.gwa) <= Number(r.gwaReq);
+      const gwaPass = hasAcademic && (Number(r.gwaReq) <= 0 || Number(r.gwa) <= Number(r.gwaReq));
       const failPass = hasAcademic && Number(r.failingGrades) === 0;
       const checklist = hasAcademic ? [
         { label: "Currently Enrolled", value: r.enrolled ? "Enrolled" : "Not Enrolled", pass: !!r.enrolled },
@@ -374,7 +375,7 @@ document.addEventListener("DOMContentLoaded", () => {
       '<div class="profile">' +
       '<div class="profile-top"><div class="avatar">' + initials(r.name) + '</div>' +
       '<div><div class="record-profile-name">' + esc(r.fullName || r.name) + ' <span class="status-badge ' + statusClass + '">' + esc(recordStatusLabel(r.status)) + '</span></div>' +
-      '<div class="profile-id font-mono">' + esc(r.studentId) + '</div></div></div>' +
+      '<div class="profile-id font-mono">' + esc(r.studentId) + (r.age != null ? ' · <span title="Born ' + esc(r.birthdate) + '">' + r.age + ' yrs old</span>' : '') + '</div></div></div>' +
       '<div class="profile-meta">' +
       '<span>' + esc(typeAcronym(r.scholarshipType)) + ' Scholarship</span>' +
       '<span>' + esc(r.currentSemester || r.semester) + ' &middot; <span class="font-mono">' + esc(r.sy) + '</span></span>' +

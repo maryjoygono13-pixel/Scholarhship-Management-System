@@ -34,6 +34,16 @@ function sendRecordToRenewal(PDO $pdo, array $rec, ?string $status = 'pending', 
     $semester = normalizeSemesterName($rec['semester'] ?? '');
     $sy = trim((string)($rec['sy'] ?? '')) !== '' ? trim($rec['sy']) : getActiveSchoolYear($pdo);
 
+    // A scholarship configured with "requires_renewal = No" never enters Renewal & Retention
+    // at all — once approved, it stays approved with no further per-term reassessment.
+    if (function_exists('resolveScholarshipIdForType') && function_exists('getScholarshipRenewalRules')) {
+        $scholarshipId = resolveScholarshipIdForType($pdo, (string)$rec['scholarship_type']);
+        if ($scholarshipId) {
+            $rules = getScholarshipRenewalRules($pdo, $scholarshipId);
+            if ($rules && !$rules['requires_renewal']) return null;
+        }
+    }
+
     // One row per scholarship per term: a student holding two scholarship types has two rows.
     $exists = $pdo->prepare("SELECT id FROM renewal_retention WHERE student_id = ? AND school_year = ? AND semester = ? AND LOWER(TRIM(scholarship_type)) = LOWER(TRIM(?))");
     $exists->execute([$sid, $sy, $semester, (string)$rec['scholarship_type']]);
@@ -63,7 +73,7 @@ function sendRecordToRenewal(PDO $pdo, array $rec, ?string $status = 'pending', 
 
     if ($status === null) {
         $required = resolveGwaRequirement($pdo, (string)$rec['scholarship_type'], $applicant ? (float)$applicant['gwa_req'] : null);
-        $status = ($gwa > 0 && $gwa <= $required) ? 'eligible' : 'at-risk';
+        $status = ($required <= 0 || ($gwa > 0 && $gwa <= $required)) ? 'eligible' : 'at-risk';
     }
 
     $insert = $pdo->prepare("

@@ -22,6 +22,30 @@ document.addEventListener("DOMContentLoaded", () => {
   const schUnlimited = document.getElementById("schUnlimited") as HTMLInputElement | null;
   const schCoverage = document.getElementById("schCoverage") as HTMLTextAreaElement | null;
 
+  // Wizard steps 1-6 (Basic Info / Criteria / Documents / Benefits / Renewal / Review)
+  const schEducationLevel = document.getElementById("schEducationLevel") as HTMLSelectElement | null;
+  const schSchoolYear = document.getElementById("schSchoolYear") as HTMLInputElement | null;
+  const schAppStart = document.getElementById("schAppStart") as HTMLInputElement | null;
+  const schAppDeadline = document.getElementById("schAppDeadline") as HTMLInputElement | null;
+  const schDescription = document.getElementById("schDescription") as HTMLTextAreaElement | null;
+  const schStepCounter = document.getElementById("schStepCounter");
+  const schProgressFill = document.getElementById("schProgressFill") as HTMLElement | null;
+  const schWizardBackBtn = document.getElementById("schWizardBackBtn") as HTMLElement | null;
+  const schWizardNextBtn = document.getElementById("schWizardNextBtn") as HTMLElement | null;
+  const schWizardSaveBtn = document.getElementById("schWizardSaveBtn") as HTMLElement | null;
+  const schCriteriaRows = document.getElementById("schCriteriaRows");
+  const schDocumentRows = document.getElementById("schDocumentRows");
+  const schBenefitRows = document.getElementById("schBenefitRows");
+  const schRenewalRequired = document.getElementById("schRenewalRequired") as HTMLInputElement | null;
+  const schRenewalDetails = document.getElementById("schRenewalDetails") as HTMLElement | null;
+  const schRenewalFlags = document.getElementById("schRenewalFlags") as HTMLElement | null;
+  const schRenewalPeriod = document.getElementById("schRenewalPeriod") as HTMLSelectElement | null;
+  const schRenewalMinGwa = document.getElementById("schRenewalMinGwa") as HTMLInputElement | null;
+  const schRenewalNoFailing = document.getElementById("schRenewalNoFailing") as HTMLInputElement | null;
+  const schRenewalUpdatedDocs = document.getElementById("schRenewalUpdatedDocs") as HTMLInputElement | null;
+  const schRenewalDescription = document.getElementById("schRenewalDescription") as HTMLTextAreaElement | null;
+  const schReviewBody = document.getElementById("schReviewBody");
+
   const schViewOverlay = document.getElementById("schViewOverlay");
   const schViewCloseBtn = document.getElementById("schViewCloseBtn");
   const schViewCloseBtn2 = document.getElementById("schViewCloseBtn2");
@@ -115,7 +139,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (subtypes.length === 0 && !selectedName) {
       const empty = document.createElement("span");
       empty.className = "pill-picker-empty";
-      empty.textContent = "No sub-types yet — add one";
+      empty.textContent = "No programs yet — add one";
       picker.insertBefore(empty, addWrap);
     }
 
@@ -153,15 +177,15 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!schGwa) return;
     if (pickedSubtypes.length > 1) {
       schGwa.value = "";
-      schGwa.placeholder = "Each sub-type uses its own GWA";
+      schGwa.placeholder = "Each program uses its own GWA";
       schGwa.disabled = true;
       return;
     }
     schGwa.disabled = false;
-    schGwa.placeholder = "e.g. 1.75";
+    schGwa.placeholder = "Leave blank if none";
     const only = pickedSubtypes[0] || (schSubtype ? schSubtype.value : "");
     const subtype = type ? type.subtypes.find((s) => s.name === only) : undefined;
-    if (subtype) schGwa.value = String(subtype.gwaRequirement);
+    if (subtype) schGwa.value = subtype.gwaRequirement > 0 ? String(subtype.gwaRequirement) : "";
   }
 
   function selectSubtype(name: string): void {
@@ -325,7 +349,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const previousValue = filterSubtype.value;
     const typeVal = filterType ? filterType.value : "all";
 
-    filterSubtype.innerHTML = '<option value="all">Sub-types</option>';
+    filterSubtype.innerHTML = '<option value="all">Programs</option>';
 
     const names: string[] = [];
     scholarshipTypes.forEach((t) => {
@@ -497,7 +521,7 @@ document.addEventListener("DOMContentLoaded", () => {
         ${s.subtype ? `<div style="font-size:12px; color:#6b7280;">${escapeHtml(s.subtype)}</div>` : ""}
       </td>
 
-      <td><span class="font-mono">${isNaN(gwa) ? "—" : gwa.toFixed(2)}</span></td>
+      <td><span class="font-mono">${isNaN(gwa) || gwa <= 0 ? "—" : gwa.toFixed(2)}</span></td>
 
       <td>
         <span class="font-mono">
@@ -541,20 +565,20 @@ document.addEventListener("DOMContentLoaded", () => {
 
       <td>${escapeHtml(t.name)}</td>
 
-      <td class="st-gwa font-mono">${Number(st.gwaRequirement).toFixed(2)}</td>
+      <td class="st-gwa font-mono">${Number(st.gwaRequirement) > 0 ? Number(st.gwaRequirement).toFixed(2) : "—"}</td>
 
       <td><span class="font-mono">—</span></td>
 
       <td><span class="status-badge badge-none">Not set up</span></td>
 
       <td class="actions-cell st-actions">
-        <button type="button" class="btn-icon-action" data-st-create title="Create program for this sub-type">
+        <button type="button" class="btn-icon-action" data-st-create title="Create scholarship for this program">
           <i data-lucide="plus"></i>
         </button>
-        <button type="button" class="btn-icon-action edit" data-st-edit title="Edit sub-type">
+        <button type="button" class="btn-icon-action edit" data-st-edit title="Edit program">
           <i data-lucide="pencil"></i>
         </button>
-        <button type="button" class="btn-icon-action delete" data-st-delete title="Delete sub-type">
+        <button type="button" class="btn-icon-action delete" data-st-delete title="Delete program">
           <i data-lucide="trash-2"></i>
         </button>
       </td>
@@ -587,6 +611,15 @@ document.addEventListener("DOMContentLoaded", () => {
     return d.innerHTML;
   }
 
+  // A titled list-or-"None configured" block — used by both the wizard's Review step and
+  // the read-only Scholarship Overview popup.
+  function sectionListHtml(title: string, items: any[], formatter: (i: any) => string): string {
+    const body = items.length
+      ? "<ul>" + items.map((i) => `<li>${formatter(i)}</li>`).join("") + "</ul>"
+      : '<p class="sch-review-empty">None configured.</p>';
+    return `<div class="sch-review-section"><h4>${escapeHtml(title)}</h4>${body}</div>`;
+  }
+
   function startEditSubtypeRow(tr: HTMLElement, st: ScholarshipSubtype): void {
 
     const nameEl = tr.querySelector(".st-name");
@@ -595,7 +628,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!nameEl || !gwaCell || !actionsCell) return;
 
     nameEl.innerHTML = '<input type="text" class="mt-edit-name" value="' + escapeHtml(st.name) + '" style="width:100%;">';
-    gwaCell.innerHTML = '<input type="number" step="0.01" min="0.01" class="mt-edit-gwa" value="' + escapeHtml(Number(st.gwaRequirement).toFixed(2)) + '" style="width:90px;">';
+    gwaCell.innerHTML = '<input type="number" step="0.01" min="0.01" class="mt-edit-gwa" value="' + escapeHtml(Number(st.gwaRequirement) > 0 ? Number(st.gwaRequirement).toFixed(2) : "") + '" placeholder="None" style="width:90px;">';
     actionsCell.innerHTML =
       '<button type="button" class="btn-icon-action" data-st-save title="Save"><i data-lucide="check"></i></button>' +
       '<button type="button" class="btn-icon-action delete" data-st-cancel title="Cancel"><i data-lucide="x"></i></button>';
@@ -615,8 +648,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const name = nameInput ? nameInput.value.trim() : "";
     const gwa = gwaInput ? gwaInput.value.trim() : "";
 
-    if (!name || !gwa || Number(gwa) <= 0) {
-      alert("Please enter a name and a valid GWA greater than 0.");
+    if (!name || (gwa !== "" && Number(gwa) <= 0)) {
+      alert("Please enter a name, and a GWA greater than 0 or leave it blank.");
       return;
     }
 
@@ -633,7 +666,7 @@ document.addEventListener("DOMContentLoaded", () => {
         populateFilterTypes();
         renderScholarships();
       } else {
-        alert(json.message || "Failed to update sub-type.");
+        alert(json.message || "Failed to update program.");
       }
     } catch (e) {
       alert("Server error.");
@@ -642,7 +675,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   async function deleteSubtype(id: number): Promise<void> {
 
-    if (!confirm("Delete this sub-type? This cannot be undone.")) return;
+    if (!confirm("Delete this program? This cannot be undone.")) return;
 
     try {
       const apiPath = "api";
@@ -657,16 +690,19 @@ document.addEventListener("DOMContentLoaded", () => {
         populateFilterTypes();
         renderScholarships();
       } else {
-        alert(json.message || "Failed to delete sub-type.");
+        alert(json.message || "Failed to delete program.");
       }
     } catch (e) {
       alert("Server error.");
     }
   }
 
-  function openViewModal(s: any): void {
+  async function openViewModal(s: any): Promise<void> {
     if (!schViewOverlay || !schViewBody) return;
     const statusClass = s.status === 'active' ? 'badge-active' : 'badge-inactive';
+    const applicationWindow = (s.applicationStart || s.applicationDeadline)
+      ? `${s.applicationStart || "—"} to ${s.applicationDeadline || "—"}`
+      : "Not set";
     schViewBody.innerHTML = `
       <div class="view-detail-grid">
         <div class="detail-item full-width">
@@ -677,14 +713,26 @@ document.addEventListener("DOMContentLoaded", () => {
           <span class="detail-label">Category / Type</span>
           <span class="detail-value">${s.type}</span>
         </div>
-        ${s.subtype ? '<div class="detail-item"><span class="detail-label">Sub-type</span><span class="detail-value">' + s.subtype + '</span></div>' : ''}
+        ${s.subtype ? '<div class="detail-item"><span class="detail-label">Program</span><span class="detail-value">' + s.subtype + '</span></div>' : ''}
         <div class="detail-item">
           <span class="detail-label">Status</span>
           <span class="status-badge ${statusClass}">${s.status}</span>
         </div>
         <div class="detail-item">
+          <span class="detail-label">Education Level</span>
+          <span class="detail-value">${escapeHtml(s.educationLevel || "Collegiate")}</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">School Year</span>
+          <span class="detail-value">${escapeHtml(s.schoolYear || "—")}</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Application Window</span>
+          <span class="detail-value">${escapeHtml(applicationWindow)}</span>
+        </div>
+        <div class="detail-item">
           <span class="detail-label">GWA Requirement</span>
-          <span class="detail-value mono font-mono"><= ${s.gwaRequirement || '1.75'}</span>
+          <span class="detail-value mono font-mono">${Number(s.gwaRequirement) > 0 ? "<= " + s.gwaRequirement : "No GWA requirement"}</span>
         </div>
         <div class="detail-item">
           <span class="detail-label">Total Slots Capacity</span>
@@ -695,8 +743,38 @@ document.addEventListener("DOMContentLoaded", () => {
           <span class="detail-value">${s.coverage || s.description || 'Full Tuition Coverage'}</span>
         </div>
       </div>
+      <div id="schViewExtra" class="sch-view-extra">
+        <p class="sch-review-empty">Loading eligibility criteria, documents, benefits &amp; renewal rules&hellip;</p>
+      </div>
     `;
     schViewOverlay.classList.add("open");
+
+    // The configured layer is fetched live (not cached on the row), so edits made
+    // elsewhere on this page show up immediately without a full reload.
+    try {
+      const [c, d, b, r] = await Promise.all([
+        fetch(`api/scholarship_criteria.php?scholarship_id=${s.id}`).then((res) => res.json()),
+        fetch(`api/scholarship_documents.php?scholarship_id=${s.id}`).then((res) => res.json()),
+        fetch(`api/scholarship_benefits.php?scholarship_id=${s.id}`).then((res) => res.json()),
+        fetch(`api/scholarship_renewal_rules.php?scholarship_id=${s.id}`).then((res) => res.json()),
+      ]);
+      const extra = document.getElementById("schViewExtra");
+      if (!extra) return;
+
+      const criteria = c.success ? (c.data || []) : [];
+      const documents = d.success ? (d.data || []) : [];
+      const benefits = b.success ? (b.data || []) : [];
+      const renewal = r.success ? r.data : null;
+
+      extra.innerHTML =
+        sectionListHtml("Eligibility Criteria", criteria, formatCriterionSummary) +
+        sectionListHtml("Required Documents", documents, (item: any) => `${escapeHtml(item.label)}${item.required ? "" : " (optional)"}`) +
+        sectionListHtml("Benefits", benefits, (item: any) => `${escapeHtml(item.label)}${item.value ? ": " + escapeHtml(item.value) : ""}`) +
+        `<div class="sch-review-section"><h4>Renewal Rules</h4><p style="font-size:13px; color:#374151;">${renewal && renewal.requiresRenewal ? "Requires renewal (" + escapeHtml(renewal.renewalPeriod) + ")" : "Does not require renewal"}${renewal && renewal.minGwa ? " · Min GWA " + escapeHtml(renewal.minGwa) : ""}</p></div>`;
+    } catch (e) {
+      const extra = document.getElementById("schViewExtra");
+      if (extra) extra.innerHTML = '<p class="sch-review-empty">Could not load eligibility criteria, documents, benefits &amp; renewal rules.</p>';
+    }
   }
 
   function closeViewModal(): void {
@@ -713,6 +791,325 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   if (schUnlimited) schUnlimited.addEventListener("change", syncUnlimitedSlots);
 
+  /* =========================================================
+     WIZARD: Criteria / Documents / Benefits / Renewal Rules
+     (registrar-configurable eligibility layer, per scholarship)
+  ========================================================= */
+
+  const SCH_WIZARD_STEPS = [
+    "Basic Information", "Eligibility Criteria", "Required Documents",
+    "Benefits / Incentives", "Renewal Rules", "Review",
+  ];
+  let schWizardStep = 1;
+  let CRITERION_TYPES: Record<string, string> = {};
+  let DOCUMENT_TYPES: Record<string, string> = {};
+  let BENEFIT_TYPES: Record<string, string> = {};
+  const OPERATOR_LABELS: Record<string, string> = { gt: "Greater than", gte: "At least", lt: "Less than", lte: "At most", eq: "Equal to", between: "Between" };
+
+  async function loadWizardVocab(): Promise<void> {
+    try {
+      const [c, d, b] = await Promise.all([
+        fetch("api/scholarship_criteria.php").then((r) => r.json()),
+        fetch("api/scholarship_documents.php").then((r) => r.json()),
+        fetch("api/scholarship_benefits.php").then((r) => r.json()),
+      ]);
+      if (c.success) CRITERION_TYPES = c.types || {};
+      if (d.success) DOCUMENT_TYPES = d.types || {};
+      if (b.success) BENEFIT_TYPES = b.types || {};
+    } catch (e) {
+      console.error("Failed to load criteria/document/benefit types:", e);
+    }
+  }
+
+  function optionsHtml(typesObj: Record<string, string>, selected?: string): string {
+    return Object.keys(typesObj)
+      .map((key) => `<option value="${key}" ${key === selected ? "selected" : ""}>${escapeHtml(typesObj[key])}</option>`)
+      .join("");
+  }
+
+  function goToWizardStep(n: number): void {
+    schWizardStep = Math.max(1, Math.min(SCH_WIZARD_STEPS.length, n));
+    document.querySelectorAll(".sch-step").forEach((el) => {
+      el.classList.toggle("active", Number(el.getAttribute("data-step")) === schWizardStep);
+    });
+    if (schStepCounter) schStepCounter.textContent = `Step ${schWizardStep} of ${SCH_WIZARD_STEPS.length} — ${SCH_WIZARD_STEPS[schWizardStep - 1]}`;
+    if (schProgressFill) schProgressFill.style.width = `${(schWizardStep / SCH_WIZARD_STEPS.length) * 100}%`;
+    // Plain `.hidden` loses to the `.btn-primary`/`.btn-secondary` classes' own `display`
+    // rule (equal specificity, author stylesheet order) — set `display` directly.
+    if (schWizardBackBtn) schWizardBackBtn.style.display = schWizardStep === 1 ? "none" : "";
+    const isLast = schWizardStep === SCH_WIZARD_STEPS.length;
+    if (schWizardNextBtn) schWizardNextBtn.style.display = isLast ? "none" : "";
+    if (schWizardSaveBtn) schWizardSaveBtn.style.display = isLast ? "" : "none";
+    if (isLast) renderReviewStep();
+  }
+
+  function syncRenewalFieldVisibility(): void {
+    const required = !!(schRenewalRequired && schRenewalRequired.checked);
+    if (schRenewalDetails) schRenewalDetails.style.opacity = required ? "1" : "0.45";
+    if (schRenewalFlags) schRenewalFlags.style.opacity = required ? "1" : "0.45";
+    [schRenewalPeriod, schRenewalMinGwa, schRenewalNoFailing, schRenewalUpdatedDocs].forEach((el) => {
+      if (el) (el as HTMLInputElement | HTMLSelectElement).disabled = !required;
+    });
+  }
+  if (schRenewalRequired) schRenewalRequired.addEventListener("change", syncRenewalFieldVisibility);
+
+  function resetWizard(): void {
+    schWizardStep = 1;
+    if (schCriteriaRows) schCriteriaRows.innerHTML = "";
+    if (schDocumentRows) schDocumentRows.innerHTML = "";
+    if (schBenefitRows) schBenefitRows.innerHTML = "";
+    if (schEducationLevel) schEducationLevel.value = "Collegiate";
+    if (schSchoolYear) schSchoolYear.value = "";
+    if (schAppStart) schAppStart.value = "";
+    if (schAppDeadline) schAppDeadline.value = "";
+    if (schDescription) schDescription.value = "";
+    if (schRenewalRequired) schRenewalRequired.checked = true;
+    if (schRenewalPeriod) schRenewalPeriod.value = "Every Semester";
+    if (schRenewalMinGwa) schRenewalMinGwa.value = "";
+    if (schRenewalNoFailing) schRenewalNoFailing.checked = true;
+    if (schRenewalUpdatedDocs) schRenewalUpdatedDocs.checked = false;
+    if (schRenewalDescription) schRenewalDescription.value = "";
+    syncRenewalFieldVisibility();
+    goToWizardStep(1);
+  }
+
+  // Only these actually get compared numerically (see evaluateCriterion() in
+  // includes/scholarship_criteria_helper.php) — everything else either auto-checks a yes/no
+  // fact (no Operator/Value needed) or needs a registrar's manual Pass/Fail/Pending mark
+  // (Operator/Value are never read for it). Showing Operator/Value for those was misleading.
+  const NUMERIC_CRITERIA = ["gwa", "cwra", "minimum_grade"];
+  // These match a single exact value (year level, program) rather than a number range, so
+  // they get a plain Value box with no Operator dropdown.
+  const TEXT_MATCH_CRITERIA = ["year_level", "program"];
+  // Auto-checked yes/no facts (see AUTO_CHECKABLE_CRITERIA in
+  // includes/scholarship_criteria_helper.php) that aren't numeric or text-match — the system
+  // still checks these itself, it's just not a "manual verification" item like Leadership
+  // Experience or Family Income.
+  const AUTO_BOOLEAN_CRITERIA = ["no_failing_grades", "enrollment_status", "regular_student", "existing_scholarship_restriction"];
+  // The registrar sets only a peso amount; the applicant's own Family Income (entered on
+  // the Apply page) is compared against it automatically — always "at most".
+  const THRESHOLD_CRITERIA = ["poverty_threshold"];
+
+  function criterionValuePlaceholder(type: string): string {
+    if (type === "year_level") return "e.g. 3rd Year";
+    if (type === "program") return "e.g. BS Information Technology";
+    if (THRESHOLD_CRITERIA.includes(type)) return "Monthly threshold in ₱ (e.g. 13873)";
+    if (NUMERIC_CRITERIA.includes(type)) return "Value (e.g. 1.75)";
+    if (AUTO_BOOLEAN_CRITERIA.includes(type)) return "Optional notes (checked automatically)";
+    return "Optional notes (not auto-checked)";
+  }
+
+  // Same split as applyCriterionFieldVisibility(), applied to how a saved criterion reads
+  // back on the Review step / Scholarship Overview popup.
+  function formatCriterionSummary(c: any): string {
+    const label = escapeHtml(CRITERION_TYPES[c.type] || c.type);
+    const optionalNote = c.required ? "" : " (optional)";
+    if (NUMERIC_CRITERIA.includes(c.type)) {
+      return `${label} — ${OPERATOR_LABELS[c.operator] || c.operator} ${escapeHtml(c.value)}${c.value2 ? " and " + escapeHtml(c.value2) : ""}${optionalNote}`;
+    }
+    if (THRESHOLD_CRITERIA.includes(c.type)) {
+      return `${label} — monthly family income at most ₱${escapeHtml(c.value)}${optionalNote} (checked automatically)`;
+    }
+    if (TEXT_MATCH_CRITERIA.includes(c.type)) {
+      return `${label}: ${escapeHtml(c.value)}${optionalNote}`;
+    }
+    if (AUTO_BOOLEAN_CRITERIA.includes(c.type)) {
+      return `${label}${optionalNote} (checked automatically)`;
+    }
+    return `${label}${c.value ? " — " + escapeHtml(c.value) : ""}${optionalNote} (manual verification)`;
+  }
+
+  function applyCriterionFieldVisibility(row: HTMLElement): void {
+    const type = (row.querySelector(".crit-type") as HTMLSelectElement).value;
+    const opSelect = row.querySelector(".crit-op") as HTMLSelectElement;
+    const valueInput = row.querySelector(".crit-value") as HTMLInputElement;
+    const value2Input = row.querySelector(".crit-value2") as HTMLInputElement;
+    const isNumeric = NUMERIC_CRITERIA.includes(type);
+    opSelect.style.display = isNumeric ? "" : "none";
+    if (!isNumeric) opSelect.value = THRESHOLD_CRITERIA.includes(type) ? "lte" : "eq";
+    valueInput.placeholder = criterionValuePlaceholder(type);
+    value2Input.style.display = isNumeric && opSelect.value === "between" ? "" : "none";
+  }
+
+  function addCriteriaRow(data?: any): void {
+    if (!schCriteriaRows) return;
+    const d = data || { type: "", operator: "lte", value: "", value2: "", required: true };
+    const row = document.createElement("div");
+    row.className = "sch-crit-row";
+    row.innerHTML =
+      `<select class="sch-row-type crit-type">${optionsHtml(CRITERION_TYPES, d.type)}</select>` +
+      `<select class="sch-row-op crit-op">${Object.keys(OPERATOR_LABELS).map((k) => `<option value="${k}" ${k === d.operator ? "selected" : ""}>${OPERATOR_LABELS[k]}</option>`).join("")}</select>` +
+      `<input type="text" class="sch-row-value crit-value" placeholder="Value (e.g. 1.75)" value="${escapeHtml(d.value || "")}">` +
+      `<input type="text" class="sch-row-value2 crit-value2" placeholder="and…" value="${escapeHtml(d.value2 || "")}" style="${d.operator === "between" ? "" : "display:none;"}">` +
+      `<label class="sch-row-required-label"><input type="checkbox" class="crit-required" ${d.required !== false ? "checked" : ""}> Required</label>` +
+      `<button type="button" class="sch-row-remove" title="Remove"><i data-lucide="x"></i></button>`;
+    schCriteriaRows.appendChild(row);
+    const typeSelect = row.querySelector(".crit-type") as HTMLSelectElement;
+    const opSelect = row.querySelector(".crit-op") as HTMLSelectElement;
+    typeSelect.addEventListener("change", () => applyCriterionFieldVisibility(row));
+    opSelect.addEventListener("change", () => applyCriterionFieldVisibility(row));
+    row.querySelector(".sch-row-remove")!.addEventListener("click", () => row.remove());
+    applyCriterionFieldVisibility(row);
+    if (typeof lucide !== "undefined") lucide.createIcons();
+  }
+
+  function addDocumentRow(data?: any): void {
+    if (!schDocumentRows) return;
+    const d = data || { type: "", description: "", required: true };
+    const row = document.createElement("div");
+    row.className = "sch-doc-row";
+    row.innerHTML =
+      `<select class="sch-row-type doc-type">${optionsHtml(DOCUMENT_TYPES, d.type)}</select>` +
+      `<input type="text" class="sch-row-desc doc-desc" placeholder="Instructions (optional)" value="${escapeHtml(d.description || "")}">` +
+      `<label class="sch-row-required-label"><input type="checkbox" class="doc-required" ${d.required !== false ? "checked" : ""}> Required</label>` +
+      `<button type="button" class="sch-row-remove" title="Remove"><i data-lucide="x"></i></button>`;
+    schDocumentRows.appendChild(row);
+    row.querySelector(".sch-row-remove")!.addEventListener("click", () => row.remove());
+    if (typeof lucide !== "undefined") lucide.createIcons();
+  }
+
+  function addBenefitRow(data?: any): void {
+    if (!schBenefitRows) return;
+    const d = data || { type: "", value: "", applyScope: "", description: "" };
+    const row = document.createElement("div");
+    row.className = "sch-benefit-row";
+    row.innerHTML =
+      `<select class="sch-row-type benefit-type">${optionsHtml(BENEFIT_TYPES, d.type)}</select>` +
+      `<input type="text" class="sch-row-value benefit-value" placeholder="e.g. 50%" value="${escapeHtml(d.value || "")}">` +
+      `<select class="sch-row-scope benefit-scope" style="${d.type === "tuition_discount" ? "" : "display:none;"}">${optionsHtml({ tuition_only: "Tuition Fees Only", tuition_plus_fees: "Tuition + Misc. Fees", custom: "Custom Scope" }, d.applyScope)}</select>` +
+      `<input type="text" class="sch-row-desc benefit-desc" placeholder="Notes (optional)" value="${escapeHtml(d.description || "")}">` +
+      `<button type="button" class="sch-row-remove" title="Remove"><i data-lucide="x"></i></button>`;
+    schBenefitRows.appendChild(row);
+    const typeSelect = row.querySelector(".benefit-type") as HTMLSelectElement;
+    const scopeSelect = row.querySelector(".benefit-scope") as HTMLSelectElement;
+    typeSelect.addEventListener("change", () => { scopeSelect.style.display = typeSelect.value === "tuition_discount" ? "" : "none"; });
+    row.querySelector(".sch-row-remove")!.addEventListener("click", () => row.remove());
+    if (typeof lucide !== "undefined") lucide.createIcons();
+  }
+
+  const schCriteriaAddBtn = document.getElementById("schCriteriaAddBtn");
+  const schDocumentAddBtn = document.getElementById("schDocumentAddBtn");
+  const schBenefitAddBtn = document.getElementById("schBenefitAddBtn");
+  if (schCriteriaAddBtn) schCriteriaAddBtn.addEventListener("click", () => addCriteriaRow());
+  if (schDocumentAddBtn) schDocumentAddBtn.addEventListener("click", () => addDocumentRow());
+  if (schBenefitAddBtn) schBenefitAddBtn.addEventListener("click", () => addBenefitRow());
+
+  function collectCriteriaPayload(): any[] {
+    return Array.from(document.querySelectorAll("#schCriteriaRows .sch-crit-row"))
+      .map((row) => ({
+        type: (row.querySelector(".crit-type") as HTMLSelectElement).value,
+        operator: (row.querySelector(".crit-op") as HTMLSelectElement).value,
+        value: (row.querySelector(".crit-value") as HTMLInputElement).value.trim(),
+        value2: (row.querySelector(".crit-value2") as HTMLInputElement).value.trim(),
+        required: (row.querySelector(".crit-required") as HTMLInputElement).checked,
+      }))
+      .filter((c) => c.type)
+      // A peso amount may be typed as "₱15,000.00" — keep just the number.
+      .map((c) => THRESHOLD_CRITERIA.includes(c.type) ? Object.assign(c, { value: c.value.replace(/[^0-9.]/g, "") }) : c);
+  }
+  function collectDocumentsPayload(): any[] {
+    return Array.from(document.querySelectorAll("#schDocumentRows .sch-doc-row"))
+      .map((row) => ({
+        type: (row.querySelector(".doc-type") as HTMLSelectElement).value,
+        description: (row.querySelector(".doc-desc") as HTMLInputElement).value.trim(),
+        required: (row.querySelector(".doc-required") as HTMLInputElement).checked,
+      }))
+      .filter((d) => d.type);
+  }
+  function collectBenefitsPayload(): any[] {
+    return Array.from(document.querySelectorAll("#schBenefitRows .sch-benefit-row"))
+      .map((row) => ({
+        type: (row.querySelector(".benefit-type") as HTMLSelectElement).value,
+        value: (row.querySelector(".benefit-value") as HTMLInputElement).value.trim(),
+        applyScope: (row.querySelector(".benefit-scope") as HTMLSelectElement).value,
+        description: (row.querySelector(".benefit-desc") as HTMLInputElement).value.trim(),
+      }))
+      .filter((b) => b.type);
+  }
+  function collectRenewalPayload(): any {
+    return {
+      requiresRenewal: !!(schRenewalRequired && schRenewalRequired.checked),
+      renewalPeriod: schRenewalPeriod ? schRenewalPeriod.value : "Every Semester",
+      minGwa: schRenewalMinGwa && schRenewalMinGwa.value ? schRenewalMinGwa.value : null,
+      noFailingGradesRequired: !!(schRenewalNoFailing && schRenewalNoFailing.checked),
+      updatedDocumentsRequired: !!(schRenewalUpdatedDocs && schRenewalUpdatedDocs.checked),
+      description: schRenewalDescription ? schRenewalDescription.value.trim() : "",
+    };
+  }
+
+  function renderReviewStep(): void {
+    if (!schReviewBody) return;
+    const criteria = collectCriteriaPayload();
+    const documents = collectDocumentsPayload();
+    const benefits = collectBenefitsPayload();
+    const renewal = collectRenewalPayload();
+
+    const previewNameEl = document.getElementById("schPreviewName");
+    schReviewBody.innerHTML =
+      `<div class="sch-review-section"><h4>Program</h4><p style="font-size:13px; color:#374151;">${escapeHtml(previewNameEl ? previewNameEl.textContent || "" : "")} &middot; ${escapeHtml(schEducationLevel ? schEducationLevel.value : "")}${schSchoolYear && schSchoolYear.value ? " · " + escapeHtml(schSchoolYear.value) : ""}</p></div>` +
+      sectionListHtml("Eligibility Criteria", criteria, formatCriterionSummary) +
+      sectionListHtml("Required Documents", documents, (d) => `${escapeHtml(DOCUMENT_TYPES[d.type] || d.type)}${d.required ? "" : " (optional)"}`) +
+      sectionListHtml("Benefits", benefits, (b) => `${escapeHtml(BENEFIT_TYPES[b.type] || b.type)}${b.value ? ": " + escapeHtml(b.value) : ""}`) +
+      `<div class="sch-review-section"><h4>Renewal Rules</h4><p style="font-size:13px; color:#374151;">${renewal.requiresRenewal ? "Requires renewal (" + escapeHtml(renewal.renewalPeriod) + ")" : "Does not require renewal"}${renewal.minGwa ? " · Min GWA " + escapeHtml(renewal.minGwa) : ""}</p></div>`;
+  }
+
+  async function loadWizardExtras(scholarshipId: number): Promise<void> {
+    try {
+      const [c, d, b, r] = await Promise.all([
+        fetch(`api/scholarship_criteria.php?scholarship_id=${scholarshipId}`).then((res) => res.json()),
+        fetch(`api/scholarship_documents.php?scholarship_id=${scholarshipId}`).then((res) => res.json()),
+        fetch(`api/scholarship_benefits.php?scholarship_id=${scholarshipId}`).then((res) => res.json()),
+        fetch(`api/scholarship_renewal_rules.php?scholarship_id=${scholarshipId}`).then((res) => res.json()),
+      ]);
+      if (c.success) (c.data || []).forEach((item: any) => addCriteriaRow(item));
+      if (d.success) (d.data || []).forEach((item: any) => addDocumentRow(item));
+      if (b.success) (b.data || []).forEach((item: any) => addBenefitRow(item));
+      if (r.success && r.data) {
+        const rules = r.data;
+        if (schRenewalRequired) schRenewalRequired.checked = !!rules.requiresRenewal;
+        if (schRenewalPeriod) schRenewalPeriod.value = rules.renewalPeriod || "Every Semester";
+        if (schRenewalMinGwa) schRenewalMinGwa.value = rules.minGwa != null ? rules.minGwa : "";
+        if (schRenewalNoFailing) schRenewalNoFailing.checked = !!rules.noFailingGradesRequired;
+        if (schRenewalUpdatedDocs) schRenewalUpdatedDocs.checked = !!rules.updatedDocumentsRequired;
+        if (schRenewalDescription) schRenewalDescription.value = rules.description || "";
+        syncRenewalFieldVisibility();
+      }
+    } catch (e) {
+      console.error("Failed to load scholarship criteria/documents/benefits/renewal rules:", e);
+    }
+  }
+
+  async function saveWizardExtras(scholarshipId: number): Promise<void> {
+    const post = (url: string, body: any) => fetch(`api/${url}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }).then((r) => r.json());
+
+    await Promise.all([
+      post("scholarship_criteria.php", { scholarship_id: scholarshipId, action: "save_batch", criteria: collectCriteriaPayload() }),
+      post("scholarship_documents.php", { scholarship_id: scholarshipId, action: "save_batch", documents: collectDocumentsPayload() }),
+      post("scholarship_benefits.php", { scholarship_id: scholarshipId, action: "save_batch", benefits: collectBenefitsPayload() }),
+      post("scholarship_renewal_rules.php", Object.assign({ scholarship_id: scholarshipId }, collectRenewalPayload())),
+    ]);
+  }
+
+  if (schWizardNextBtn) schWizardNextBtn.addEventListener("click", () => {
+    if (schWizardStep === 1 && (!schType || !schType.value)) {
+      alert("Please select a scholarship Type.");
+      return;
+    }
+    if (schWizardStep === 2) {
+      const badThreshold = collectCriteriaPayload().some((c) => THRESHOLD_CRITERIA.includes(c.type) && !(Number(c.value) > 0));
+      if (badThreshold) {
+        alert("Please enter the Poverty Threshold amount (monthly, in pesos).");
+        return;
+      }
+    }
+    goToWizardStep(schWizardStep + 1);
+  });
+  if (schWizardBackBtn) schWizardBackBtn.addEventListener("click", () => goToWizardStep(schWizardStep - 1));
+
   function openFormModal(editItem: any = null): void {
     if (!schFormOverlay) return;
     if (editItem) {
@@ -726,24 +1123,43 @@ document.addEventListener("DOMContentLoaded", () => {
       const matchedType = scholarshipTypes.find((t) => t.name === editItem.type);
       selectedTypeId = matchedType ? matchedType.id : null;
       pickedSubtypes = [];
-      if (schGwa) { schGwa.disabled = false; schGwa.placeholder = "e.g. 1.75"; }
+      if (schGwa) { schGwa.disabled = false; schGwa.placeholder = "Leave blank if none"; }
       if (schType) schType.value = editItem.type || '';
       if (schSubtype) schSubtype.value = editItem.subtype || '';
       renderTypePicker(editItem.type);
       renderSubtypePicker(editItem.subtype || undefined);
       updateIdentityPreview();
+
+      if (schEducationLevel) schEducationLevel.value = editItem.educationLevel || "Collegiate";
+      if (schSchoolYear) schSchoolYear.value = editItem.schoolYear || "";
+      if (schAppStart) schAppStart.value = editItem.applicationStart || "";
+      if (schAppDeadline) schAppDeadline.value = editItem.applicationDeadline || "";
+      if (schDescription) schDescription.value = editItem.description || "";
+      if (schCriteriaRows) schCriteriaRows.innerHTML = "";
+      if (schDocumentRows) schDocumentRows.innerHTML = "";
+      if (schBenefitRows) schBenefitRows.innerHTML = "";
+      if (schRenewalRequired) schRenewalRequired.checked = true;
+      if (schRenewalPeriod) schRenewalPeriod.value = "Every Semester";
+      if (schRenewalMinGwa) schRenewalMinGwa.value = "";
+      if (schRenewalNoFailing) schRenewalNoFailing.checked = true;
+      if (schRenewalUpdatedDocs) schRenewalUpdatedDocs.checked = false;
+      if (schRenewalDescription) schRenewalDescription.value = "";
+      syncRenewalFieldVisibility();
+      loadWizardExtras(editItem.id);
+      goToWizardStep(1);
     } else {
       if (schFormTitle) schFormTitle.textContent = "Add Scholarship Program";
       if (schForm) schForm.reset();
       if (schId) schId.value = "";
       selectedTypeId = null;
       pickedSubtypes = [];
-      if (schGwa) { schGwa.disabled = false; schGwa.placeholder = "e.g. 1.75"; }
+      if (schGwa) { schGwa.disabled = false; schGwa.placeholder = "Leave blank if none"; }
       if (schType) schType.value = "";
       if (schSubtype) schSubtype.value = "";
       renderTypePicker();
       renderSubtypePicker();
       updateIdentityPreview();
+      resetWizard();
     }
     syncUnlimitedSlots();
     schFormOverlay.classList.add("open");
@@ -798,7 +1214,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   /* =========================================================
-     BULK ADD SUB-TYPES (with required GWA per sub-type)
+     ADD SUB-TYPE (name only — GWA comes from the program's GWA Requirement)
   ========================================================= */
 
   let subtypeBulkRowCount = 0;
@@ -808,17 +1224,9 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!rows) return;
     const row = document.createElement("div");
     row.className = "subtype-bulk-row";
-    row.innerHTML =
-      '<input type="text" class="subtype-bulk-name" placeholder="Sub-type name">' +
-      '<input type="number" step="0.01" min="0.01" class="subtype-bulk-gwa" placeholder="GWA e.g. 1.75">' +
-      '<button type="button" class="subtype-bulk-remove" title="Remove row"><i data-lucide="x"></i></button>';
+    row.innerHTML = '<input type="text" class="subtype-bulk-name" placeholder="Program name">';
     rows.appendChild(row);
-
-    const removeBtn = row.querySelector<HTMLElement>(".subtype-bulk-remove");
-    if (removeBtn) removeBtn.addEventListener("click", () => row.remove());
-
     subtypeBulkRowCount++;
-    if (typeof lucide !== "undefined") lucide.createIcons();
   }
 
   function openSubtypeBulkModal(): void {
@@ -834,12 +1242,12 @@ document.addEventListener("DOMContentLoaded", () => {
     rows.innerHTML = "";
     subtypeBulkRowCount = 0;
     addSubtypeBulkRow();
-    addSubtypeBulkRow();
-    addSubtypeBulkRow();
 
     const type = scholarshipTypes.find((t) => t.id === selectedTypeId);
     if (label) label.textContent = "Under: " + (type ? type.name : "");
     overlay.classList.add("open");
+    const firstInput = rows.querySelector<HTMLInputElement>(".subtype-bulk-name");
+    if (firstInput) firstInput.focus();
   }
 
   function closeSubtypeBulkModal(): void {
@@ -851,34 +1259,19 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!selectedTypeId) return;
 
     const rowEls = document.querySelectorAll<HTMLElement>("#subtypeBulkRows .subtype-bulk-row");
-    const items: { name: string; gwa_requirement: string }[] = [];
-    let hasError = false;
+    // GWA is set on the scholarship's own GWA Requirement, so a sub-type is just a name.
+    const items: { name: string }[] = [];
 
     rowEls.forEach((row) => {
       const nameInput = row.querySelector<HTMLInputElement>(".subtype-bulk-name");
-      const gwaInput = row.querySelector<HTMLInputElement>(".subtype-bulk-gwa");
       if (nameInput) nameInput.classList.remove("error");
-      if (gwaInput) gwaInput.classList.remove("error");
-
       const name = nameInput ? nameInput.value.trim() : "";
-      const gwa = gwaInput ? gwaInput.value.trim() : "";
-      if (!name && !gwa) return; // skip a fully empty row
-
-      if (!name || !gwa || Number(gwa) <= 0) {
-        hasError = true;
-        if (nameInput && !name) nameInput.classList.add("error");
-        if (gwaInput && (!gwa || Number(gwa) <= 0)) gwaInput.classList.add("error");
-        return;
-      }
-      items.push({ name, gwa_requirement: gwa });
+      if (name) items.push({ name });
+      else if (nameInput) nameInput.classList.add("error");
     });
 
-    if (hasError) {
-      alert("Please fill in both a name and a valid GWA (greater than 0) for every sub-type row.");
-      return;
-    }
     if (items.length === 0) {
-      alert("Add at least one sub-type.");
+      alert("Please enter a program name.");
       return;
     }
 
@@ -912,7 +1305,7 @@ document.addEventListener("DOMContentLoaded", () => {
         populateFilterTypes();
         renderScholarships();
       } else {
-        alert(json.message || "Failed to save sub-types.");
+        alert(json.message || "Failed to save program.");
       }
     } catch (e) {
       alert("Server error.");
@@ -925,8 +1318,11 @@ document.addEventListener("DOMContentLoaded", () => {
   const subtypeAddBtn = document.getElementById("schSubtypeAddBtn");
   if (subtypeAddBtn) subtypeAddBtn.addEventListener("click", openSubtypeBulkModal);
 
-  const subtypeBulkAddRowBtn = document.getElementById("subtypeBulkAddRowBtn");
-  if (subtypeBulkAddRowBtn) subtypeBulkAddRowBtn.addEventListener("click", addSubtypeBulkRow);
+  // Enter in the name field saves.
+  const subtypeBulkRowsEl = document.getElementById("subtypeBulkRows");
+  if (subtypeBulkRowsEl) subtypeBulkRowsEl.addEventListener("keydown", (e: KeyboardEvent) => {
+    if (e.key === "Enter") { e.preventDefault(); saveSubtypeBulk(); }
+  });
 
   const subtypeBulkCancelBtn = document.getElementById("subtypeBulkCancelBtn");
   if (subtypeBulkCancelBtn) subtypeBulkCancelBtn.addEventListener("click", closeSubtypeBulkModal);
@@ -954,7 +1350,7 @@ document.addEventListener("DOMContentLoaded", () => {
       fd.set("name", name);
       fd.set("code", code);
       fd.set("subtype", subName);
-      fd.set("gwa_requirement", sub ? String(sub.gwaRequirement) : "1.75");
+      fd.set("gwa_requirement", sub && sub.gwaRequirement > 0 ? String(sub.gwaRequirement) : "");
 
       try {
         const res = await fetch("api/list_scholarships.php", { method: "POST", body: fd });
@@ -991,6 +1387,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const res = await fetch("api/list_scholarships.php", { method: "POST", body: formData });
         const json = await res.json();
         if (json.success) {
+          await saveWizardExtras(json.id);
           closeFormModal();
           loadScholarships();
         } else {
@@ -1046,4 +1443,5 @@ document.addEventListener("DOMContentLoaded", () => {
     renderTypePicker();
     return loadScholarships();
   });
+  loadWizardVocab();
 });

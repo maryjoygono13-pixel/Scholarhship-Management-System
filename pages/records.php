@@ -73,6 +73,7 @@ include __DIR__ . '/../includes/header.php';
                     <tr>
                         <th>Student ID</th>
                         <th>Name</th>
+                        <th>Age</th>
                         <th>Scholarship Type</th>
                         <th>Status</th>
                         <th>Semester</th>

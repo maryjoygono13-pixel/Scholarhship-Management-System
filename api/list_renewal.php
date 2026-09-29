@@ -35,7 +35,7 @@ try {
         }
 
         $origin = strtolower((string)($cand['origin'] ?? 'approved'));
-        $required = resolveGwaRequirement($pdo, (string)$cand['scholarship_type']);
+        $required = resolveRenewalGwaRequirement($pdo, (string)$cand['scholarship_type']);
         // Reaching here means this entry is actionable now, so its GWA basis is always the
         // term right before the current one (see the identical logic in the GET listing below).
         [$gwaSemester] = renewalPreviousTerm(getActiveSemester($pdo), getActiveSchoolYear($pdo));
@@ -70,7 +70,9 @@ try {
         $barred = false;
         if ($action === 'terminate' && $origin !== 'rejected') {
             $barred = recordScholarshipTermination($pdo, (string)$cand['student_id'], (string)$cand['scholarship_type'], $id,
-                'GWA ' . number_format($figures['gwa'], 2) . ' did not meet the required ' . number_format($required, 2) . ' (' . normalizeSemesterName($cand['semester']) . ' ' . $cand['school_year'] . ').');
+                ($required > 0
+                    ? 'GWA ' . number_format($figures['gwa'], 2) . ' did not meet the required ' . number_format($required, 2)
+                    : 'Terminated') . ' (' . normalizeSemesterName($cand['semester']) . ' ' . $cand['school_year'] . ').');
         }
 
         // The Record follows the decision: renewed = approved, terminated = rejected. Matched
@@ -163,7 +165,7 @@ try {
         $decidable = isRenewalActionable($pdo, $r);
         $locked = !$decidable;
         $originVal = strtolower((string)($r['origin'] ?? 'approved'));
-        $required = resolveGwaRequirement($pdo, (string)$r['scholarship_type']);
+        $required = resolveRenewalGwaRequirement($pdo, (string)$r['scholarship_type']);
 
         $activeSem = getActiveSemester($pdo);
         $activeSy = getActiveSchoolYear($pdo);
@@ -207,7 +209,7 @@ try {
             'gwaSchoolYear' => $gwaSchoolYear,
             // No grades on file yet isn't a failure (e.g. a first-year scholar whose eligibility
             // still follows their Grade 12 record) — only a recorded GWA above the requirement is.
-            'meetsGwa' => (float)$r['gwa'] <= 0 || (float)$r['gwa'] <= $required,
+            'meetsGwa' => (float)$r['gwa'] <= 0 || gwaMeetsRequirement((float)$r['gwa'], $required),
             'id' => (int)$r['id'],
             'studentId' => $r['student_id'],
             'student_id' => $r['student_id'],

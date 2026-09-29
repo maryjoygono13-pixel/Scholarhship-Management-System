@@ -69,6 +69,7 @@ function initDatabase(): PDO {
         'Community Service or Leadership Scholarship',
         'Other types of Scholarship and Discount',
         'CHED Scholarship',
+        'Provincial Scholarship Program',
     ];
     $insertType = $pdo->prepare("INSERT IGNORE INTO scholarship_types (name, sort_order) VALUES (?, ?)");
     foreach ($defaultTypes as $i => $typeName) {
@@ -161,6 +162,12 @@ function initDatabase(): PDO {
         'mother_contact' => "VARCHAR(50) DEFAULT ''",
         'father_name' => "VARCHAR(255) DEFAULT ''",
         'father_contact' => "VARCHAR(50) DEFAULT ''",
+        // Monthly family income the applicant declares — compared against a program's Poverty Threshold.
+        'family_income' => "DECIMAL(12,2) DEFAULT NULL",
+        // Talent / Community Service / Other Discounts: the field or qualification the applicant
+        // declared (includes/special_qualification_helper.php), plus their text when it's "Other".
+        'special_qualification' => "VARCHAR(255) DEFAULT ''",
+        'special_qualification_other' => "VARCHAR(255) DEFAULT ''",
     ] as $col => $def) {
         try {
             $pdo->exec("ALTER TABLE applicants ADD COLUMN $col $def");
@@ -203,6 +210,123 @@ function initDatabase(): PDO {
             }
         }
     };
+
+    // 2b. Scholarship configuration layer — criteria / documents / benefits / renewal rules
+    // per scholarship, all registrar-editable from the Scholarships page. Kept as child tables
+    // of `scholarships` (added here, not in its original CREATE TABLE above, so an existing
+    // install picks them up via ADD COLUMN / CREATE TABLE IF NOT EXISTS without touching any
+    // existing scholarship row) instead of a single rigid rule set, so a brand-new scholarship
+    // category never needs a source-code change to define its own eligibility rules.
+    $addColumnIfMissing('scholarships', 'education_level', "VARCHAR(20) NOT NULL DEFAULT 'Collegiate'");
+    $addColumnIfMissing('scholarships', 'school_year', "VARCHAR(50) DEFAULT ''");
+    $addColumnIfMissing('scholarships', 'application_start', "DATE DEFAULT NULL");
+    $addColumnIfMissing('scholarships', 'application_deadline', "DATE DEFAULT NULL");
+
+    $pdo->exec("CREATE TABLE IF NOT EXISTS scholarship_criteria (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        scholarship_id INT NOT NULL,
+        criterion_type VARCHAR(50) NOT NULL,
+        label VARCHAR(255) DEFAULT '',
+        operator VARCHAR(20) NOT NULL DEFAULT 'lte',
+        value VARCHAR(255) DEFAULT '',
+        value2 VARCHAR(255) DEFAULT NULL,
+        required INT NOT NULL DEFAULT 1,
+        sort_order INT DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (scholarship_id) REFERENCES scholarships(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+    $pdo->exec("CREATE TABLE IF NOT EXISTS scholarship_documents (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        scholarship_id INT NOT NULL,
+        document_type VARCHAR(100) NOT NULL,
+        description TEXT,
+        required INT NOT NULL DEFAULT 1,
+        sort_order INT DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (scholarship_id) REFERENCES scholarships(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+    $pdo->exec("CREATE TABLE IF NOT EXISTS scholarship_benefits (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        scholarship_id INT NOT NULL,
+        benefit_type VARCHAR(100) NOT NULL,
+        value VARCHAR(255) DEFAULT '',
+        apply_scope VARCHAR(50) DEFAULT NULL,
+        description TEXT,
+        sort_order INT DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (scholarship_id) REFERENCES scholarships(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+    $pdo->exec("CREATE TABLE IF NOT EXISTS scholarship_renewal_rules (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        scholarship_id INT NOT NULL UNIQUE,
+        requires_renewal INT NOT NULL DEFAULT 1,
+        renewal_period VARCHAR(50) DEFAULT 'Every Semester',
+        min_gwa DOUBLE DEFAULT NULL,
+        no_failing_grades_required INT NOT NULL DEFAULT 1,
+        updated_documents_required INT NOT NULL DEFAULT 0,
+        description TEXT,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (scholarship_id) REFERENCES scholarships(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+    // Generalized applicant upload record — lets a scholarship require documents other than
+    // the 3 legacy ones below. Those 3 legacy `applicants` columns are kept and still written
+    // (see api/student_apply.php) so nothing that already reads them breaks; this table is the
+    // canonical source for everything, including the legacy 3.
+    $pdo->exec("CREATE TABLE IF NOT EXISTS applicant_documents (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        applicant_id INT NOT NULL,
+        scholarship_document_id INT DEFAULT NULL,
+        document_type VARCHAR(100) NOT NULL,
+        file_path VARCHAR(500) NOT NULL,
+        uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (applicant_id) REFERENCES applicants(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+    // A registrar's manual Pass/Fail/Pending mark for one applicant's one non-auto-checkable
+    // criterion (e.g. "Leadership Experience"). Latest row per (applicant, criterion) wins.
+    $pdo->exec("CREATE TABLE IF NOT EXISTS applicant_criteria_reviews (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        applicant_id INT NOT NULL,
+        scholarship_criteria_id INT NOT NULL,
+        status VARCHAR(20) NOT NULL DEFAULT 'pending',
+        remarks TEXT,
+        reviewed_by VARCHAR(255) DEFAULT '',
+        reviewed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_acr_lookup (applicant_id, scholarship_criteria_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+    // Migrate the 4 existing CHED programs onto this layer so their applicant-facing behaviour
+    // is unchanged (same GWA check, same 3 required documents) — just now expressed as data
+    // instead of hardcoded PHP. A no-op once already migrated, and a no-op entirely until the
+    // `scholarships` rows themselves exist (same request-by-request pattern as the CHED
+    // sub-type reclassification above — seedDataIfEmpty() runs at the very end of this
+    // function, so a brand-new install only sees the rows to migrate from the next request on).
+    $legacyCodes = $pdo->query("SELECT id, code, gwa_requirement FROM scholarships WHERE code IN ('CMSP','TDP','TES','COSCHO')")->fetchAll(PDO::FETCH_ASSOC);
+    $critExists = $pdo->prepare("SELECT id FROM scholarship_criteria WHERE scholarship_id = ? AND criterion_type = 'gwa'");
+    $critInsert = $pdo->prepare("INSERT INTO scholarship_criteria (scholarship_id, criterion_type, label, operator, value, required, sort_order) VALUES (?, 'gwa', 'GWA Requirement', 'lte', ?, 1, 1)");
+    $docCount = $pdo->prepare("SELECT COUNT(*) FROM scholarship_documents WHERE scholarship_id = ?");
+    $docInsert = $pdo->prepare("INSERT INTO scholarship_documents (scholarship_id, document_type, description, required, sort_order) VALUES (?, ?, ?, 1, ?)");
+    foreach ($legacyCodes as $legacyRow) {
+        $legacySid = (int)$legacyRow['id'];
+        $critExists->execute([$legacySid]);
+        if (!$critExists->fetchColumn()) {
+            $critInsert->execute([$legacySid, (string)$legacyRow['gwa_requirement']]);
+        }
+        $docCount->execute([$legacySid]);
+        if ((int)$docCount->fetchColumn() === 0) {
+            foreach ([
+                ['transcript', 'Official Transcript of Records (TOR)', 1],
+                ['coe', 'Certificate of Enrollment (COE)', 2],
+                ['good_moral', 'Certificate of Good Moral Character', 3],
+            ] as [$legacyDocType, $legacyDocDesc, $legacyDocOrder]) {
+                $docInsert->execute([$legacySid, $legacyDocType, $legacyDocDesc, $legacyDocOrder]);
+            }
+        }
+    }
 
     // Inbox: messages received from scholars / applicants (manually logged, or synced
     // from Gmail — see includes/gmail_client.php). A Gmail message is matched on

@@ -4,6 +4,8 @@ require_once __DIR__ . '/../config/db_helper.php';
 require_once __DIR__ . '/../includes/locations.php';
 require_once __DIR__ . '/../includes/programs_helper.php';
 require_once __DIR__ . '/../includes/scholarship_type_helper.php';
+require_once __DIR__ . '/../includes/scholarship_criteria_helper.php';
+require_once __DIR__ . '/../includes/special_qualification_helper.php';
 
 $pdo = getDB();
 $studentId = trim($_GET['student_id'] ?? '');
@@ -14,7 +16,7 @@ $step = $studentId !== '' ? 2 : 1;
 // stored decrement counter, so a program never shows "Limit Reached" from stale drift when
 // no one has actually applied for it.
 $programs = $pdo->query("
-    SELECT name, type, subtype, slots, slots_available, unlimited_slots
+    SELECT id, name, type, subtype, slots, slots_available, unlimited_slots
     FROM scholarships
     WHERE LOWER(status) = 'active'
     ORDER BY type, name
@@ -23,6 +25,34 @@ foreach ($programs as &$p) {
     $p['slots_available'] = scholarshipSlotsAvailable($pdo, $p);
 }
 unset($p);
+
+// Each program's own required documents (registrar-configured on the Scholarships page),
+// keyed by program name — Step 6 swaps its file fields to match whichever program the
+// applicant picked in Step 5, instead of the same fixed 3 fields for every program.
+$programDocuments = [];
+foreach ($programs as $p) {
+    $docs = getScholarshipDocuments($pdo, (int)$p['id']);
+    $programDocuments[$p['name']] = array_map(fn($d) => [
+        'type' => $d['document_type'],
+        'label' => DOCUMENT_TYPES[$d['document_type']] ?? $d['document_type'],
+        'required' => (bool)$d['required'],
+    ], $docs);
+}
+
+// Programs with a Poverty Threshold ask for the applicant's family income. Only a yes/no per
+// program is sent to the page — the threshold amount itself stays server-side.
+$programNeedsIncome = [];
+foreach ($programs as $p) {
+    $programNeedsIncome[$p['name']] = scholarshipNeedsFamilyIncome($pdo, (int)$p['id']);
+}
+
+// Talent / Community Service / Other Discounts programs ask one extra question (label +
+// options), keyed by program name. Programs of any other type are simply left out.
+$programQualification = [];
+foreach ($programs as $p) {
+    $cfg = specialQualificationConfig((string)$p['type']);
+    if ($cfg !== null) $programQualification[$p['name']] = $cfg;
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -72,9 +102,11 @@ unset($p);
         <div id="apFlash" class="ap-flash" hidden></div>
         <div id="apSuccess" class="ap-success" hidden>
             <div class="ap-success-icon">&#10003;</div>
-            <h2>Your application was successfully uploaded and is waiting for evaluation.</h2>
-            <p>You'll be notified once the registrar's office reviews it.</p>
-            <a href="<?= SITE_BASE ?>/login" class="ap-btn-primary ap-success-btn">Return to Main Page</a>
+            <h2>Application Submitted Successfully! 🎉</h2>
+            <p>Thank you for submitting your scholarship application. Your application has been successfully received and is now under review.</p>
+            <p>Our Scholarship Office will review your application and submitted documents. We will contact you through the contact information you provided once there is an update regarding your application.</p>
+            <p class="ap-success-note">Please make sure that your contact information remains active and accessible.</p>
+            <a href="<?= SITE_BASE ?>/apply" class="ap-btn-primary ap-success-btn">Back to Home</a>
         </div>
 
         <div class="ap-progress-wrap" id="apProgressWrap">
@@ -210,6 +242,20 @@ unset($p);
                             </label>
                         <?php endforeach; ?>
                     </div>
+                    <div class="ap-field" id="apQualField" hidden>
+                        <label for="apQualSelect" id="apQualLabel">Special Field / Area of Involvement *</label>
+                        <select id="apQualSelect" name="specialQualification" disabled></select>
+                        <span class="ap-note">Upload proof of this in the Required Documents step — the Scholarship Office verifies it.</span>
+                    </div>
+                    <div class="ap-field" id="apQualOtherField" hidden>
+                        <label for="apQualOther">Please specify *</label>
+                        <input type="text" id="apQualOther" name="specialQualificationOther" maxlength="255" title="Please describe it — this cannot be blank." disabled>
+                    </div>
+                    <div class="ap-field ap-income-field" id="apIncomeField" hidden>
+                        <label for="apFamilyIncome">Total Monthly Family Income (₱) *</label>
+                        <input type="number" id="apFamilyIncome" name="familyIncome" min="0" step="0.01" inputmode="decimal" placeholder="e.g. 12000" disabled>
+                        <span class="ap-note">Combined monthly income of everyone in your household. This program considers family income as part of eligibility.</span>
+                    </div>
                 </div>
                 <div class="ap-step-nav">
                     <button type="button" class="ap-btn-secondary ap-btn-back">Back</button>
@@ -220,11 +266,9 @@ unset($p);
             <div class="ap-step" data-step="6">
                 <div class="ap-section">
                     <h3>Required Documents</h3>
-                    <p class="ap-note">PNG images only. All three are required to submit your application.</p>
-                    <div class="ap-grid">
-                        <div class="ap-field"><label>Transcript of Records *</label><input type="file" name="transcript" accept="image/png" required></div>
-                        <div class="ap-field"><label>Certificate of Enrollment *</label><input type="file" name="coe" accept="image/png" required></div>
-                        <div class="ap-field"><label>Good Moral Certificate *</label><input type="file" name="goodMoral" accept="image/png" required></div>
+                    <p class="ap-note">PNG images only. Documents required depend on the scholarship program you selected.</p>
+                    <div class="ap-grid" id="apDocumentsGrid">
+                        <!-- Filled in by apply.js based on the Step 5 selection -->
                     </div>
                 </div>
                 <div class="ap-step-nav">
@@ -238,6 +282,11 @@ unset($p);
     </div>
 </div>
 
+<script>
+window.SCHOLARSHIP_DOCUMENTS = <?= json_encode($programDocuments) ?>;
+window.SCHOLARSHIP_NEEDS_INCOME = <?= json_encode($programNeedsIncome) ?>;
+window.SCHOLARSHIP_QUALIFICATION = <?= json_encode($programQualification, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>;
+</script>
 <?php endif; ?>
 
 <script src="<?= SITE_BASE ?>/assets/js/apply.js?v=<?= time() ?>"></script>

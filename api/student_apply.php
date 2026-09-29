@@ -16,8 +16,10 @@ require_once __DIR__ . '/../includes/grades_helper.php';
 require_once __DIR__ . '/../includes/renewal_helper.php';
 require_once __DIR__ . '/../includes/programs_helper.php';
 require_once __DIR__ . '/../includes/scholarship_type_helper.php';
+require_once __DIR__ . '/../includes/scholarship_criteria_helper.php';
 require_once __DIR__ . '/../includes/locations.php';
 require_once __DIR__ . '/../includes/merit_helper.php';
+require_once __DIR__ . '/../includes/special_qualification_helper.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -72,20 +74,59 @@ try {
     if ($scholarshipName === '') {
         sendError('Please select a scholarship program.');
     }
-    // Every document is mandatory — never accepted as a "complete later" application.
-    foreach (['transcript' => 'Transcript of Records', 'coe' => 'Certificate of Enrollment', 'goodMoral' => 'Good Moral Certificate'] as $field => $label) {
-        if (!isset($_FILES[$field]) || $_FILES[$field]['error'] === UPLOAD_ERR_NO_FILE) {
-            sendError("Please upload your $label.");
-        }
-    }
 
     // The chosen program must be a real, currently active one — and not full. Re-checked here
     // (not just in the form) since another applicant could take the last slot in the meantime.
-    $prog = $pdo->prepare("SELECT name, type, subtype, slots, slots_available, unlimited_slots FROM scholarships WHERE name = ? AND LOWER(status) = 'active' LIMIT 1");
+    $prog = $pdo->prepare("SELECT id, name, type, subtype, slots, slots_available, unlimited_slots FROM scholarships WHERE name = ? AND LOWER(status) = 'active' LIMIT 1");
     $prog->execute([$scholarshipName]);
     $program = $prog->fetch(PDO::FETCH_ASSOC);
     if (!$program) {
         sendError('That scholarship program is not available. Please choose another.', 404);
+    }
+
+    // A program with a Poverty Threshold needs the applicant's monthly family income. The
+    // threshold itself is set by the registrar and never sent from or shown on the form.
+    $familyIncome = null;
+    if (scholarshipNeedsFamilyIncome($pdo, (int)$program['id'])) {
+        $incomeRaw = str_replace([',', '₱', ' '], '', trim((string)($_POST['familyIncome'] ?? '')));
+        if ($incomeRaw === '' || !is_numeric($incomeRaw) || (float)$incomeRaw < 0) {
+            sendError('Please enter your total monthly family income.');
+        }
+        $familyIncome = round((float)$incomeRaw, 2);
+    }
+
+    // Talent / Community Service / Other Discounts programs ask what the applicant qualifies
+    // through. Only the question for THIS program's type is read — anything sent for another
+    // type is ignored. Saved as a declaration only; the registrar verifies it from documents.
+    $specialQualification = '';
+    $specialQualificationOther = '';
+    $qualConfig = specialQualificationConfig((string)$program['type']);
+    if ($qualConfig !== null) {
+        $specialQualification = trim((string)($_POST['specialQualification'] ?? ''));
+        if ($specialQualification === '' || !in_array($specialQualification, $qualConfig['options'], true)) {
+            sendError('Please select your ' . $qualConfig['label'] . '.');
+        }
+        if ($specialQualification === SPECIAL_QUALIFICATION_OTHER) {
+            $specialQualificationOther = trim(preg_replace('/\s+/', ' ', (string)($_POST['specialQualificationOther'] ?? '')));
+            if ($specialQualificationOther === '') {
+                sendError('Please specify your ' . $qualConfig['label'] . '.');
+            }
+            if (mb_strlen($specialQualificationOther) > 255) {
+                sendError('Your ' . $qualConfig['label'] . ' description is too long (255 characters max).');
+            }
+        }
+    }
+
+    // The documents this specific program requires (registrar-configured on the Scholarships
+    // page) — never the same fixed 3 fields for every program. Every required one is mandatory;
+    // an application is never accepted as "complete later".
+    $requiredDocuments = array_values(array_filter(getScholarshipDocuments($pdo, (int)$program['id']), fn($d) => (bool)$d['required']));
+    foreach ($requiredDocuments as $doc) {
+        $field = $doc['document_type'];
+        $label = DOCUMENT_TYPES[$field] ?? $field;
+        if (!isset($_FILES['documents']['error'][$field]) || $_FILES['documents']['error'][$field] === UPLOAD_ERR_NO_FILE) {
+            sendError("Please upload your $label.");
+        }
     }
     // Counted live from actual applicants, not a stored decrement counter — so this can never
     // drift into showing "full" for a program nobody has actually applied to.
@@ -130,37 +171,56 @@ try {
     $semester = getActiveSemester($pdo);
     $gwaReq = resolveGwaRequirement($pdo, $scholarshipType, 1.75);
 
-    // Required documents: PNG only.
+    // Every document this program has configured (required and optional) — PNG only. Field
+    // names are documents[<type>], matching pages/apply.php's dynamically-rendered Step 6.
+    $allDocuments = getScholarshipDocuments($pdo, (int)$program['id']);
+
     $uploadDir = __DIR__ . '/../uploads/';
     if (!is_dir($uploadDir) && !mkdir($uploadDir, 0777, true)) {
         sendError('Unable to create upload directory.', 500);
     }
-    $saveUpload = function (string $field) use ($uploadDir): string {
-        if (!isset($_FILES[$field]) || $_FILES[$field]['error'] === UPLOAD_ERR_NO_FILE) {
+    $saveUpload = function (string $type) use ($uploadDir): string {
+        if (!isset($_FILES['documents']['error'][$type]) || $_FILES['documents']['error'][$type] === UPLOAD_ERR_NO_FILE) {
             return '';
         }
-        if ($_FILES[$field]['error'] !== UPLOAD_ERR_OK) {
+        if ($_FILES['documents']['error'][$type] !== UPLOAD_ERR_OK) {
             return '';
         }
-        $ext = strtolower(pathinfo(basename($_FILES[$field]['name']), PATHINFO_EXTENSION));
+        $label = DOCUMENT_TYPES[$type] ?? $type;
+        $tmpName = $_FILES['documents']['tmp_name'][$type];
+        $ext = strtolower(pathinfo(basename($_FILES['documents']['name'][$type]), PATHINFO_EXTENSION));
         if ($ext !== 'png') {
-            throw new Exception("$field must be a PNG image.");
+            throw new Exception("\"$label\" must be a PNG image.");
         }
         // A real PNG, not just a renamed file with a .png extension.
-        $info = @getimagesize($_FILES[$field]['tmp_name']);
+        $info = @getimagesize($tmpName);
         if ($info === false || $info[2] !== IMAGETYPE_PNG) {
-            throw new Exception("$field does not look like a valid PNG image.");
+            throw new Exception("\"$label\" does not look like a valid PNG image.");
         }
-        $newName = uniqid($field . '_', true) . '.png';
-        if (!move_uploaded_file($_FILES[$field]['tmp_name'], $uploadDir . $newName)) {
-            throw new Exception("Failed to upload $field.");
+        $newName = uniqid($type . '_', true) . '.png';
+        if (!move_uploaded_file($tmpName, $uploadDir . $newName)) {
+            throw new Exception("Failed to upload \"$label\".");
         }
         return $newName;
     };
-    $transcriptFile = $saveUpload('transcript');
-    $coeFile = $saveUpload('coe');
-    $goodMoralFile = $saveUpload('goodMoral');
-    $docsComplete = ($transcriptFile && $coeFile && $goodMoralFile) ? 1 : 0;
+
+    $uploadedDocs = []; // document_type => saved filename, for everything actually uploaded
+    foreach ($allDocuments as $doc) {
+        $filename = $saveUpload($doc['document_type']);
+        if ($filename !== '') $uploadedDocs[$doc['document_type']] = $filename;
+    }
+    // The 3 legacy columns are still populated whenever the matching document type was
+    // uploaded, so every existing reader of applicants.transcript_file/coe_file/good_moral_file
+    // keeps working unchanged.
+    $transcriptFile = $uploadedDocs['transcript'] ?? '';
+    $coeFile = $uploadedDocs['coe'] ?? '';
+    $goodMoralFile = $uploadedDocs['good_moral'] ?? '';
+    // Complete once every document this program actually requires has been uploaded — not a
+    // fixed rule about those 3 specific types.
+    $docsComplete = 1;
+    foreach ($requiredDocuments as $doc) {
+        if (empty($uploadedDocs[$doc['document_type']])) { $docsComplete = 0; break; }
+    }
 
     $insert = $pdo->prepare("
         INSERT INTO applicants (
@@ -168,13 +228,15 @@ try {
             address, municipality, barangay, latitude, longitude, mother_name, mother_contact,
             father_name, father_contact, school, school_year, program, year_level,
             semester, gpa, scholarship_type, status, gwa, gwa_req, failing_grades, units,
-            enrolled, docs_complete, transcript_file, coe_file, good_moral_file
+            enrolled, docs_complete, transcript_file, coe_file, good_moral_file, family_income,
+            special_qualification, special_qualification_other
         ) VALUES (
             ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
             ?, ?, ?, ?, ?, ?, ?,
             ?, ?, ?, ?, ?, ?,
             ?, 0.0, ?, 'pending', 0.0, ?, 0, 21,
-            1, ?, ?, ?, ?
+            1, ?, ?, ?, ?, ?,
+            ?, ?
         )
     ");
     $insert->execute([
@@ -183,9 +245,21 @@ try {
         $fatherName, $fatherContact, 'College of Maasin', $schoolYear, $department, $yearLevel,
         $semester,
         $scholarshipType, $gwaReq,
-        $docsComplete, $transcriptFile, $coeFile, $goodMoralFile,
+        $docsComplete, $transcriptFile, $coeFile, $goodMoralFile, $familyIncome,
+        $specialQualification, $specialQualificationOther,
     ]);
     $newId = (int)$pdo->lastInsertId();
+
+    // Every uploaded file (legacy-named or a program-specific one) also gets a row in the
+    // generalized documents table — the canonical source Evaluation's Documents tab reads from.
+    if (!empty($uploadedDocs)) {
+        $docIdByType = [];
+        foreach ($allDocuments as $doc) $docIdByType[$doc['document_type']] = (int)$doc['id'];
+        $insertDoc = $pdo->prepare("INSERT INTO applicant_documents (applicant_id, scholarship_document_id, document_type, file_path) VALUES (?, ?, ?, ?)");
+        foreach ($uploadedDocs as $docType => $filename) {
+            $insertDoc->execute([$newId, $docIdByType[$docType] ?? null, $docType, $filename]);
+        }
+    }
 
     // No manual slot decrement needed — this new `applicants` row is itself counted the moment
     // anyone reads scholarshipSlotsAvailable(), so the next applicant sees an up-to-date count
