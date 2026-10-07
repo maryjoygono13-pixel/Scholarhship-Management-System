@@ -8,6 +8,8 @@ include __DIR__ . '/../includes/header.php';
 require_once __DIR__ . '/../config/db_helper.php';
 require_once __DIR__ . '/../includes/scholarship_distribution.php';
 require_once __DIR__ . '/../includes/merit_helper.php';
+require_once __DIR__ . '/../includes/renewal_helper.php';
+require_once __DIR__ . '/../includes/scholar_standing_helper.php';
 
 function timeAgo(string $datetime): string {
     $ts = strtotime($datetime);
@@ -62,22 +64,13 @@ try {
         WHERE LOWER(status) IN ('pending', 'review')
     ")->fetchColumn();
 
-    // Merit-based scholars are added to the roster automatically
-    syncMeritScholars($pdo);
+    // Active Scholars = exactly who the Scholars page lists as Active: same automatic syncs
+    // (Merit + approved Records) and the same live grade-based standing.
+    $active_scholars = countActiveScholars($pdo);
 
-    // Active scholars come from the actual scholar roster, not from applicants
-    $active_scholars = (int)$pdo->query("
-        SELECT COUNT(*)
-        FROM scholars
-        WHERE LOWER(status) = 'active'
-    ")->fetchColumn();
-
-    // Renewal records needing attention
-    $renewal_due = (int)$pdo->query("
-        SELECT COUNT(*)
-        FROM renewal_retention
-        WHERE LOWER(status) IN ('pending', 'at-risk')
-    ")->fetchColumn();
+    // Pending Renewal = the Renewal & Retention page's own "Pending" count (entries still
+    // awaiting a Renew/Terminate decision, at-risk included), computed the same way it is there.
+    $pending_renewal = renewalLedgerSummary($pdo)['pending'];
 
     // Recent activity, powered by the real audit trail
     $recent_activity = $pdo->query("
@@ -115,17 +108,24 @@ try {
     // from the records table (see includes/scholarship_distribution.php).
     $distribution = getScholarshipDistribution($pdo, $yearFilter);
 
+    // Every active scholarship program, exactly as listed on the Scholarships page, with live slots.
+    $activePrograms = array_map(function ($p) use ($pdo) {
+        $p['taken'] = scholarshipTakenCount($pdo, (string)($p['subtype'] ?? ''), (string)$p['name']);
+        return $p;
+    }, $pdo->query("SELECT id, name, code, type, subtype, slots, unlimited_slots, education_level FROM scholarships WHERE LOWER(TRIM(status)) = 'active' ORDER BY type, name")->fetchAll(PDO::FETCH_ASSOC));
+
 } catch (Exception $e) {
     $schoolYears = [];
     $selectedYear = 'all';
     $total_applicants = 0;
     $under_evaluation = 0;
     $active_scholars = 0;
-    $renewal_due = 0;
+    $pending_renewal = 0;
     $recent_activity = [];
     $monthly_labels = [];
     $monthly_counts = [];
-    $distribution = ['types' => [], 'totalApproved' => 0, 'totalTypes' => 0, 'mostPopular' => null];
+    $distribution = ['types' => [], 'totalApproved' => 0, 'totalTypes' => 0, 'totalPrograms' => 0, 'mostPopular' => null];
+    $activePrograms = [];
 }
 ?>
 <script>
@@ -175,8 +175,8 @@ try {
                 <i data-lucide="refresh-cw"></i>
             </div>
             <div>
-                <span class="card-text">Renewal Due</span>
-                <h1><?= number_format($renewal_due) ?></h1>
+                <span class="card-text">Pending Renewal</span>
+                <h1><?= number_format($pending_renewal) ?></h1>
             </div>
         </div>
     </div>
@@ -200,8 +200,8 @@ try {
                 <strong class="dist-stat-value" id="distTotalApproved"><?= number_format($distribution['totalApproved']) ?></strong>
             </div>
             <div class="dist-stat">
-                <span class="dist-stat-label">Total Scholarship Types</span>
-                <strong class="dist-stat-value" id="distTotalTypes"><?= number_format($distribution['totalTypes']) ?></strong>
+                <span class="dist-stat-label">Total Scholarship Programs</span>
+                <strong class="dist-stat-value" id="distTotalPrograms"><?= number_format($distribution['totalPrograms'] ?? count($activePrograms)) ?></strong>
             </div>
             <div class="dist-stat">
                 <span class="dist-stat-label">Most Populated Scholarship Type</span>
@@ -228,6 +228,33 @@ try {
         </div>
     </div>
 
+    <!-- Active Scholarship Programs: everything active on the Scholarships page -->
+    <div class="programs-panel">
+        <div class="programs-panel-head">
+            <h3>Active Scholarship Programs</h3>
+            <span class="programs-count"><?= count($activePrograms) ?> program<?= count($activePrograms) === 1 ? '' : 's' ?></span>
+        </div>
+        <?php if (empty($activePrograms)): ?>
+            <p class="programs-empty">No active scholarship programs. Add or activate one on the Scholarships page.</p>
+        <?php else: ?>
+            <div class="programs-grid">
+                <?php foreach ($activePrograms as $ap):
+                    $slotsText = $ap['unlimited_slots'] ? 'Unlimited slots' : ((int)$ap['taken'] . ' / ' . (int)$ap['slots'] . ' slots filled');
+                    $full = !$ap['unlimited_slots'] && (int)$ap['slots'] > 0 && (int)$ap['taken'] >= (int)$ap['slots'];
+                ?>
+                    <div class="program-item">
+                        <div class="program-item-name"><?= htmlspecialchars($ap['name']) ?></div>
+                        <div class="program-item-type"><?= htmlspecialchars($ap['type']) ?></div>
+                        <div class="program-item-meta">
+                            <span class="program-slots <?= $full ? 'is-full' : '' ?>"><?= htmlspecialchars($full ? 'Limit reached' : $slotsText) ?></span>
+                            <span class="program-level"><?= htmlspecialchars($ap['education_level'] ?: 'Collegiate') ?></span>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+        <?php endif; ?>
+    </div>
+
     <!-- Notifications -->
     <div class="notification-container">
         <h3>Recent Activity & Alerts</h3>
@@ -250,6 +277,28 @@ try {
                 </div>
             <?php endforeach; ?>
         <?php endif; ?>
+    </div>
+
+    <!-- About -->
+    <div class="about-container">
+        <h3>About</h3>
+        <p>
+            The Scholarship Management System is the College of Maasin Registrar's Office tool for handling
+            scholarships from start to finish. It holds the scholarship programs the school offers, each with
+            its own eligibility criteria, required documents, benefits and number of slots, and it gives
+            students a simple way to apply online using their Student ID.
+        </p>
+        <p>
+            Once an application comes in, the registrar reviews it against the program's requirements and the
+            student's academic records, then approves or rejects it. Approved students are kept on record as
+            scholars, and their standing is checked each term against their grades to see whether their
+            scholarship should be renewed. The system also lets the office send notices to applicants and keeps
+            a history of the actions taken.
+        </p>
+        <p>
+            Its purpose is to keep scholarship information organized and in one place. The final decisions
+            remain with the Registrar's Office.
+        </p>
     </div>
 </div>
 

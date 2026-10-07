@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/init.php';
 require_once __DIR__ . '/../includes/settings_helper.php';
+require_once __DIR__ . '/../includes/history_filters.php';
 
 checkAuth();
 
@@ -24,35 +25,8 @@ try {
     $localDate = sprintf("DATE(created_at + INTERVAL %d MINUTE)", $tzMinutes);
     $localTime = sprintf("(created_at + INTERVAL %d MINUTE)", $tzMinutes);
 
-    $where = "WHERE 1=1";
-    $params = [];
-
-    if ($search !== '') {
-        $where .= " AND (description LIKE ? OR user_name LIKE ? OR action LIKE ?)";
-        $params[] = "%$search%";
-        $params[] = "%$search%";
-        $params[] = "%$search%";
-    }
-
-    if ($date !== '') {
-        $where .= " AND $localDate = ?";
-        $params[] = $date;
-    }
-
-    if ($action !== '' && strtolower($action) !== 'all') {
-        $where .= " AND action = ?";
-        $params[] = $action;
-    }
-
-    if ($module !== '' && strtolower($module) !== 'all') {
-        $where .= " AND module = ?";
-        $params[] = $module;
-    }
-
-    if ($user !== '' && strtolower($user) !== 'all') {
-        $where .= " AND user_name = ?";
-        $params[] = $user;
-    }
+    // Same filters as "Delete Browsing Data" (includes/history_filters.php).
+    [$where, $params] = historyWhereClause($_GET);
 
     /* =========================================================
        CSV EXPORT

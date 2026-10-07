@@ -70,3 +70,35 @@ function scholarshipSlotsAvailable(PDO $pdo, array $scholarship): int {
     $taken = scholarshipTakenCount($pdo, (string)($scholarship['subtype'] ?? ''), (string)($scholarship['name'] ?? ''));
     return max(0, (int)$scholarship['slots'] - $taken);
 }
+
+// Whether a program has used up all its slots (never for unlimited / no-slot-count programs).
+function scholarshipIsFull(PDO $pdo, array $scholarship): bool {
+    return empty($scholarship['unlimited_slots']) && (int)($scholarship['slots'] ?? 0) > 0 && scholarshipSlotsAvailable($pdo, $scholarship) <= 0;
+}
+
+// The `scholarships` row an applicant's stored scholarship type belongs to (null if none).
+function scholarshipForType(PDO $pdo, string $type): ?array {
+    $key = normalizeScholarshipType($pdo, $type);
+    if ($key === '') return null;
+    $rows = $pdo->query("SELECT * FROM scholarships ORDER BY (LOWER(TRIM(status)) = 'active') DESC, id DESC")->fetchAll(PDO::FETCH_ASSOC);
+    foreach ($rows as $r) {
+        if (strcasecmp(normalizeScholarshipType($pdo, trim((string)$r['subtype']) !== '' ? $r['subtype'] : $r['name']), $key) === 0) return $r;
+    }
+    return null;
+}
+
+/*
+ * Serializes "is there a slot left? -> add the applicant" across simultaneous requests, so two
+ * people can't both take the last slot. MySQL releases the lock when the request's connection
+ * closes; scholarshipSlotUnlock() releases it earlier.
+ */
+function scholarshipSlotLock(PDO $pdo): void {
+    $pdo->query("SELECT GET_LOCK('sms_scholarship_slots', 15)")->fetchColumn();
+}
+function scholarshipSlotUnlock(PDO $pdo): void {
+    $pdo->query("SELECT RELEASE_LOCK('sms_scholarship_slots')")->fetchColumn();
+}
+
+function scholarshipFullMessage(string $programName): string {
+    return "$programName has reached its slot limit and is no longer accepting applicants.";
+}

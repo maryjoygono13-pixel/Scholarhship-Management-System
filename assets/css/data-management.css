@@ -21,7 +21,7 @@
 =========================== */
 
 .import-card {
-    background: #fff;
+    background: #fafbf9;
     border-radius: 12px;
     padding: 20px;
     box-shadow: 0 4px 12px rgba(0,0,0,.08);
@@ -58,14 +58,14 @@
 
 #gradeBtn,
 #enrollmentBtn {
-    background: #f2faf4;
+    background: #edf2ed;
     color: var(--green-900, #134e2a);
-    border: 1px solid var(--green-100, #e8f5e9);
+    border: 1px solid var(--green-100, #e1eae2);
 }
 
 #gradeBtn:hover,
 #enrollmentBtn:hover {
-    background: #e8f5e9;
+    background: #e1eae2;
 }
 
 /* Import */
@@ -123,7 +123,7 @@
 =========================== */
 
 .table-card {
-    background: #fff;
+    background: #fafbf9;
     border-radius: 12px;
     padding: 20px;
     box-shadow: 0 4px 12px rgba(0,0,0,.08);
@@ -176,14 +176,14 @@
 }
 
 .table-card th {
-    background: #f2faf4 !important;
+    background: #edf2ed !important;
     color: var(--green-900, #134e2a) !important;
     font-size: 13px;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.5px;
     padding: 12px 14px;
-    border-bottom: 2px solid #e8f5e9;
+    border-bottom: 2px solid #e1eae2;
     text-align: left;
 }
 
@@ -261,7 +261,7 @@
 }
 
 .btn-action.btn-view:hover {
-    background: #e8f5e9;
+    background: #e1eae2;
     color: var(--green-900, #134e2a);
     transform: scale(1.1);
 }
@@ -303,7 +303,7 @@
 }
 
 .custom-modal-card {
-    background: #fff;
+    background: #fafbf9;
     border-radius: 12px;
     width: 90%;
     max-width: 460px;
@@ -402,7 +402,7 @@
 }
 
 .btn-modal-secondary {
-    background: #fff;
+    background: #fafbf9;
     border: 1px solid #d1d5db;
     color: #374151;
     padding: 8px 16px;
@@ -457,3 +457,65 @@
 }
 
 }
+
+/* ===========================
+   FETCH FROM REGISTRAR DATABASE
+=========================== */
+.registrar-fetch-card { background: #fafbf9; border-radius: 12px; padding: 20px; box-shadow: 0 4px 12px rgba(0,0,0,.08); margin-bottom: 25px; }
+.registrar-fetch-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+.registrar-fetch-card h2 { margin: 0 0 6px; color: var(--green-900, #134e2a); font-size: 20px; font-weight: 700; }
+.registrar-fetch-sub { margin: 0; font-size: 13px; color: #6b7280; max-width: 640px; }
+.registrar-conn { font-size: 12px; font-weight: 600; padding: 5px 12px; border-radius: 999px; background: #e9ece6; color: #6b7280; white-space: nowrap; }
+.registrar-conn.is-ok { background: #d5e8da; color: #065f46; }
+.registrar-conn.is-bad { background: #fee2e2; color: #991b1b; }
+.registrar-fetch-controls { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 16px; }
+.registrar-choose-btn { border: 1px solid var(--green-100, #e1eae2); background: #edf2ed; color: var(--green-900, #134e2a); padding: 10px 16px; border-radius: 8px; font-weight: 600; cursor: pointer; }
+.registrar-choose-btn:hover { background: #e1eae2; }
+.registrar-file-name { font-size: 13px; color: #374151; flex: 1 1 160px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.registrar-save-toggle { font-size: 13px; color: #374151; display: flex; align-items: center; gap: 6px; }
+.registrar-fetch-btn { border: none; padding: 10px 22px; border-radius: 8px; font-weight: 600; cursor: pointer; }
+.registrar-fetch-btn:disabled { opacity: .6; cursor: wait; }
+.registrar-test-link { display: inline-block; margin-top: 10px; font-size: 12.5px; color: var(--green-700, #238f54); }
+.registrar-results { margin-top: 18px; }
+.registrar-summary { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+.registrar-summary span { font-size: 12.5px; background: #edf2ed; color: #374151; padding: 5px 12px; border-radius: 999px; }
+.registrar-summary span.ok { background: #d5e8da; color: #065f46; }
+.registrar-summary span.bad { background: #fee2e2; color: #991b1b; }
+.registrar-summary span.warn { background: #f3e8c9; color: #92400e; }
+.registrar-table-wrap { overflow-x: auto; border: 1px solid #e2e6df; border-radius: 10px; }
+.registrar-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.registrar-table th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: #6b7280; background: #f3f5f1; padding: 10px; white-space: nowrap; }
+.registrar-table td { padding: 9px 10px; border-top: 1px solid #eef0ec; color: #1f2937; vertical-align: top; }
+.registrar-table .text-center { text-align: center; }
+.registrar-table .mono { font-family: "Geist Mono", monospace; }
+.registrar-table .muted { color: #9ca3af; }
+.rf-badge { display: inline-block; font-size: 11.5px; font-weight: 600; padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
+.rf-badge.ok { background: #d5e8da; color: #065f46; }
+.rf-badge.bad { background: #fee2e2; color: #991b1b; }
+.rf-badge.warn { background: #f3e8c9; color: #92400e; }
+.registrar-goto { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+.registrar-goto[hidden] { display: none; }
+.registrar-goto-btn { display: inline-block; padding: 9px 16px; border-radius: 8px; background: var(--green-900, #134e2a); color: #fff; font-size: 13px; font-weight: 600; text-decoration: none; }
+.registrar-goto-btn:hover { background: var(--green-800, #1b6336); }
+.registrar-issues h4 { margin: 4px 0 8px; font-size: 13px; color: #92400e; }
+.registrar-issues[hidden] { display: none; }
+
+/* Verify CHED Enrollment List */
+.rf-badge.muted { background: #e9ece6; color: #4b5563; }
+.verify-filter { display: inline-flex; flex-wrap: wrap; gap: 6px; margin-left: auto; }
+.verify-filter button { border: 1px solid #d1d5db; background: #fafbf9; color: #374151; font-size: 12px; font-weight: 600; padding: 6px 12px; border-radius: 999px; cursor: pointer; }
+.verify-filter button.active { background: #134e2a; border-color: #134e2a; color: #fff; }
+.registrar-goto { align-items: center; }
+.verify-table-wrap { max-height: 420px; overflow-y: auto; }
+.verify-table-wrap thead th { position: sticky; top: 0; z-index: 1; }
+.verify-marked { font-size: 11px; color: #065f46; margin-top: 3px; }
+.registrar-table .muted { color: #6b7280; font-size: 12px; }
+.verify-history { margin-top: 16px; border-top: 1px solid #e2e6df; padding-top: 12px; }
+.verify-history summary { cursor: pointer; font-size: 13px; font-weight: 600; color: #134e2a; }
+.verify-history-body { margin-top: 10px; overflow-x: auto; font-size: 13px; }
+
+/* Import Academic / Enrollment Records section: hidden (see pages/data-management.php). */
+.page-container[hidden] { display: none !important; }
+
+/* Page container: same size as the Notifications page (.page in notification.css). */
+.dm-page { max-width: 1400px; margin: 0 auto; padding: 24px; box-sizing: border-box; }

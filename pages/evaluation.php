@@ -22,14 +22,17 @@
                 </div>
                 <div class="select-wrap">
                     <select id="filterStatus">
-                        <option value="all">All Statuses</option>
+                        <option value="all">All Status</option>
                         <option value="review">For Review</option>
                         <option value="non-compliant">Non-Compliant</option>
                     </select>
                     <i data-lucide="chevron-down"></i>
                 </div>
+                <!-- Multi-select delete (assets/js/bulk-delete.js): trash icon, shown once applicants are ticked -->
+                <span class="bulk-delete-host" id="evalBulkDeleteHost"></span>
 
-            <div class="header-actions">
+            <!-- Import Academic / Import Enrollment: hidden for now (remove "hidden" to show again). -->
+            <div class="header-actions" hidden style="display:none;">
                 <input type="file" id="gradeFile" hidden accept=".csv,.xlsx,.xls">
                 <button type="button" class="btn-primary btn-no-anim" id="evalGradeHeaderBtn">
                     <i data-lucide="file-spreadsheet"></i>
@@ -60,5 +63,19 @@
     </div>
 
     <div class="toast" id="toast"></div>
+
+    <!-- Message an applicant from the Evaluation window (message icon on the applicant card) -->
+    <script src="<?= SITE_BASE ?>/assets/js/evaluation-message.js?v=<?= time() ?>"></script>
+
+    <!-- Multi-select delete: trash icon + confirmation (shared with Applicants, Scholars, Records) -->
+    <script src="<?= SITE_BASE ?>/assets/js/bulk-delete.js?v=<?= time() ?>"></script>
+    <script>
+        setupBulkDelete({
+            host: "#evalBulkDeleteHost", rows: "#tableWrap", selectAll: "#selectAllEval",
+            endpoint: "delete_applicant.php", noun: ["applicant", "applicants"],
+            label: (tr) => tr.querySelector(".name").textContent.trim() + " (" + tr.querySelector(".id").textContent.trim() + ")",
+            reload: () => (window.reloadEvaluation ? window.reloadEvaluation() : location.reload()),
+        });
+    </script>
 
     <?php include __DIR__ . '/../includes/footer.php'; ?>

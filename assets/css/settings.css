@@ -14,9 +14,9 @@
 }
 
 .settings-alert.success {
-    background: #e8f5e9;
+    background: #e1eae2;
     color: #134e2a;
-    border: 1px solid #c8e6c9;
+    border: 1px solid #c3d6c6;
 }
 
 .settings-alert.error {
@@ -41,14 +41,14 @@
     padding: 4px 8px;
     border-radius: 6px;
 }
-.password-toggle:hover { background: #e8f5e9; }
+.password-toggle:hover { background: #e1eae2; }
 
 .field-hint { margin: 6px 0 0; font-size: 12px; color: #6b7280; }
 .field-hint.ok { color: #166534; }
 .field-hint.bad { color: #b91c1c; }
 
 .settings-card {
-    background: #ffffff;
+    background: #fafbf9;
     border-radius: 12px;
     padding: 28px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.04);
@@ -88,7 +88,7 @@
     border-radius: 8px;
     font-size: 14px;
     outline: none;
-    background: #ffffff;
+    background: #fafbf9;
 }
 
 .form-input:focus {

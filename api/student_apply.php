@@ -20,6 +20,7 @@ require_once __DIR__ . '/../includes/scholarship_criteria_helper.php';
 require_once __DIR__ . '/../includes/locations.php';
 require_once __DIR__ . '/../includes/merit_helper.php';
 require_once __DIR__ . '/../includes/special_qualification_helper.php';
+require_once __DIR__ . '/../includes/apply_guard_helper.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -57,6 +58,34 @@ try {
     if ($studentId === '') {
         sendError('Your Student ID is missing. Please start over from the Apply page.');
     }
+
+    // ---- Safeguards against spam and floods (includes/apply_guard_helper.php). Cheap checks
+    // first, before any file handling or heavy database work. ----
+    $clientIp = applyClientIp();
+    if (trim((string)($_POST[APPLY_HONEYPOT_FIELD] ?? '')) !== '') {
+        sendError('Your application could not be submitted.', 400); // hidden field filled in: a bot
+    }
+    $wait = applyThrottleWait($pdo, 'apply_attempt', $clientIp, APPLY_ATTEMPTS_PER_IP, APPLY_ATTEMPTS_WINDOW);
+    if ($wait > 0) {
+        sendError('Too many attempts from this connection. Please wait ' . applyWaitText($wait) . ' and try again.', 429);
+    }
+    applyThrottleRecord($pdo, 'apply_attempt', $clientIp);
+    $tokenError = applyCheckFormToken(trim((string)($_POST['formToken'] ?? '')), $studentId);
+    if ($tokenError !== null) {
+        sendError($tokenError, 403);
+    }
+    $wait = applyThrottleWait($pdo, 'apply_submitted_ip', $clientIp, APPLY_SUBMISSIONS_PER_IP, APPLY_SUBMISSIONS_IP_WINDOW);
+    if ($wait > 0) {
+        sendError('Too many applications have been submitted from this connection. Please try again in ' . applyWaitText($wait) . '.', 429);
+    }
+    $wait = applyThrottleWait($pdo, 'apply_submitted_student', $studentId, APPLY_SUBMISSIONS_PER_STUDENT, APPLY_SUBMISSIONS_STUDENT_WINDOW);
+    if ($wait > 0) {
+        sendError('This Student ID has reached the limit of ' . APPLY_SUBMISSIONS_PER_STUDENT . ' applications per day. Please try again in ' . applyWaitText($wait) . '.', 429);
+    }
+    $sizeError = applyCheckUploadSizes();
+    if ($sizeError !== null) {
+        sendError($sizeError, 413);
+    }
     if (
         $firstName === '' || $lastName === '' || $gender === '' || $phone === '' || $email === '' ||
         $birthdate === '' || $municipality === '' || $barangay === '' ||
@@ -77,11 +106,16 @@ try {
 
     // The chosen program must be a real, currently active one — and not full. Re-checked here
     // (not just in the form) since another applicant could take the last slot in the meantime.
-    $prog = $pdo->prepare("SELECT id, name, type, subtype, slots, slots_available, unlimited_slots FROM scholarships WHERE name = ? AND LOWER(status) = 'active' LIMIT 1");
+    $prog = $pdo->prepare("SELECT id, name, code, type, subtype, slots, slots_available, unlimited_slots FROM scholarships WHERE name = ? AND LOWER(status) = 'active' LIMIT 1");
     $prog->execute([$scholarshipName]);
     $program = $prog->fetch(PDO::FETCH_ASSOC);
     if (!$program) {
         sendError('That scholarship program is not available. Please choose another.', 404);
+    }
+    // Applied for on an outside site (e.g. CHED StuFAPs), never through this form.
+    $externalUrl = externalApplicationUrl($program);
+    if ($externalUrl !== null) {
+        sendError('Applications for ' . $program['name'] . ' are submitted through ' . $externalUrl . ', not this form.', 422);
     }
 
     // A program with a Poverty Threshold needs the applicant's monthly family income. The
@@ -120,7 +154,7 @@ try {
     // The documents this specific program requires (registrar-configured on the Scholarships
     // page) — never the same fixed 3 fields for every program. Every required one is mandatory;
     // an application is never accepted as "complete later".
-    $requiredDocuments = array_values(array_filter(getScholarshipDocuments($pdo, (int)$program['id']), fn($d) => (bool)$d['required']));
+    $requiredDocuments = array_values(array_filter(getApplicationDocuments($pdo, (int)$program['id']), fn($d) => (bool)$d['required']));
     foreach ($requiredDocuments as $doc) {
         $field = $doc['document_type'];
         $label = DOCUMENT_TYPES[$field] ?? $field;
@@ -130,8 +164,9 @@ try {
     }
     // Counted live from actual applicants, not a stored decrement counter — so this can never
     // drift into showing "full" for a program nobody has actually applied to.
-    $isFull = !$program['unlimited_slots'] && (int)$program['slots'] > 0 && scholarshipSlotsAvailable($pdo, $program) <= 0;
-    if ($isFull) {
+    // Held until this request ends, so a simultaneous applicant can't take the same last slot.
+    scholarshipSlotLock($pdo);
+    if (scholarshipIsFull($pdo, $program)) {
         sendError('That scholarship program has reached its slot limit and is no longer accepting applicants. Please choose another program.', 409);
     }
     $scholarshipType = normalizeScholarshipType($pdo, $program['subtype'] !== '' ? $program['subtype'] : $program['name']);
@@ -173,7 +208,7 @@ try {
 
     // Every document this program has configured (required and optional) — PNG only. Field
     // names are documents[<type>], matching pages/apply.php's dynamically-rendered Step 6.
-    $allDocuments = getScholarshipDocuments($pdo, (int)$program['id']);
+    $allDocuments = getApplicationDocuments($pdo, (int)$program['id']);
 
     $uploadDir = __DIR__ . '/../uploads/';
     if (!is_dir($uploadDir) && !mkdir($uploadDir, 0777, true)) {
@@ -249,12 +284,15 @@ try {
         $specialQualification, $specialQualificationOther,
     ]);
     $newId = (int)$pdo->lastInsertId();
+    // Count this accepted application toward the per-connection and per-Student-ID limits.
+    applyThrottleRecord($pdo, 'apply_submitted_ip', $clientIp);
+    applyThrottleRecord($pdo, 'apply_submitted_student', $studentId);
 
     // Every uploaded file (legacy-named or a program-specific one) also gets a row in the
     // generalized documents table — the canonical source Evaluation's Documents tab reads from.
     if (!empty($uploadedDocs)) {
         $docIdByType = [];
-        foreach ($allDocuments as $doc) $docIdByType[$doc['document_type']] = (int)$doc['id'];
+        foreach ($allDocuments as $doc) $docIdByType[$doc['document_type']] = (int)$doc['id'] ?: null; // universal docs (id 0) have no program row
         $insertDoc = $pdo->prepare("INSERT INTO applicant_documents (applicant_id, scholarship_document_id, document_type, file_path) VALUES (?, ?, ?, ?)");
         foreach ($uploadedDocs as $docType => $filename) {
             $insertDoc->execute([$newId, $docIdByType[$docType] ?? null, $docType, $filename]);
@@ -266,7 +304,6 @@ try {
     // with no separate counter that could ever drift from it.
 
     recalculateApplicantGwa($pdo, $studentId);
-    syncMeritScholars($pdo);
 
     $fullName = trim($firstName . ' ' . $middleName . ' ' . $lastName . ' ' . $suffix);
     logActivity($pdo, 'Applicant Added', 'Applicants', $fullName . ' (Student ID: ' . $studentId . ') applied for ' . $scholarshipName . ' through the public Apply page.', $newId);

@@ -2,9 +2,11 @@
    Applicants
 =========================== */
 
+/* Same size as the Scholars page (.scholars-container in scholars.css). */
 .page {
-    max-width: 1000px;
-    margin: 0 auto;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 24px;
 }
 
 
@@ -45,7 +47,7 @@
     width: 100%;
     height: 40px;
     padding: 0 14px 0 38px;
-    background: #ffffff;
+    background: #fafbf9;
     border: 1px solid #d1d5db;
     border-radius: 8px;
     font-size: 13.5px;
@@ -96,7 +98,7 @@
 
     padding: 0 36px 0 14px;
 
-    background: #ffffff;
+    background: #fafbf9;
     border: 1px solid #d1d5db;
     border-radius: 8px;
 
@@ -145,7 +147,7 @@
 =========================== */
 
 .table-card {
-    background: #fff;
+    background: #fafbf9;
     border: 1px solid var(--slate-200);
     border-radius: 14px;
     overflow: hidden;
@@ -257,13 +259,13 @@
 
 .status-badge.badge-pending,
 .status-badge.pending {
-    background: #fef3c7;
+    background: #f3e8c9;
     color: #92400e;
 }
 
 .status-badge.badge-approved,
 .status-badge.approved {
-    background: #d1fae5;
+    background: #d5e8da;
     color: #065f46;
 }
 
@@ -275,7 +277,7 @@
 
 .status-badge.badge-interview,
 .status-badge.interview {
-    background: #fef3c7;
+    background: #f3e8c9;
     color: #92400e;
 }
 
@@ -312,7 +314,7 @@
     border-radius: 8px;
     border: 1px solid #e5e7eb;
 
-    background: #ffffff;
+    background: #fafbf9;
     color: #4b5563;
 
     cursor: pointer;
@@ -567,7 +569,7 @@
     max-width: 900px;
     max-height: 90vh;
 
-    background: #fff;
+    background: #fafbf9;
 
     border-radius: 16px;
 
@@ -693,7 +695,7 @@
 
     color: var(--slate-400);
 
-    background: #fff;
+    background: #fafbf9;
 
     transition: all 0.2s ease;
 
@@ -1148,3 +1150,17 @@
         width: 100%;
     }
 }
+/* Scholarship Types sits right beside the search bar (the search wrapper used to stretch
+   across the free space and push the dropdown to the far right). Add Applicant stays right. */
+.table-header-toolbar .search-wrap {
+    flex: 0 0 auto;
+    min-width: 0;
+}
+
+/* Multi-select delete */
+.select-head, .row-select-cell { width: 36px; text-align: center; padding-left: 14px !important; padding-right: 4px !important; }
+.select-head input, .row-select-cell input { width: 16px; height: 16px; accent-color: #134e2a; cursor: pointer; }
+.row-select-cell { cursor: pointer; }
+.applicants-table tbody tr.is-selected { background: #edf2ed; }
+.bulk-delete-list { margin: 0; padding-left: 18px; font-size: 13px; color: #374151; max-height: 180px; overflow-y: auto; }
+.bulk-delete-list li { margin: 2px 0; }

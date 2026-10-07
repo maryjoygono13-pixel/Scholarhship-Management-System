@@ -58,20 +58,35 @@ function setupLegendToggle() {
 
 // Program & Department Color Palette
 const departmentColors = {
-    "Nursing": "#ec4899",
-    "Information Technology": "#2563eb",
-    "Accountancy": "#7c3aed",
-    "Business Administration": "#f59e0b",
-    "Political Science": "#84cc16",
-    "Elementary Education": "#16a34a",
-    "Secondary Education": "#06b6d4",
+    "Nursing": "#ec4899",                 // BSN — pink
+    "Information Technology": "#dc2626",  // BSIT — red
+    "Accountancy": "#f59e0b",             // BSA — yellow orange
+    "Business Administration": "#16a34a", // BSBA — green
+    "Secondary Education": "#2563eb",     // BSED — blue
+    "Elementary Education": "#89cff0",    // BEED — baby blue
+    "Political Science": "#800000",       // BA PolSci — maroon
+    "Food Preparation and Services Technology": "#7c3aed", // BIT FPST — purple
+};
 
+// How each program is named on the map (legend, filter, popups).
+const departmentAbbreviations = {
+    "Nursing": "BS Nursing",
+    "Information Technology": "BS Information Technology",
+    "Accountancy": "BS Accountancy",
+    "Business Administration": "BS Business Administration",
+    "Secondary Education": "B Secondary Education",
+    "Elementary Education": "B Elementary Education",
+    "Political Science": "BA PolSci",
+    "Food Preparation and Services Technology": "BIT Food Preparation and Services Technology",
 };
 
 
 function normalizeDepartment(deptStr) {
     const d = (deptStr || "").toLowerCase();
 
+    if (d.includes("food preparation") || d.includes("fpst") || d.includes("food service")) {
+        return "Food Preparation and Services Technology";
+    }
     if (d.includes("nursing")) return "Nursing";
 
     if (
@@ -90,7 +105,7 @@ function normalizeDepartment(deptStr) {
         return "Business Administration";
     }
     if (
-        d.includes("political")
+        d.includes("political") || d.includes("polsci")
     ) {
         return "Political Science";
     }
@@ -294,7 +309,7 @@ async function loadStudentLocations(map) {
                                 color: ${color};
                                 font-weight:700;
                             ">
-                                ${escapeHtml(deptKey)}
+                                ${escapeHtml(departmentAbbreviations[deptKey] || deptKey)}
                             </span>
                         </div>
 

@@ -20,6 +20,26 @@ checkAuth();
             window.SITE_BASE = <?= json_encode(SITE_BASE) ?>;
             window.SITE_URL = <?= json_encode(SITE_URL) ?>;
             window.API_BASE = window.SITE_BASE + '/api';
+
+            // If the sign-in session has ended, any API call answers 401. Instead of every
+            // screen showing a bare "Unauthorized.", explain it once and go to Sign In.
+            (function () {
+                const nativeFetch = window.fetch.bind(window);
+                let redirecting = false;
+                window.fetch = async function (input, init) {
+                    const res = await nativeFetch(input, init);
+                    const url = typeof input === "string" ? input : (input && input.url) || "";
+                    if (res.status === 401 && (url.indexOf("/api/") !== -1 || url.indexOf("api/") === 0)) {
+                        if (!redirecting) {
+                            redirecting = true;
+                            alert("Your session has ended. Please sign in again — nothing on this page was saved.");
+                            window.location.href = window.SITE_BASE + "/login";
+                        }
+                        return new Promise(() => {}); // stop the page from also showing its own error
+                    }
+                    return res;
+                };
+            })();
         </script>
         <script src="<?= SITE_BASE ?>/assets/lib/lucide.min.js"></script>
         <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>

@@ -119,28 +119,160 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         const body = rows.map((r) => {
+            const ticked = selectedIds.has(r.id);
             return (
-                '<tr data-id="' + r.id + '">' +
+                '<tr data-id="' + r.id + '"' + (ticked ? ' class="is-selected"' : "") + '>' +
+                '<td class="history-select-cell"><input type="checkbox" class="history-select" data-id="' + r.id + '"' + (ticked ? " checked" : "") + ' aria-label="Select entry"></td>' +
                 '<td class="font-mono">' + esc(formatDateTime(r.createdAt)) + '</td>' +
                 '<td>' + esc(r.userName) + '</td>' +
                 '<td><span class="module-pill">' + esc(r.module) + '</span></td>' +
                 '<td><span class="action-badge ' + actionBadgeClass(r.action) + '">' + esc(r.action) + '</span></td>' +
                 '<td class="desc-cell" title="' + esc(r.description) + '">' + esc(r.description) + '</td>' +
+                '<td class="history-actions-cell"><button type="button" class="btn-icon-action delete history-row-delete" data-id="' + r.id + '" title="Delete entry" aria-label="Delete entry"><i data-lucide="trash-2"></i></button></td>' +
                 '</tr>'
             );
         }).join("");
 
         tableWrap.innerHTML =
             '<table class="history-table"><thead><tr>' +
-            '<th>Date &amp; Time</th><th>User</th><th>Module</th><th>Action</th><th>Description</th>' +
+            '<th class="history-select-cell"><input type="checkbox" id="historySelectAll" title="Select all on this page" aria-label="Select all entries on this page"></th>' +
+            '<th>Date &amp; Time</th><th>User</th><th>Module</th><th>Action</th><th>Description</th><th class="history-actions-cell"></th>' +
             '</tr></thead><tbody>' + body + '</tbody></table>';
 
         tableWrap.querySelectorAll("tr[data-id]").forEach((tr) => {
-            tr.addEventListener("click", () => {
+            tr.addEventListener("click", (e) => {
+                // Checkbox and trash icon have their own actions.
+                if (e.target.closest(".history-select-cell, .history-actions-cell")) return;
                 const id = parseInt(tr.getAttribute("data-id"), 10);
                 const row = currentData.find(r => r.id === id);
                 if (row) openDetailModal(row);
             });
+        });
+
+        tableWrap.querySelectorAll("input.history-select").forEach((box) => {
+            box.addEventListener("change", () => {
+                const id = parseInt(box.getAttribute("data-id"), 10);
+                if (box.checked) selectedIds.add(id); else selectedIds.delete(id);
+                updateSelectionUi();
+            });
+        });
+        const selectAll = document.getElementById("historySelectAll");
+        if (selectAll) {
+            selectAll.addEventListener("change", () => {
+                tableWrap.querySelectorAll("input.history-select").forEach((box) => {
+                    box.checked = selectAll.checked;
+                    const id = parseInt(box.getAttribute("data-id"), 10);
+                    if (selectAll.checked) selectedIds.add(id); else selectedIds.delete(id);
+                });
+                updateSelectionUi();
+            });
+        }
+        tableWrap.querySelectorAll(".history-row-delete").forEach((btn) => {
+            btn.addEventListener("click", () => openDeleteConfirm([parseInt(btn.getAttribute("data-id"), 10)]));
+        });
+        updateSelectionUi();
+    }
+
+    /* ---------- Delete history entries (one, or several selected) ---------- */
+    const selectedIds = new Set();          // kept across pages until deleted or cleared
+    const bulkDeleteBtn = document.getElementById("historyBulkDeleteBtn");
+    const bulkCount = document.getElementById("historyBulkCount");
+    const deleteOverlay = document.getElementById("historyDeleteOverlay");
+    const deleteCount = document.getElementById("historyDeleteCount");
+    const deletePlural = document.getElementById("historyDeletePlural");
+    const deleteConfirmBtn = document.getElementById("historyDeleteConfirmBtn");
+    let pendingDelete = [];
+    let deleteAllMatching = false;   // true: delete every entry matching the current filters
+    let lastMatchingTotal = 0;
+    const deleteMessage = document.getElementById("historyDeleteMessage");
+
+    function updateSelectionUi() {
+        if (bulkCount) bulkCount.textContent = String(selectedIds.size);
+        const countWrap = document.getElementById("historyBulkCountWrap");
+        if (countWrap) countWrap.hidden = selectedIds.size === 0;
+        if (!tableWrap) return;
+        const boxes = Array.from(tableWrap.querySelectorAll("input.history-select"));
+        boxes.forEach((b) => { const tr = b.closest("tr"); if (tr) tr.classList.toggle("is-selected", b.checked); });
+        const all = document.getElementById("historySelectAll");
+        if (all) {
+            const ticked = boxes.filter((b) => b.checked).length;
+            all.checked = boxes.length > 0 && ticked === boxes.length;
+            all.indeterminate = ticked > 0 && ticked < boxes.length;
+        }
+    }
+
+    function openDeleteConfirm(ids) {
+        pendingDelete = ids.filter((id) => id > 0);
+        deleteAllMatching = false;
+        if (!pendingDelete.length || !deleteOverlay) return;
+        if (deleteMessage) deleteMessage.innerHTML = 'Delete <strong id="historyDeleteCount">0</strong> history entr<span id="historyDeletePlural">ies</span>?';
+        const deleteCount = document.getElementById("historyDeleteCount");
+        const deletePlural = document.getElementById("historyDeletePlural");
+        if (deleteCount) deleteCount.textContent = String(pendingDelete.length);
+        if (deletePlural) deletePlural.textContent = pendingDelete.length === 1 ? "y" : "ies";
+        deleteOverlay.classList.add("open");
+        if (typeof lucide !== "undefined") lucide.createIcons();
+    }
+    function closeDeleteConfirm() {
+        if (deleteOverlay) deleteOverlay.classList.remove("open");
+        pendingDelete = [];
+        deleteAllMatching = false;
+    }
+
+    // No entries ticked: delete everything the list currently shows (all pages, current filters).
+    function openDeleteAllMatching() {
+        if (!deleteOverlay) return;
+        if (lastMatchingTotal <= 0) { alert("There are no history entries to delete."); return; }
+        const filtered = (searchInput && searchInput.value.trim()) || (dateFilter && dateFilter.value) ||
+            (actionFilter && actionFilter.value !== "all") || (moduleFilter && moduleFilter.value !== "all");
+        pendingDelete = [];
+        deleteAllMatching = true;
+        if (deleteMessage) {
+            deleteMessage.innerHTML = filtered
+                ? "Delete all <strong>" + lastMatchingTotal.toLocaleString() + "</strong> history entr" + (lastMatchingTotal === 1 ? "y" : "ies") + " matching the current filters?"
+                : "Delete <strong>all " + lastMatchingTotal.toLocaleString() + "</strong> history entr" + (lastMatchingTotal === 1 ? "y" : "ies") + "? Tick entries first to delete only some of them.";
+        }
+        deleteOverlay.classList.add("open");
+        if (typeof lucide !== "undefined") lucide.createIcons();
+    }
+
+    if (bulkDeleteBtn) bulkDeleteBtn.addEventListener("click", () => {
+        if (selectedIds.size > 0) openDeleteConfirm(Array.from(selectedIds));
+        else openDeleteAllMatching();
+    });
+    ["historyDeleteCloseBtn", "historyDeleteCancelBtn"].forEach((id) => {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener("click", closeDeleteConfirm);
+    });
+    if (deleteConfirmBtn) {
+        deleteConfirmBtn.addEventListener("click", async () => {
+            if (!pendingDelete.length && !deleteAllMatching) return closeDeleteConfirm();
+            const fd = new FormData();
+            if (deleteAllMatching) {
+                fd.append("scope", "filtered");
+                buildParams({}).forEach((value, key) => fd.append(key, value));
+            } else {
+                pendingDelete.forEach((id) => fd.append("ids[]", String(id)));
+            }
+            deleteConfirmBtn.disabled = true;
+            deleteConfirmBtn.textContent = "Deleting…";
+            try {
+                const res = await fetch(`${apiBase}/delete_history.php`, { method: "POST", body: fd });
+                const json = await res.json();
+                if (!json.success) {
+                    alert(json.message || "The entries could not be deleted.");
+                    return;
+                }
+                if (deleteAllMatching) selectedIds.clear(); else pendingDelete.forEach((id) => selectedIds.delete(id));
+                closeDeleteConfirm();
+                currentPage = 1;
+                await loadHistory();
+            } catch (e) {
+                alert("Could not reach the server.");
+            } finally {
+                deleteConfirmBtn.disabled = false;
+                deleteConfirmBtn.textContent = "Delete";
+            }
         });
     }
 
@@ -214,6 +346,7 @@ document.addEventListener("DOMContentLoaded", () => {
             renderStats(json.stats);
             renderTable(currentData);
             renderPagination(json.pagination);
+            lastMatchingTotal = (json.pagination && Number(json.pagination.total)) || currentData.length;
 
             if (typeof lucide !== "undefined") lucide.createIcons();
         } catch (e) {

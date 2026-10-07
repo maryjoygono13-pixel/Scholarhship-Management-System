@@ -1,21 +1,20 @@
 <?php
 /*
- * MERIT-BASED Academic Scholarship (Dean's Listers) is different from the scholarships that go
- * through Evaluation -> Renewal & Retention: it has no slot limit and nobody applies for it in
- * particular. Every applicant is considered for it by default, and any enrolled student whose
- * GWA (from the imported academic records) meets its requirement is a scholar automatically.
- * They are added to the Scholars list; they can hold another scholarship at the same time.
+ * MERIT-BASED Academic Scholarship: a scholarship students APPLY for, evaluated and approved like
+ * any other program (Apply page -> Evaluation -> Records). Once approved, the student is on the
+ * Scholars list through their approved Record (syncApprovedScholars() below).
  *
- * The scholarship itself (its GWA requirement, active or not) is the one set up on the
- * Scholarships page under the type "MERIT-BASED Academic Scholarship".
+ * It is not the Dean's List: that one is the school's recognition for grades alone, with no
+ * application (see deans_list_rules.php / deans_list_helper.php).
  *
- * Standing is decided by each semester's GWA:
- *   - at or better than the requirement (1.50): a scholar for that semester, and on into the
- *     following semesters and year levels for as long as they keep it;
- *   - worse than the requirement but better than MERIT_LOCKOUT_GWA (2.00): not a scholar for
- *     that semester, but back in as soon as a later semester reaches the requirement again;
- *   - MERIT_LOCKOUT_GWA (2.00) or worse in any semester: out of Scholars for the rest of that
- *     school year, even if a later semester reaches the requirement, until the next school year.
+ * The program set up on the Scholarships page under the type "MERIT-BASED Academic Scholarship"
+ * defines its Full Merit / Half Merit GWA ranges (collegiate) and its Basic Education criteria.
+ * A Merit scholar's standing is decided by each semester's GWA:
+ *   - within the Full or Half Merit range: Active for that semester;
+ *   - worse than the Half Merit limit but better than MERIT_LOCKOUT_GWA (2.00): not Active for that
+ *     semester, but back as soon as a later semester is within range again;
+ *   - MERIT_LOCKOUT_GWA (2.00) or worse in any semester: Removed for the rest of that school year,
+ *     even if a later semester is back within range, until the next school year.
  */
 
 require_once __DIR__ . '/grades_helper.php';
@@ -26,6 +25,54 @@ const MERIT_SCHOLARSHIP_TYPE = 'MERIT-BASED Academic Scholarship';
 
 // A semester GWA this bad (or worse) locks a Merit scholar out for the rest of the school year.
 const MERIT_LOCKOUT_GWA = 2.00;
+
+/*
+ * Collegiate Merit tiers (Full Merit / Half Merit GWA ranges) and the Basic Education
+ * requirement are edited on the Merit program itself (scholarships.merit_* columns, set on the
+ * Scholarships page). These are only the defaults, used until a Merit program sets its own.
+ * Anything worse than the Half Merit limit isn't Merit at all, so that limit is also the
+ * program's GWA requirement.
+ */
+const MERIT_DEFAULT_RANGES = [
+    'full_min' => 1.00, 'full_max' => 1.30,
+    'half_min' => 1.31, 'half_max' => 1.50,
+    'basic_criteria' => 'Top 1 or Top 2 in class',
+];
+
+// A program row's Merit ranges (falls back to the defaults for anything missing).
+function meritRangesFromRow(?array $row): array {
+    $r = MERIT_DEFAULT_RANGES;
+    if (!$row) return $r;
+    foreach (['full_min', 'full_max', 'half_min', 'half_max'] as $k) {
+        if (isset($row['merit_' . $k]) && (float)$row['merit_' . $k] > 0) $r[$k] = round((float)$row['merit_' . $k], 2);
+    }
+    if (trim((string)($row['merit_basic_criteria'] ?? '')) !== '') $r['basic_criteria'] = trim($row['merit_basic_criteria']);
+    return $r;
+}
+
+// The active Merit program's ranges — what every Merit decision is based on.
+function getMeritRanges(PDO $pdo): array {
+    return meritRangesFromRow(getMeritScholarship($pdo));
+}
+
+// 'Full Merit' / 'Half Merit' for a collegiate GWA under the given ranges, or null when it doesn't qualify.
+function meritTierForGwa(float $gwa, array $ranges = MERIT_DEFAULT_RANGES): ?string {
+    if ($gwa <= 0) return null;
+    if ($gwa >= $ranges['full_min'] && $gwa <= $ranges['full_max']) return 'Full Merit';
+    if ($gwa >= $ranges['half_min'] && $gwa <= $ranges['half_max']) return 'Half Merit';
+    return null;
+}
+
+// The GWA requirement a Merit program has for its education level (0 = none, Basic Education).
+function meritGwaRequirementFor(string $educationLevel, array $ranges = MERIT_DEFAULT_RANGES): float {
+    return strtolower(trim($educationLevel)) === 'basic education' ? 0.0 : (float)$ranges['half_max'];
+}
+
+// "Full Merit 1.00–1.30, Half Merit 1.31–1.50"
+function meritRangesText(array $ranges): string {
+    $f = fn($v) => number_format((float)$v, 2);
+    return 'Full Merit ' . $f($ranges['full_min']) . '–' . $f($ranges['full_max']) . ', Half Merit ' . $f($ranges['half_min']) . '–' . $f($ranges['half_max']);
+}
 
 // Whether a scholarship type is the MERIT-BASED Academic one (also its older name "Academic Merit").
 function isMeritScholarshipType(string $type): bool {
@@ -65,100 +112,15 @@ function getMeritScholarship(PDO $pdo): ?array {
 
 // Program -> the department name used on the Scholars page.
 function departmentForProgram(string $program): string {
-    switch (resolveProgramName($program) ?? '') {
-        case 'BS Nursing': return 'Nursing';
-        case 'BS Information Technology': return 'Information Technology';
-        case 'BS Accountancy': return 'Accountancy';
-        case 'BS Business Administration': return 'Business Administration';
-        case 'BA Political Science':
-        case 'Bachelor of Elementary Education':
-        case 'Bachelor of Secondary Education': return 'Liberal Arts and Education';
-    }
-    return 'Information Technology';   // the Scholars form's own default
+    // Scholars are listed by program, named as in the Departments dropdowns (PROGRAM_DISPLAY_NAMES).
+    $canonical = resolveProgramName($program);
+    return PROGRAM_DISPLAY_NAMES[$canonical ?? ''] ?? 'BS Information Technology';   // the Scholars form's own default
 }
 
 /*
- * Adds every qualifying applicant to the Scholars list. Safe to call any time (it only adds
- * people who are missing). Returns how many were added.
- *
- * Qualifies: not rejected, enrolled, has imported grades, and their GWA (newest graded
- * semester) is within the Merit scholarship's requirement. Anyone deleted from Scholars
- * (still in the Trash Bin) is not added back.
- */
-function syncMeritScholars(PDO $pdo): int {
-    $merit = getMeritScholarship($pdo);
-    if (!$merit) return 0;
-    $required = (float)$merit['gwa_requirement'];
-    if ($required <= 0) return 0;
-
-    $applicants = $pdo->query("
-        SELECT * FROM applicants
-        WHERE LOWER(TRIM(status)) != 'rejected' AND enrolled = 1 AND TRIM(student_id) != ''
-        ORDER BY id
-    ")->fetchAll(PDO::FETCH_ASSOC);
-    if (empty($applicants)) return 0;
-
-    $existing = [];
-    foreach ($pdo->query("SELECT student_id FROM scholars")->fetchAll(PDO::FETCH_COLUMN) as $sid) {
-        $existing[trim((string)$sid)] = true;
-    }
-    // Deleted on purpose (Trash Bin): leave them out until they are restored.
-    $deleted = [];
-    foreach ($pdo->query("SELECT item_data FROM deleted_items WHERE item_type = 'scholar'")->fetchAll(PDO::FETCH_COLUMN) as $json) {
-        $d = json_decode((string)$json, true);
-        if (!empty($d['student_id'])) $deleted[trim((string)$d['student_id'])] = true;
-    }
-
-    $stats = getSemesterGradeStats($pdo, array_column($applicants, 'student_id'));
-    $semesterOrder = ['Summer Term', '2nd Semester', '1st Semester'];   // newest graded semester first
-
-    $insert = $pdo->prepare("
-        INSERT INTO scholars (student_id, name, department, year_level, gwa, status, school_year, remarks, address, latitude, longitude, scholarship_type)
-        VALUES (?, ?, ?, ?, ?, 'Active', ?, ?, ?, ?, ?, ?)
-    ");
-
-    $added = 0;
-    $done = [];
-    foreach ($applicants as $a) {
-        $sid = trim((string)$a['student_id']);
-        if (isset($existing[$sid]) || isset($deleted[$sid]) || isset($done[$sid])) continue;
-
-        $gwa = null;
-        foreach ($semesterOrder as $sem) {
-            if (isset($stats[$sid][$sem])) { $gwa = $stats[$sid][$sem]['gwa']; break; }
-        }
-        if ($gwa === null || $gwa <= 0 || $gwa > $required) continue;
-        // 2.00 or worse in any semester of this school year: not a scholar until the next one.
-        if (meritLockout($pdo, $sid, getActiveSchoolYear($pdo))) continue;
-
-        $year = preg_match('/(\d)/', (string)$a['year_level'], $m) ? max(1, min(4, (int)$m[1])) : 1;
-        $sy = trim((string)$a['school_year']) !== '' ? trim($a['school_year']) : getActiveSchoolYear($pdo);
-        $insert->execute([
-            $sid,
-            buildFullName($a['first_name'], $a['middle_name'] ?? '', $a['last_name']),
-            departmentForProgram((string)$a['program']),
-            $year,
-            $gwa,
-            $sy,
-            'Added automatically: GWA ' . number_format($gwa, 2) . ' meets the ' . MERIT_SCHOLARSHIP_TYPE . ' requirement (<= ' . number_format($required, 2) . ').',
-            (string)($a['address'] ?? ''),
-            $a['latitude'] ?? null,
-            $a['longitude'] ?? null,
-            MERIT_SCHOLARSHIP_TYPE,
-        ]);
-        $done[$sid] = true;
-        $added++;
-    }
-
-    if ($added > 0) {
-        logActivity($pdo, 'Scholar Added', 'Scholars', $added . ' student(s) were added automatically to Scholars: their GWA meets the ' . MERIT_SCHOLARSHIP_TYPE . ' requirement.');
-    }
-    return $added;
-}
-
-/*
- * Every OTHER scholarship (unlike MERIT-BASED Academic above) is granted by an approved
- * application — so once a Record is approved, that student belongs on the Scholars list too,
+ * Every scholarship (MERIT-BASED Academic included) is granted by an approved application — so
+ * once a Record is approved, that student belongs on the Scholars list too ("Dean's List" Records
+ * are left out: those students are added only by "Scan Registrar Now"),
  * regardless of their GWA at that moment. GWA maintenance (Active vs Removed) is judged
  * afterwards by list_scholars.php from their imported grades, same as any other scholar.
  */
@@ -166,15 +128,26 @@ function syncApprovedScholars(PDO $pdo): int {
     $records = $pdo->query("SELECT * FROM records WHERE LOWER(TRIM(status)) = 'approved' ORDER BY id")->fetchAll(PDO::FETCH_ASSOC);
     if (empty($records)) return 0;
 
-    $existing = [];
-    foreach ($pdo->query("SELECT student_id FROM scholars")->fetchAll(PDO::FETCH_COLUMN) as $sid) {
-        $existing[trim((string)$sid)] = true;
+    $existing = [];   // student_id => the scholarship type on their Scholars entry
+    foreach ($pdo->query("SELECT student_id, scholarship_type FROM scholars")->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        $existing[trim((string)$row['student_id'])] = trim((string)$row['scholarship_type']);
     }
     // Deleted on purpose (Trash Bin): leave them out until they are restored.
     $deleted = [];
     foreach ($pdo->query("SELECT item_data FROM deleted_items WHERE item_type = 'scholar'")->fetchAll(PDO::FETCH_COLUMN) as $json) {
         $d = json_decode((string)$json, true);
         if (!empty($d['student_id'])) $deleted[trim((string)$d['student_id'])] = true;
+    }
+
+    // A Dean's Lister (added by "Scan Registrar Now") who is approved for a scholarship: their Scholars
+    // entry now names that scholarship. Being a Dean's Lister still shows as the badge (by grades).
+    $toScholarship = $pdo->prepare("UPDATE scholars SET scholarship_type = ?, remarks = ? WHERE student_id = ? AND scholarship_type = \"Dean's List\"");
+    foreach ($records as $rec) {
+        $sid = trim((string)$rec['student_id']);
+        if ($sid === '' || strcasecmp($existing[$sid] ?? '', "Dean's List") !== 0) continue;
+        if (strcasecmp(trim((string)$rec['scholarship_type']), "Dean's List") === 0) continue;
+        $toScholarship->execute([(string)$rec['scholarship_type'], 'Approved for ' . $rec['scholarship_type'] . ' in Records (also a Dean\'s Lister by grades).', $sid]);
+        $existing[$sid] = (string)$rec['scholarship_type'];
     }
 
     $findApplicantById = $pdo->prepare("SELECT * FROM applicants WHERE id = ?");
@@ -193,6 +166,9 @@ function syncApprovedScholars(PDO $pdo): int {
     foreach ($records as $rec) {
         $sid = trim((string)$rec['student_id']);
         if ($sid === '' || isset($existing[$sid]) || isset($deleted[$sid]) || isset($done[$sid])) continue;
+        // Dean's List records come with their Scholars entry from "Scan Registrar Now"; removing that
+        // entry must stick, so they're never re-added here on a page load.
+        if (strcasecmp(trim((string)$rec['scholarship_type']), "Dean's List") === 0) continue;
 
         $app = null;
         if ((int)($rec['applicant_id'] ?? 0) > 0) {

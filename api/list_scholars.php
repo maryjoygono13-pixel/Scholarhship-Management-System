@@ -1,14 +1,13 @@
 <?php
 require_once __DIR__ . '/init.php';
 
-// Used only for scholars whose scholarship can't be found (e.g. entered by hand).
-const SCHOLAR_DEFAULT_GWA_REQUIREMENT = 1.50;
+require_once __DIR__ . '/../includes/scholar_standing_helper.php';   // shared with the Dashboard
 
 try {
     $pdo = getDB();
 
-    // Students who meet the MERIT-BASED Academic requirement are scholars automatically.
-    syncMeritScholars($pdo);
+    // Dean's Listers from the Registrar's database are added by "Scan Registrar Now"
+    // (api/scan_deans_list.php), so the page can say how many new ones were found.
     // Anyone approved in Records for any other scholarship belongs here too.
     syncApprovedScholars($pdo);
 
@@ -42,65 +41,18 @@ try {
     $stmt->execute($params);
     $scholars = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    // GWA comes from the imported academic records, kept separately for each semester.
-    $gradeStats = getSemesterGradeStats($pdo, array_column($scholars, 'student_id'));
-
-    // The scholarship a scholar holds decides the GWA they must keep: the latest
-    // evaluation record first, then their application.
-    $recordType = $pdo->prepare("SELECT scholarship_type FROM records WHERE student_id = ? AND LOWER(TRIM(status)) = 'approved' ORDER BY id DESC LIMIT 1");
-    $applicantType = $pdo->prepare("SELECT scholarship_type FROM applicants WHERE student_id = ? ORDER BY id DESC LIMIT 1");
-
-    // Newest graded semester first: that is the standing the scholar is judged on.
-    $semesterOrder = ['Summer Term', '2nd Semester', '1st Semester'];
-
     $wantAbove = in_array(strtolower($status), ['', 'all', 'above', 'active'], true);
     $wantBelow = in_array(strtolower($status), ['below', 'removed'], true);
 
+    // Standing (Active / Removed) from the imported grades — the same calculation the
+    // Dashboard's "Active Scholars" card uses (includes/scholar_standing_helper.php).
     $result = [];
-    foreach ($scholars as $s) {
-        $sid = (string)$s['student_id'];
-        $stats = $gradeStats[$sid] ?? [];
-
-        $type = trim((string)($s['scholarship_type'] ?? ''));   // set for scholars added by the Merit scholarship
-        if ($type === '') {
-            $recordType->execute([$sid]);
-            $type = trim((string)$recordType->fetchColumn());
-        }
-        if ($type === '') {
-            $applicantType->execute([$sid]);
-            $type = trim((string)$applicantType->fetchColumn());
-        }
-        $required = $type !== '' ? resolveGwaRequirement($pdo, $type) : SCHOLAR_DEFAULT_GWA_REQUIREMENT;
-
-        $standingSemester = null;
-        foreach ($semesterOrder as $sem) {
-            if (isset($stats[$sem])) { $standingSemester = $sem; break; }
-        }
-        // No imported grades yet: fall back to the GWA stored on the scholar.
-        $gwa = $standingSemester ? $stats[$standingSemester]['gwa'] : (float)$s['gwa'];
-        $maintains = gwaMeetsRequirement((float)$gwa, (float)$required);
-
-        // MERIT-BASED Academic: 2.00 or worse in any semester of this school year removes the
-        // scholar until the next school year, even if a later semester is back within 1.50.
-        $lockout = isMeritScholarshipType($type) ? meritLockout($pdo, $sid, getActiveSchoolYear($pdo)) : null;
-        if ($lockout) {
-            $maintains = false;
-            $s['remarks'] = 'Removed: GWA ' . number_format($lockout['gwa'], 2) . ' in ' . $lockout['semester'] . ' is ' . number_format(MERIT_LOCKOUT_GWA, 2) . ' or worse. Not a scholar again until the next school year.';
-        }
-
-        if ($wantAbove && !$maintains) continue;
-        if ($wantBelow && $maintains) continue;
-
-        $s['gwa'] = $gwa;
-        $s['gwa_first'] = $stats['1st Semester']['gwa'] ?? null;
-        $s['gwa_second'] = $stats['2nd Semester']['gwa'] ?? null;
-        $s['gwa_summer'] = $stats['Summer Term']['gwa'] ?? null;
-        $s['gwaSemester'] = $standingSemester;          // which semester `gwa` is for (null = stored figure)
-        $s['scholarshipType'] = $type;
-        $s['maintainsGrade'] = $maintains;
-        $s['thresholdRequirement'] = $required;
-        // Standing follows the grades: above their scholarship's requirement = Removed.
-        $s['displayStatus'] = $maintains ? 'Active' : 'Removed';
+    foreach (computeScholarStandings($pdo, $scholars) as $s) {
+        // The Dean's List is per semester: listed only while the active semester's GWA qualifies
+        // (no grades yet for it, or not meeting the rule = not a Dean's Lister this semester).
+        if (isDeansListType((string)$s['scholarshipType']) && !$s['deansLister']) continue;
+        if ($wantAbove && !$s['maintainsGrade']) continue;
+        if ($wantBelow && $s['maintainsGrade']) continue;
         $result[] = $s;
     }
 

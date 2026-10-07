@@ -197,7 +197,7 @@ let loadedApplicants = [];
 let editingApplicantId = null;
 let deletingApplicantId = null;
 
-const APPLICANTS_PAGE_SIZE = 10;
+const APPLICANTS_PAGE_SIZE = 100;
 let applicantsCurrentPage = 1;
 
 const checkIcon = `
@@ -562,6 +562,7 @@ function renderTable() {
 
 
         tr.innerHTML = `
+            <td class="row-select-cell"><input type="checkbox" class="row-select" data-id="${app.id}" aria-label="Select applicant"></td>
             <td>
                 <strong class="font-mono">
                     ${app.studentId || "-"}
@@ -620,7 +621,7 @@ function renderTable() {
                     e.target &&
                     e.target.closest &&
                     e.target.closest(
-                        ".actions-cell, .btn-icon-action, button, svg, path"
+                        ".actions-cell, .btn-icon-action, .row-select-cell, button, svg, path"
                     )
                 ) {
                     return;

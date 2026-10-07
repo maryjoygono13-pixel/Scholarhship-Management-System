@@ -7,6 +7,7 @@
     $page_js = "applicants.js";
 
     include __DIR__ . '/../includes/header.php';
+require_once __DIR__ . '/../includes/programs_helper.php';   // PROGRAM_DISPLAY_NAMES
     require_once __DIR__ . '/../includes/locations.php';
 
     ?>
@@ -31,6 +32,9 @@
                     </div>
                 </div>
 
+                <!-- Multi-select delete (assets/js/bulk-delete.js): trash icon, shown once applicants are ticked -->
+                <span class="bulk-delete-host" id="bulkDeleteHost"></span>
+
                 <button class="btn-primary" id="openBtn">
                     <i data-lucide="user-plus"></i>
                     Add Applicant
@@ -41,6 +45,7 @@
               <table class="applicants-table">
               <thead>
                 <tr>
+                  <th class="select-head"><input type="checkbox" id="selectAllApplicants" title="Select all on this page" aria-label="Select all applicants on this page"></th>
                   <th>Student ID</th>
                   <th>Name</th>
                   <th>Scholarship type</th>
@@ -267,34 +272,9 @@
                             <option value="">
                                 Select program
                             </option>
-
-                            <option value="BS Accountancy">
-                                Bachelor of Science in Accountancy (BSA)
-                            </option>
-
-                            <option value="BS Business Administration">
-                                Bachelor of Science in Business Administration (BSBA)
-                            </option>
-
-                            <option value="BS Information Technology">
-                                Bachelor of Science in Information Technology (BSIT)
-                            </option>
-
-                            <option value="BS Nursing">
-                                Bachelor of Science in Nursing (BSN)
-                            </option>
-
-                            <option value="BA Political Science">
-                                Bachelor of Arts in Political Science (BAPolSci)
-                            </option>
-
-                            <option value="Bachelor of Elementary Education">
-                                Bachelor of Elementary Education (BEEd)
-                            </option>
-
-                            <option value="Bachelor of Secondary Education">
-                                Bachelor of Secondary Education (BSEd)
-                            </option>
+                            <?php foreach (PROGRAM_DISPLAY_NAMES as $prog => $progName): ?>
+                            <option value="<?= htmlspecialchars($prog) ?>"><?= htmlspecialchars($progName) ?></option>
+                            <?php endforeach; ?>
                         </select>
                     </div>
 
@@ -540,5 +520,15 @@
       input.addEventListener('focus', fill);
       fill();
     })();
+  </script>
+  <!-- Multi-select delete: trash icon + confirmation (shared with Evaluation, Scholars, Records) -->
+  <script src="<?= SITE_BASE ?>/assets/js/bulk-delete.js?v=<?= time() ?>"></script>
+  <script>
+    setupBulkDelete({
+      host: "#bulkDeleteHost", rows: "#tableBody", selectAll: "#selectAllApplicants",
+      endpoint: "delete_applicant.php", noun: ["applicant", "applicants"],
+      label: (tr) => tr.cells[2].textContent.trim() + " (" + tr.cells[1].textContent.trim() + ")",
+      reload: () => (typeof loadTableData === "function" ? loadTableData() : location.reload()),
+    });
   </script>
   <?php include __DIR__ . '/../includes/footer.php'; ?>

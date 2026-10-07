@@ -34,38 +34,6 @@ include __DIR__ . '/../includes/header.php';
 
 <div class="page">
 
-    <!-- Stat Cards -->
-    <div class="history-stats">
-        <div class="history-stat-card">
-            <div class="history-stat-icon total">
-                <i data-lucide="activity"></i>
-            </div>
-            <div>
-                <span class="history-stat-label">Total Activity</span>
-                <h1 id="statTotal">0</h1>
-            </div>
-        </div>
-
-        <div class="history-stat-card">
-            <div class="history-stat-icon today">
-                <i data-lucide="calendar-clock"></i>
-            </div>
-            <div>
-                <span class="history-stat-label">Today's Activity</span>
-                <h1 id="statToday">0</h1>
-            </div>
-        </div>
-
-        <div class="history-stat-card">
-            <div class="history-stat-icon user">
-                <i data-lucide="user-round"></i>
-            </div>
-            <div>
-                <span class="history-stat-label">Most Active User</span>
-                <h1 id="statMostActive" class="history-stat-user">&mdash;</h1>
-            </div>
-        </div>
-    </div>
 
     <!-- Toolbar -->
     <div class="table-header-toolbar">
@@ -89,9 +57,10 @@ include __DIR__ . '/../includes/header.php';
 
             <div class="header-actions">
                 <button type="button" class="btn-secondary" id="historyClearFiltersBtn">Clear Filters</button>
-                <button type="button" class="btn-primary btn-no-anim" id="historyExportBtn">
-                    <i data-lucide="download"></i>
-                    Export CSV
+                <!-- Deletes the ticked entries, or every entry matching the filters when none are ticked -->
+                <button type="button" class="btn-danger btn-no-anim history-clear-data" id="historyBulkDeleteBtn">
+                    <i data-lucide="trash-2"></i>
+                    Delete Browsing Data<span class="history-clear-count" id="historyBulkCountWrap" hidden> (<span id="historyBulkCount">0</span>)</span>
                 </button>
             </div>
         </div>
@@ -119,6 +88,26 @@ include __DIR__ . '/../includes/header.php';
             <button type="button" class="custom-modal-close" id="historyDetailCloseBtn"><i data-lucide="x"></i></button>
         </div>
         <div class="custom-modal-body" id="historyDetailBody"></div>
+    </div>
+</div>
+
+<!-- Confirm deleting history entries -->
+<div class="custom-modal-overlay" id="historyDeleteOverlay">
+    <div class="custom-modal-card" style="max-width:440px;">
+        <div class="custom-modal-header">
+            <div>
+                <h3>Delete history entries</h3>
+                <p>This can't be undone. The deletion itself will be recorded in History.</p>
+            </div>
+            <button type="button" class="custom-modal-close" id="historyDeleteCloseBtn"><i data-lucide="x"></i></button>
+        </div>
+        <div class="custom-modal-body">
+            <p style="margin:0; font-size:14px;" id="historyDeleteMessage">Delete <strong id="historyDeleteCount">0</strong> history entr<span id="historyDeletePlural">ies</span>?</p>
+        </div>
+        <div class="custom-modal-footer">
+            <button type="button" class="btn-secondary" id="historyDeleteCancelBtn">Cancel</button>
+            <button type="button" class="btn-danger" id="historyDeleteConfirmBtn">Delete</button>
+        </div>
     </div>
 </div>
 

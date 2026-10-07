@@ -13,7 +13,7 @@ const monthlyData: Record<string, number> = {
 };
 // ---------------------------------------------------------
 
-const colors: string[] = ["#238f54", "#2ea263", "#3ab774", "#1b6336"];
+const colors: string[] = ["#238f54", "#2f8a58", "#4a9a6c", "#1b6336"];
 
 function makeBarChart(canvasId: string, dataObj: Record<string, number>): void {
   const canvas = document.getElementById(canvasId) as HTMLCanvasElement | null;

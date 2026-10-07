@@ -61,11 +61,15 @@ function normalizeEval(record: any): EvaluationApplicant {
     goodMoralFile: String(record.goodMoralFile ?? record.good_moral_file ?? ""),
     status: String(record.status ?? "review"),
     remarks: String(record.remarks ?? ""),
+    email: String(record.email ?? ""),
+    enrollmentVerified: Boolean(record.enrollmentVerified),
+    enrollmentVerifiedSource: String(record.enrollmentVerifiedSource ?? ""),
     grades: record.grades && typeof record.grades === "object" ? record.grades : {},
     criteria: Array.isArray(record.criteria) ? record.criteria : [],
     documents: Array.isArray(record.documents) ? record.documents : [],
     specialQualification: String(record.specialQualification ?? ""),
     specialQualificationLabel: String(record.specialQualificationLabel ?? ""),
+    deansLister: Boolean(record.deansLister),
   };
 }
 
@@ -74,7 +78,7 @@ function normalizeEval(record: any): EvaluationApplicant {
   let selectedId: string | null = null;
   let activeTab = "overview";
 
-  const EVAL_PAGE_SIZE = 10;
+  const EVAL_PAGE_SIZE = 100;
   let evalCurrentPage = 1;
 
   function initials(name: string): string {
@@ -84,6 +88,24 @@ function normalizeEval(record: any): EvaluationApplicant {
     const d = document.createElement("div");
     d.textContent = str == null ? "" : String(str);
     return d.innerHTML;
+  }
+  // Enrollment is confirmed only by an uploaded Certificate of Enrollment (legacy coe_file or a
+  // "coe" entry in the documents list) — not by the `enrolled` flag, which every new applicant
+  // gets by default. Used by the table column, the Enrollment tab and the checklist alike.
+  function isEnrollmentVerified(a: EvaluationApplicant): boolean {
+    return Boolean(a.enrollmentVerified) || Boolean(a.coeFile) || (a.documents || []).some((d) => d.type === "coe" && d.submitted);
+  }
+  // enrolled = COE on file; unconfirmed = marked enrolled but no COE yet; not-enrolled = marked not enrolled.
+  function enrollmentState(a: EvaluationApplicant): "enrolled" | "unconfirmed" | "not-enrolled" {
+    if (!a.enrolled) return "not-enrolled";
+    return isEnrollmentVerified(a) ? "enrolled" : "unconfirmed";
+  }
+  function enrollmentCell(a: EvaluationApplicant): string {
+    const state = enrollmentState(a);
+    const color = state === "enrolled" ? "var(--green)" : state === "unconfirmed" ? "var(--amber)" : "var(--red)";
+    const label = state === "enrolled" ? "Enrolled" : state === "unconfirmed" ? "Unconfirmed" : "Not Enrolled";
+    const title = state === "unconfirmed" ? ' title="No Certificate of Enrollment on file yet"' : "";
+    return '<td><span style="color:' + color + '"' + title + '><span class="dot" style="background:' + color + '"></span>' + label + "</span></td>";
   }
   function gwaColor(gwa: number, req: number): string {
     if (req <= 0 || gwa <= req) return "var(--green)";
@@ -176,7 +198,7 @@ function normalizeEval(record: any): EvaluationApplicant {
     const gwaPass = !hasGwa || a.gwaReq <= 0 || a.gwa <= a.gwaReq;
     const failPass = Number(a.failingGrades) === 0;
     return [
-      { label: "Currently Enrolled", value: a.enrolled ? "Enrolled" : "Not Enrolled", pass: a.enrolled },
+      { label: "Currently Enrolled", value: enrollmentState(a) === "enrolled" ? "Enrolled" : enrollmentState(a) === "unconfirmed" ? "Unconfirmed — no COE" : "Not Enrolled", pass: enrollmentState(a) === "enrolled" },
       { label: "GWA Requirement (\u2264 " + a.gwaReq + ")", value: hasGwa ? (gwaPass ? "Passed" : "Failed") : "No grades yet", pass: gwaPass },
       { label: "No Failing Grade", value: failPass ? "Passed" : "Failed", pass: failPass },
       { label: "Complete Documents", value: a.docsComplete ? "Complete" : "Missing", pass: a.docsComplete },
@@ -290,9 +312,9 @@ function normalizeEval(record: any): EvaluationApplicant {
     const current = sel.value;
     const types = Array.from(new Set(applicants.map((a) => a.type))).sort();
     sel.innerHTML =
-      '<option value="all">Scholarship Types</option>' +
+      '<option value="all">Scholarship Types</option><option value="deans">Dean&#39;s Listers</option>' +
       types.map((t) => '<option value="' + esc(t) + '">' + esc(t) + "</option>").join("");
-    sel.value = types.includes(current) ? current : "all";
+    sel.value = current === "deans" || types.includes(current) ? current : "all";
   }
 
   function getFiltered(): EvaluationApplicant[] {
@@ -304,7 +326,7 @@ function normalizeEval(record: any): EvaluationApplicant {
     const q = searchEl ? searchEl.value.trim().toLowerCase() : "";
 
     return applicants.filter((a) => {
-      if (type !== "all" && a.type !== type) return false;
+      if (type === "deans" ? !a.deansLister : (type !== "all" && a.type !== type)) return false;
       if (status !== "all" && a.status !== status) return false;
       if (q && !(a.name.toLowerCase().includes(q) || a.studentId.toLowerCase().includes(q))) return false;
       return true;
@@ -373,10 +395,11 @@ function normalizeEval(record: any): EvaluationApplicant {
       .map((a) => {
         return (
           '<tr data-id="' + a.id + '" class="' + (a.id === selectedId ? "active" : "") + '">' +
+          '<td class="row-select-cell"><input type="checkbox" class="row-select" data-id="' + esc(a.id) + '" aria-label="Select ' + esc(a.name) + '"></td>' +
           '<td><div class="who"><div class="avatar">' + initials(a.name) + '</div><div><div class="name">' + esc(a.name) + '</div><div class="id font-mono">' + esc(a.studentId) + "</div></div></div></td>" +
           '<td class="type-cell">' + esc(a.type) + "</td>" +
           semGwaCell(a.semesterGwa.first, a.gwaReq) + semGwaCell(a.semesterGwa.second, a.gwaReq) +
-          '<td><span style="color:' + (a.enrolled ? "var(--green)" : "var(--red)") + '"><span class="dot" style="background:' + (a.enrolled ? "var(--green)" : "var(--red)") + '"></span>' + (a.enrolled ? "Enrolled" : "Not Enrolled") + "</span></td>" +
+          enrollmentCell(a) +
           "<td>" + statusBadge(a.status) + "</td>" +
           '<td><button class="btn-primary" style="height:32px; padding:0 12px; font-size:12.5px;" data-review="' + a.id + '">Review</button></td>' +
           "</tr>"
@@ -386,6 +409,7 @@ function normalizeEval(record: any): EvaluationApplicant {
 
     wrap.innerHTML =
       '<table class="applicants-table"><thead><tr>' +
+      '<th class="select-head"><input type="checkbox" id="selectAllEval" title="Select all on this page" aria-label="Select all applicants on this page"></th>' +
       '<th>Applicant</th><th>Scholarship Type</th><th>1st Sem GWA</th><th>2nd Sem GWA</th><th>Enrollment</th><th>Status</th><th class="actions-head">Action</th>' +
       '</tr></thead><tbody>' + rows + '</tbody></table>';
 
@@ -516,12 +540,12 @@ function normalizeEval(record: any): EvaluationApplicant {
           // Driven only by real evidence — the uploaded Certificate of Enrollment — not the
           // generic `enrolled` flag, which defaults true regardless of whether anything was
           // actually submitted or verified.
-          const isVerified = Boolean(a.coeFile);
+          const isVerified = isEnrollmentVerified(a);
           return '<div class="section"><h3>Enrollment Verification</h3>' +
             '<div class="view-detail-grid">' +
             '<div class="detail-item"><span class="detail-label">Enrollment Status</span><span class="detail-value highlight" style="color:' + (isVerified ? "var(--green)" : "var(--red)") + '">' + (isVerified ? "Enrolled & Official" : "Unconfirmed — no Certificate of Enrollment on file") + '</span></div>' +
             '<div class="detail-item"><span class="detail-label">Semester</span><span class="detail-value">' + esc(a.semester || "1st Semester") + '</span></div>' +
-            '<div class="detail-item"><span class="detail-label">Registrar Verified</span><span class="detail-value">' + (isVerified ? "Office of the Registrar (via uploaded COE)" : "Not yet verified") + '</span></div>' +
+            '<div class="detail-item"><span class="detail-label">Registrar Verified</span><span class="detail-value">' + (isVerified ? "Office of the Registrar" : "Not yet verified") + '</span></div>' +
             '<div class="detail-item full-width"><span class="detail-label">Degree Program</span><span class="detail-value">' + esc(formatDeptLine(a.program, a.major, a.yearLevel)) + '</span></div>' +
             '</div></div>';
         })()
@@ -633,6 +657,7 @@ function normalizeEval(record: any): EvaluationApplicant {
       "</button></div>" +
       '<div class="custom-modal-body" style="flex:1; overflow-y:auto;">' +
       '<div class="profile">' +
+      '<button type="button" class="profile-msg-btn" id="profileMsgBtn" title="Message this applicant" aria-label="Message this applicant"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></button>' +
       '<div class="profile-top"><div class="avatar">' + initials(a.name) + "</div>" +
       '<div><div class="eval-profile-name">' + esc(a.fullName) + " " + statusBadge(a.status) + '</div><div class="profile-id font-mono">' + esc(a.studentId) + "</div></div></div>" +
       '<div class="profile-meta">' +
@@ -649,6 +674,8 @@ function normalizeEval(record: any): EvaluationApplicant {
       '<button type="button" class="btn-primary" data-decide="approved"' + (approveBlockReason(a) ? ' title="' + esc(approveBlockReason(a)) + '"' : "") + '>Approve</button>' +
       "</div>";
 
+    const msgBtn = panel.querySelector("#profileMsgBtn");
+    if (msgBtn) msgBtn.addEventListener("click", () => { const open = (window as any).openApplicantMessage; if (open) open(a); });
     const closeBtn = panel.querySelector("#closePanelBtn");
     if (closeBtn) closeBtn.addEventListener("click", closeRightPanel);
 
@@ -749,6 +776,19 @@ function normalizeEval(record: any): EvaluationApplicant {
       if (e.target === evalOverlay) closeRightPanel();
     });
   }
+
+  // Lets the multi-select delete (assets/js/bulk-delete.js) refresh the list afterwards.
+
+  (window as any).reloadEvaluation = async () => {
+
+      await loadApplicants();
+
+      populateTypeFilter();
+
+      renderTable();
+
+  };
+
 
   (async function init() {
     setupImportHandlers();

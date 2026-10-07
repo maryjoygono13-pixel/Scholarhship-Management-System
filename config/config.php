@@ -13,6 +13,20 @@ if (session_status() === PHP_SESSION_NONE) {
      */
     ini_set('session.gc_maxlifetime', '28800');
 
+    /*
+     * This app's own session cookie and session folder. Other PHP apps on the same server
+     * (e.g. other copies of this system in htdocs) otherwise share the default PHPSESSID
+     * cookie and folder: signing in/out of one replaces or destroys this app's session, and
+     * their 24-minute cleanup deletes it — which surfaced as "Unauthorized." on save.
+     */
+    session_name('SMS_SESSION');
+    $smsSessionDir = rtrim((string)(ini_get('session.save_path') ?: sys_get_temp_dir()), '/\\') . DIRECTORY_SEPARATOR . 'sms_sessions';
+    if (is_dir($smsSessionDir) || @mkdir($smsSessionDir, 0700, true)) {
+        if (is_writable($smsSessionDir)) {
+            session_save_path($smsSessionDir);
+        }
+    }
+
     session_set_cookie_params([
         'lifetime' => 0,
         'path' => '/',

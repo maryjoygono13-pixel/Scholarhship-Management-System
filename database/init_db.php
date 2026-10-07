@@ -168,6 +168,11 @@ function initDatabase(): PDO {
         // declared (includes/special_qualification_helper.php), plus their text when it's "Other".
         'special_qualification' => "VARCHAR(255) DEFAULT ''",
         'special_qualification_other' => "VARCHAR(255) DEFAULT ''",
+        // Enrollment confirmed in the Registrar's records (CHED list verification or a Registrar fetch),
+        // which counts as officially enrolled even without an uploaded Certificate of Enrollment.
+        'enrollment_verified' => "TINYINT(1) NOT NULL DEFAULT 0",
+        'enrollment_verified_at' => "DATETIME DEFAULT NULL",
+        'enrollment_verified_source' => "VARCHAR(255) DEFAULT ''",
     ] as $col => $def) {
         try {
             $pdo->exec("ALTER TABLE applicants ADD COLUMN $col $def");
@@ -219,6 +224,13 @@ function initDatabase(): PDO {
     // category never needs a source-code change to define its own eligibility rules.
     $addColumnIfMissing('scholarships', 'education_level', "VARCHAR(20) NOT NULL DEFAULT 'Collegiate'");
     $addColumnIfMissing('scholarships', 'school_year', "VARCHAR(50) DEFAULT ''");
+    // MERIT-BASED eligibility, editable on the Merit program (see includes/merit_helper.php):
+    // collegiate Full / Half Merit GWA ranges, and the Basic Education requirement as text.
+    $addColumnIfMissing('scholarships', 'merit_full_min', "DECIMAL(4,2) NOT NULL DEFAULT 1.00");
+    $addColumnIfMissing('scholarships', 'merit_full_max', "DECIMAL(4,2) NOT NULL DEFAULT 1.30");
+    $addColumnIfMissing('scholarships', 'merit_half_min', "DECIMAL(4,2) NOT NULL DEFAULT 1.31");
+    $addColumnIfMissing('scholarships', 'merit_half_max', "DECIMAL(4,2) NOT NULL DEFAULT 1.50");
+    $addColumnIfMissing('scholarships', 'merit_basic_criteria', "VARCHAR(255) NOT NULL DEFAULT 'Top 1 or Top 2 in class'");
     $addColumnIfMissing('scholarships', 'application_start', "DATE DEFAULT NULL");
     $addColumnIfMissing('scholarships', 'application_deadline', "DATE DEFAULT NULL");
 
@@ -403,6 +415,12 @@ function initDatabase(): PDO {
         remarks TEXT,
         FOREIGN KEY (applicant_id) REFERENCES applicants(id) ON DELETE SET NULL
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    // Records keep the history: one per student / scholarship / school year / semester, each with the
+    // student's program and year level AT THAT TIME (includes/records_helper.php), and where it came
+    // from: 'evaluation', 'renewal' (a Renew / Terminate decision) or 'deans_list' (Scan Registrar Now).
+    $addColumnIfMissing('records', 'program', "VARCHAR(150) DEFAULT NULL");
+    $addColumnIfMissing('records', 'year_level', "VARCHAR(30) DEFAULT NULL");
+    $addColumnIfMissing('records', 'origin', "VARCHAR(30) NOT NULL DEFAULT 'evaluation'");
 
     // 6. Renewal & Retention Table
     $pdo->exec("CREATE TABLE IF NOT EXISTS renewal_retention (
@@ -430,6 +448,11 @@ function initDatabase(): PDO {
     // the row's link to its original Record.
     $addColumnIfMissing('renewal_retention', 'decided_semester', "VARCHAR(50) DEFAULT NULL");
     $addColumnIfMissing('renewal_retention', 'decided_school_year', "VARCHAR(50) DEFAULT NULL");
+    // Enrollment as the Registrar's database reports it for the active term (checked whenever the
+    // Active Semester / Academic Year changes — includes/renewal_enrollment_helper.php).
+    $addColumnIfMissing('renewal_retention', 'enrollment_status', "VARCHAR(120) DEFAULT NULL");
+    $addColumnIfMissing('renewal_retention', 'enrollment_term', "VARCHAR(80) DEFAULT NULL");
+    $addColumnIfMissing('renewal_retention', 'enrollment_checked_at', "DATETIME DEFAULT NULL");
 
     // A scholar terminated from a scholarship can't apply for that same scholarship again
     // (they may still apply for a different one). See includes/renewal_helper.php.
@@ -539,6 +562,66 @@ function initDatabase(): PDO {
         created_applicant_ids TEXT DEFAULT NULL,
         created_grade_ids TEXT DEFAULT NULL,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+    // Scholars are now listed by program (e.g. "BA PolSci", "B Elementary Education") instead of
+    // the old department groups. One-time conversion of rows still holding an old group name,
+    // using the program on the scholar's application; only rows with an old name are touched.
+    require_once __DIR__ . '/../includes/programs_helper.php';
+    $oldDepartments = [
+        'Nursing' => 'BS Nursing', 'Information Technology' => 'BS Information Technology',
+        'Accountancy' => 'BS Accountancy', 'Business Administration' => 'BS Business Administration',
+        'Food Preparation & Service Technology' => 'BIT Food Preparation and Services Technology',
+        'Food Preparation and Services Technology' => 'BIT Food Preparation and Services Technology',
+        'Liberal Arts and Education' => null,   // split by program below
+    ];
+    $inOld = implode(',', array_fill(0, count($oldDepartments), '?'));
+    $toConvert = $pdo->prepare("SELECT s.id, s.department, (SELECT a.program FROM applicants a WHERE a.student_id = s.student_id ORDER BY a.id DESC LIMIT 1) AS program FROM scholars s WHERE s.department IN ($inOld)");
+    $toConvert->execute(array_keys($oldDepartments));
+    $setDepartment = $pdo->prepare("UPDATE scholars SET department = ? WHERE id = ?");
+    foreach ($toConvert->fetchAll(PDO::FETCH_ASSOC) as $sc) {
+        $canonical = resolveProgramName((string)($sc['program'] ?? ''));
+        $newName = $canonical !== null ? PROGRAM_DISPLAY_NAMES[$canonical] : $oldDepartments[$sc['department']];
+        if ($newName !== null) $setDepartment->execute([$newName, $sc['id']]);
+    }
+
+    // Rate limiting for the public Apply page (includes/apply_guard_helper.php): one row per
+    // attempt / submission, keyed by a hash of the IP address or Student ID. Old rows are pruned.
+    $pdo->exec("CREATE TABLE IF NOT EXISTS request_throttle (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        bucket VARCHAR(40) NOT NULL,
+        key_hash CHAR(64) NOT NULL,
+        created_at DATETIME NOT NULL,
+        KEY idx_throttle (bucket, key_hash, created_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+    // CHED enrollment list verification (Data Management): each uploaded list, and the
+    // Registrar's answer for every student on it (includes/enrollment_verification_helper.php).
+    $pdo->exec("CREATE TABLE IF NOT EXISTS enrollment_verifications (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        file_name VARCHAR(255) NOT NULL,
+        school_year VARCHAR(20) DEFAULT '',
+        total_rows INT NOT NULL DEFAULT 0,
+        enrolled_count INT NOT NULL DEFAULT 0,
+        not_enrolled_count INT NOT NULL DEFAULT 0,
+        not_found_count INT NOT NULL DEFAULT 0,
+        review_count INT NOT NULL DEFAULT 0,
+        marked_count INT NOT NULL DEFAULT 0,
+        result_path VARCHAR(500) DEFAULT NULL,
+        checked_by VARCHAR(255) DEFAULT 'Registrar Staff',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    $pdo->exec("CREATE TABLE IF NOT EXISTS enrollment_verification_results (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        verification_id INT NOT NULL,
+        row_no INT NOT NULL DEFAULT 0,
+        name_in_file VARCHAR(255) DEFAULT '',
+        student_id VARCHAR(50) DEFAULT '',
+        result VARCHAR(20) NOT NULL,
+        remarks VARCHAR(255) DEFAULT '',
+        KEY idx_verification (verification_id),
+        KEY idx_student (student_id),
+        FOREIGN KEY (verification_id) REFERENCES enrollment_verifications(id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
     // Seed Data if empty

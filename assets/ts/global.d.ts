@@ -5,6 +5,8 @@ interface ApplicantData {
   lastName?: string;
   name: string;
   email: string;
+  enrollmentVerified: boolean;
+  enrollmentVerifiedSource: string;
   phone?: string;
   birthdate?: string;
   address?: string;
@@ -87,6 +89,8 @@ interface EvaluationApplicant {
   documents: EvalDocumentItem[];
   specialQualification: string;
   specialQualificationLabel: string;
+  deansLister: boolean;   // newest graded semester: GWA 1.50 or better, no subject grade of 2.00 or worse
+  email: string;
 }
 
 interface Window {

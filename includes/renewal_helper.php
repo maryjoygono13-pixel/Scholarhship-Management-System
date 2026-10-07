@@ -22,6 +22,8 @@ require_once __DIR__ . '/grades_helper.php';
 require_once __DIR__ . '/gwa_helper.php';
 require_once __DIR__ . '/scholarship_type_helper.php';
 require_once __DIR__ . '/merit_helper.php';
+require_once __DIR__ . '/deans_list_rules.php';
+require_once __DIR__ . '/records_helper.php';
 
 /*
  * Adds the record's scholar to Renewal & Retention for the record's term, unless
@@ -149,30 +151,33 @@ function renewalPreviousTerm(string $semester, string $schoolYear): array {
 }
 
 /*
- * Keeps the Record in step with the decision taken in Renewal & Retention.
- * Returns the record status it was set to, or null when no matching record exists.
+ * Records the decision taken in Renewal & Retention as the scholar's record for the term it was made
+ * in (the active term): renewed = approved, terminated = rejected. The earlier term's record stays as
+ * it was, so Records keeps the full history (e.g. 1st Semester approved, 2nd Semester renewed). One
+ * record per term: deciding again in the same term updates that record. Such a record doesn't start a
+ * Renewal & Retention entry of its own — the original entry carries the scholar from year to year.
+ * Returns the record status it was set to.
  */
 function syncRecordWithRenewal(PDO $pdo, array $ren, string $action): ?string {
     $map = ['renew' => 'approved', 'terminate' => 'rejected', 'flag' => 'pending'];
     if (!isset($map[$action])) return null;
     $newStatus = $map[$action];
+    $semester = getActiveSemester($pdo);
+    $schoolYear = getActiveSchoolYear($pdo);
 
-    $sem = normalizeSemesterName($ren['semester']);
-    $find = $pdo->prepare("SELECT id, semester, applicant_id, student_id FROM records WHERE student_id = ? AND TRIM(sy) = ? AND LOWER(TRIM(scholarship_type)) = LOWER(TRIM(?)) ORDER BY id DESC");
-    $find->execute([trim((string)$ren['student_id']), trim((string)$ren['school_year']), (string)$ren['scholarship_type']]);
-    $record = null;
-    foreach ($find->fetchAll(PDO::FETCH_ASSOC) as $r) {
-        if (normalizeSemesterName($r['semester']) === $sem) { $record = $r; break; }
-    }
-    if (!$record) return null;
-
-    $pdo->prepare("UPDATE records SET status = ? WHERE id = ?")->execute([$newStatus, $record['id']]);
-
-    // A renewed scholar never goes back through Evaluation — once they have a Record, all
-    // further eligibility tracking (including each new term's GWA re-check) happens here in
-    // Renewal & Retention, via isRenewalActionable()/renewalPreviousTerm(). Evaluation is only
-    // for a first-time application.
-
+    // The original record (name / applicant link), matched on the entry's own term.
+    $original = findTermRecord($pdo, (string)$ren['student_id'], (string)$ren['scholarship_type'], (string)$ren['school_year'], (string)$ren['semester']);
+    saveTermRecord($pdo, [
+        'applicant_id' => $original['applicant_id'] ?? null,
+        'student_id' => (string)$ren['student_id'],
+        'name' => (string)($original['name'] ?? $ren['name']),
+        'scholarship_type' => (string)$ren['scholarship_type'],
+        'status' => $newStatus,
+        'semester' => $semester,
+        'sy' => $schoolYear,
+        'remarks' => ($action === 'renew' ? 'Renewed' : 'Terminated') . " in Renewal & Retention for $semester $schoolYear.",
+        'origin' => 'renewal',
+    ], true);
     return $newStatus;
 }
 
@@ -280,8 +285,59 @@ function backfillCurrentTermRenewals(PDO $pdo): int {
     $added = 0;
     foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $rec) {
         if (normalizeSemesterName($rec['semester']) !== $semester) continue;
+        // The Dean's List isn't a scholarship: it's judged on the Scholars list by grades, never renewed.
+        if (isDeansListType((string)$rec['scholarship_type'])) continue;
+        // A record made by a Renew / Terminate decision: the original entry already tracks this scholar.
+        if (($rec['origin'] ?? '') === 'renewal') continue;
         $origin = strtolower(trim((string)$rec['status'])) === 'rejected' ? 'rejected' : 'approved';
         if (sendRecordToRenewal($pdo, $rec, 'pending', null, $origin) !== null) $added++;
     }
     return $added;
+}
+
+/*
+ * Renewal & Retention ledger rules shared by its page (api/list_renewal.php) and the
+ * Dashboard, so both always show the same numbers.
+ */
+
+// A row's link back to its Record: same student, school year, semester and scholarship type.
+function renewalRecordKey(string $studentId, string $schoolYear, string $semester, string $scholarshipType): string {
+    return trim($studentId) . '|' . trim($schoolYear) . '|' . normalizeSemesterName($semester) . '|' . strtolower(trim($scholarshipType));
+}
+
+// Every Record, keyed by renewalRecordKey() (later rows win on a duplicate key).
+function renewalRecordIndex(PDO $pdo): array {
+    $index = [];
+    foreach ($pdo->query("SELECT student_id, sy, semester, scholarship_type, name FROM records ORDER BY id ASC")->fetchAll(PDO::FETCH_ASSOC) as $rec) {
+        $index[renewalRecordKey((string)$rec['student_id'], (string)$rec['sy'], (string)$rec['semester'], (string)$rec['scholarship_type'])] = $rec;
+    }
+    return $index;
+}
+
+// The status the ledger shows: a decided entry (renewed/terminated) that has reopened for a new
+// school year's reassessment reads as "pending" again; everything else shows as stored.
+function renewalDisplayStatus(PDO $pdo, array $row): string {
+    $status = strtolower(trim((string)$row['status']));
+    return (in_array($status, ['eligible', 'terminated'], true) && isRenewalActionable($pdo, $row)) ? 'pending' : (string)$row['status'];
+}
+
+// Ledger counts exactly as the Renewal & Retention page's summary shows them (no filters).
+// "pending" includes at-risk entries — both still await a Renew/Terminate decision.
+function renewalLedgerSummary(PDO $pdo): array {
+    backfillCurrentTermRenewals($pdo);
+    $records = renewalRecordIndex($pdo);
+    $summary = ['pending' => 0, 'eligible' => 0, 'at_risk' => 0, 'terminated' => 0, 'total' => 0];
+    foreach ($pdo->query("SELECT * FROM renewal_retention")->fetchAll(PDO::FETCH_ASSOC) as $r) {
+        if (!isset($records[renewalRecordKey((string)$r['student_id'], (string)$r['school_year'], (string)$r['semester'], (string)$r['scholarship_type'])])) {
+            continue; // no Record behind it — the ledger doesn't show it
+        }
+        $summary['total']++;
+        switch (strtolower(trim(renewalDisplayStatus($pdo, $r)))) {
+            case 'pending': $summary['pending']++; break;
+            case 'at-risk': $summary['pending']++; $summary['at_risk']++; break;
+            case 'eligible': $summary['eligible']++; break;
+            case 'terminated': $summary['terminated']++; break;
+        }
+    }
+    return $summary;
 }

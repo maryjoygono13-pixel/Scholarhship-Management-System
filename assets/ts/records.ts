@@ -6,6 +6,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const filterSemester = document.getElementById("filterSemester") as HTMLSelectElement | null;
   const filterSy = document.getElementById("filterSy") as HTMLSelectElement | null;
   const filterProgram = document.getElementById("filterProgram") as HTMLSelectElement | null;
+  const filterYearLevel = document.getElementById("filterYearLevel") as HTMLSelectElement | null;
   const exportBtn = document.getElementById("exportRecordsBtn");
 
   const recFormOverlay = document.getElementById("recFormOverlay");
@@ -38,8 +39,13 @@ document.addEventListener("DOMContentLoaded", () => {
   let viewingRecord: any = null;
   let activeRecordTab = "overview";
 
-  const RECORDS_PAGE_SIZE = 10;
+  // No page limit: every matching record is listed on one page.
+  const RECORDS_PAGE_SIZE = Infinity;
   let recordsCurrentPage = 1;
+
+  // Lets the multi-select delete (assets/js/bulk-delete.js) refresh the list afterwards.
+
+  (window as any).reloadRecords = () => loadRecords();
 
   async function loadRecords(): Promise<void> {
     try {
@@ -62,6 +68,19 @@ document.addEventListener("DOMContentLoaded", () => {
     return (v.includes("2") || v.includes("second")) ? "2nd" : "1st";
   }
 
+  // The status a record shows and is filtered by: "renewed" / "terminated" (decided in Renewal &
+  // Retention) or its own status (pending / approved / rejected).
+  function recordStatusKey(r: any): string {
+    if (r.renewed) return "renewed";
+    if (r.terminated) return "terminated";
+    return String(r.status || "").toLowerCase();
+  }
+  function recordStatusText(r: any): string {
+    if (r.renewed) return "Renewed";
+    if (r.terminated) return "Terminated";
+    return recordStatusLabel(r.status);
+  }
+
   // "approved"/"rejected"/"pending" (as stored) -> the wording shown on the Status badge.
   function recordStatusLabel(status: string): string {
     const labels: Record<string, string> = { approved: "Approved", rejected: "Declined", pending: "Pending" };
@@ -71,7 +90,7 @@ document.addEventListener("DOMContentLoaded", () => {
   function populateSchoolYearFilter(): void {
     if (!filterSy) return;
     const current = filterSy.value;
-    const years = Array.from(new Set(recordsData.map((r: any) => r.sy))).filter(Boolean).sort().reverse() as string[];
+    const years = Array.from(new Set(recordsData.map((r: any) => r.displaySy || r.sy))).filter(Boolean).sort().reverse() as string[];
     filterSy.innerHTML = '<option value="all">School Years</option>' +
       years.map((y) => '<option value="' + y + '">' + y + '</option>').join("");
     filterSy.value = years.includes(current) ? current : "all";
@@ -81,8 +100,9 @@ document.addEventListener("DOMContentLoaded", () => {
   function populateFilterTypes(): void {
     populateSchoolYearFilter();
     if (!filterType) return;
-    const types = Array.from(new Set(recordsData.map((r: any) => r.scholarshipType))).filter(Boolean);
-    filterType.innerHTML = '<option value="all">Scholarship Types</option>';
+    const types = Array.from(new Set(recordsData.map((r: any) => r.scholarshipType))).filter((t: any) => t && t !== "Dean's List");   // the "Dean's Listers" option covers it
+    // "Dean's Listers": newest graded semester GWA 1.50 or better, no subject grade of 2.00 or worse.
+    filterType.innerHTML = '<option value="all">Scholarship Types</option><option value="deans">Dean&#39;s Listers</option>';
     types.forEach(t => {
       const opt = document.createElement("option");
       opt.value = t;
@@ -102,6 +122,16 @@ document.addEventListener("DOMContentLoaded", () => {
     return value.split(" ")[0].split("T")[0];
   }
 
+  // A–Z by surname, then first name (the table and the export use the same order).
+  function sortBySurname(list: any[]): any[] {
+    const key = (r: any) => [String(r.lastName || r.name || ""), String(r.firstName || "")];
+    return list.slice().sort((a, b) => {
+      const [al, af] = key(a);
+      const [bl, bf] = key(b);
+      return al.localeCompare(bl, "en", { sensitivity: "base" }) || af.localeCompare(bf, "en", { sensitivity: "base" });
+    });
+  }
+
   function getFilteredRecords(): any[] {
     const query = searchInput ? searchInput.value.toLowerCase().trim() : "";
     const typeVal = filterType ? filterType.value.toLowerCase() : "all";
@@ -109,16 +139,19 @@ document.addEventListener("DOMContentLoaded", () => {
     const semVal = filterSemester ? filterSemester.value : "all";
     const syVal = filterSy ? filterSy.value : "all";
     const progVal = filterProgram ? filterProgram.value : "all";
+    const yearVal = filterYearLevel ? filterYearLevel.value : "all";
 
-    return recordsData.filter((r: any) => {
-      const matchQuery = r.name.toLowerCase().includes(query) || r.studentId.toLowerCase().includes(query);
-      const matchType = typeVal === "all" || r.scholarshipType.toLowerCase() === typeVal;
-      const matchStatus = statusVal === "all" || statusVal === "all status" || r.status.toLowerCase() === statusVal;
-      const matchSem = semVal === "all" || semesterKey(r.semester) === semVal;
-      const matchSy = syVal === "all" || r.sy === syVal;
+    return sortBySurname(recordsData.filter((r: any) => {
+      // Name, Student ID, department, scholarship type, year level, semester or school year.
+            const matchQuery = !query || [r.name, r.studentId, r.department, r.programCode, r.scholarshipType, r.yearLevel, r.currentSemester || r.semester, r.displaySy || r.sy].join(" ").toLowerCase().includes(query);
+      const matchType = typeVal === "all" || (typeVal === "deans" ? !!r.deansLister : r.scholarshipType.toLowerCase() === typeVal);
+      const matchStatus = statusVal === "all" || statusVal === "all status" || recordStatusKey(r) === statusVal;
+      const matchSem = semVal === "all" || semesterKey(r.currentSemester || r.semester) === semVal;
+      const matchSy = syVal === "all" || (r.displaySy || r.sy) === syVal;
       const matchProg = progVal === "all" || r.programCode === progVal;
-      return matchQuery && matchType && matchStatus && matchSem && matchSy && matchProg;
-    });
+      const matchYear = yearVal === "all" || String(r.yearLevel || "").toLowerCase() === yearVal.toLowerCase();
+      return matchQuery && matchType && matchStatus && matchSem && matchSy && matchProg && matchYear;
+    }));
   }
 
   function renderPaginationBar(total: number): void {
@@ -132,6 +165,14 @@ document.addEventListener("DOMContentLoaded", () => {
     if (total === 0) {
       wrap.innerHTML = "";
       return;
+    }
+
+    if (totalPages <= 1) {
+
+      wrap.innerHTML = `<span>Showing all ${total} entr${total === 1 ? "y" : "ies"}</span>`;
+
+      return;
+
     }
 
     const start = (recordsCurrentPage - 1) * RECORDS_PAGE_SIZE + 1;
@@ -164,7 +205,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     tableBody.innerHTML = "";
     if (filtered.length === 0) {
-      tableBody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding: 24px; color: #6b7280;">No records found.</td></tr>`;
+      tableBody.innerHTML = `<tr><td colspan="10" style="text-align:center; padding: 24px; color: #6b7280;">No records found.</td></tr>`;
       renderPaginationBar(0);
       return;
     }
@@ -176,15 +217,16 @@ document.addEventListener("DOMContentLoaded", () => {
 
     pageItems.forEach((r: any) => {
       const tr = document.createElement("tr");
-      const badgeClass = r.status === "approved" ? "badge-approved" : (r.status === "rejected" ? "badge-rejected" : "badge-pending");
+      const badgeClass = r.terminated ? "badge-rejected" : (r.status === "approved" ? "badge-approved" : (r.status === "rejected" ? "badge-rejected" : "badge-pending"));
       tr.innerHTML = `
+        <td class="row-select-cell"><input type="checkbox" class="row-select" data-id="${r.id}" aria-label="Select ${r.name}"></td>
         <td><strong class="font-mono">${r.studentId}</strong></td>
-        <td>${r.name}</td>
-        <td>${r.age != null ? r.age : "—"}</td>
+        <td>${r.name}${r.deansLister ? '<span class="dl-tag">Dean\'s Lister</span>' : ""}</td>
+        <td>${r.department || "—"}</td>
         <td>${typeAcronym(r.scholarshipType)}</td>
-        <td><span class="status-badge ${badgeClass}">${recordStatusLabel(r.status)}</span></td>
+        <td><span class="status-badge ${badgeClass}">${recordStatusText(r)}</span></td>
         <td>${r.currentSemester || r.semester}</td>
-        <td><span class="font-mono">${r.sy}</span></td>
+        <td><span class="font-mono">${r.displaySy || r.sy}</span></td>
         <td><span class="font-mono">${dateOnly(r.dateEvaluated)}</span></td>
         <td class="actions-cell">
           <button type="button" class="btn-icon-action edit" title="Edit Record" onclick="editRecord(event, ${r.id})">
@@ -277,7 +319,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const failPass = hasAcademic && Number(r.failingGrades) === 0;
       const checklist = hasAcademic ? [
         { label: "Currently Enrolled", value: r.enrolled ? "Enrolled" : "Not Enrolled", pass: !!r.enrolled },
-        { label: `GWA Requirement (≤ ${r.gwaReq})`, value: gwaPass ? "Passed" : "Failed", pass: gwaPass },
+        { label: Number(r.gwaReq) > 0 ? `GWA Requirement (≤ ${r.gwaReq})` : "GWA Requirement (none)", value: Number(r.gwaReq) > 0 ? (gwaPass ? "Passed" : "Failed") : "Not required", pass: gwaPass },
         { label: "No Failing Grade", value: failPass ? "Passed" : "Failed", pass: failPass },
         { label: "Complete Documents", value: r.docsComplete ? "Complete" : "Missing", pass: !!r.docsComplete },
       ] : [];
@@ -340,23 +382,40 @@ document.addEventListener("DOMContentLoaded", () => {
       return '<div class="section"><h3>Enrollment Verification</h3>' +
         '<div class="view-detail-grid">' +
         '<div class="detail-item"><span class="detail-label">Enrollment Status</span><span class="detail-value highlight">' + (hasAcademic ? (r.enrolled ? "Validated & Official" : "Unconfirmed") : "Not available") + '</span></div>' +
-        '<div class="detail-item"><span class="detail-label">School Year</span><span class="detail-value font-mono">' + esc(r.sy) + '</span></div>' +
+        '<div class="detail-item"><span class="detail-label">School Year</span><span class="detail-value font-mono">' + esc(r.displaySy || r.sy) + '</span></div>' +
         '<div class="detail-item"><span class="detail-label">Semester</span><span class="detail-value">' + esc(r.currentSemester || r.semester) + '</span></div>' +
         '<div class="detail-item full-width"><span class="detail-label">Degree Program</span><span class="detail-value">' + esc(formatDeptLine(r.program, r.major, r.yearLevel)) + '</span></div>' +
         '</div></div>';
     }
 
     if (tab === "documents") {
+      // The documents the applicant submitted (api/list_records.php), shown like Evaluation's tab.
+      const uploadsBase = (window.SITE_BASE || "") + "/uploads/";
+      const docs = Array.isArray(r.documents) ? r.documents : [];
+      const docRow = (d: any) => {
+        const label = esc(d.label) + (d.required ? "" : ' <span class="doc-optional">(optional)</span>');
+        if (!d.filename) {
+          return '<div class="doc-row"><div class="doc-row-info"><div class="doc-row-label">' + label + '</div><div class="doc-row-meta">Not submitted</div></div>' +
+            '<span class="status-badge ' + (d.required ? "badge-rejected" : "badge-pending") + '">' + (d.required ? "Missing" : "Optional") + "</span></div>";
+        }
+        const url = uploadsBase + encodeURIComponent(d.filename);
+        return '<div class="doc-row">' +
+          '<a href="' + url + '" target="_blank" rel="noopener" class="doc-row-thumb"><img src="' + url + '" alt="' + esc(d.label) + '"></a>' +
+          '<div class="doc-row-info"><div class="doc-row-label">' + label + '</div><div class="doc-row-meta">Uploaded · PNG</div></div>' +
+          '<a href="' + url + '" target="_blank" rel="noopener" class="status-badge badge-approved doc-view-link">View Full Size</a></div>';
+      };
       return '<div class="section"><h3>Submitted Verification Documents</h3>' +
-        '<p class="empty-note">No document records are on file for this archived record.</p>' +
-        '</div>';
+        (docs.length
+          ? '<p class="empty-note" style="margin-bottom:12px;">Uploaded by the applicant. Click a document to view it full size.</p>' + docs.map(docRow).join("")
+          : '<p class="empty-note">No documents are on file for this record.</p>') +
+        "</div>";
     }
 
     // "evaluation" tab
     const statusClass = r.status === 'approved' ? 'badge-approved' : 'badge-rejected';
     return '<div class="section"><h3>Scholarship Committee Decision</h3>' +
       '<div class="view-detail-grid">' +
-      '<div class="detail-item"><span class="detail-label">Outcome</span><span class="status-badge ' + statusClass + '">' + esc(recordStatusLabel(r.status)) + '</span></div>' +
+      '<div class="detail-item"><span class="detail-label">Outcome</span><span class="status-badge ' + statusClass + '">' + esc(recordStatusText(r)) + '</span></div>' +
       '<div class="detail-item"><span class="detail-label">Date Evaluated</span><span class="detail-value font-mono">' + esc(dateOnly(r.dateEvaluated)) + '</span></div>' +
       '<div class="detail-item full-width"><span class="detail-label">Remarks</span><span class="detail-value remarks">' + (r.remarks ? esc(r.remarks) : 'No remarks recorded.') + '</span></div>' +
       '</div></div>';
@@ -366,7 +425,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!recViewBody || !viewingRecord) return;
     const r = viewingRecord;
     const statusClass = r.status === 'approved' ? 'badge-approved' : 'badge-rejected';
-    const tabs = ["overview", "grades", "enrollment", "evaluation"];
+    const tabs = ["overview", "grades", "enrollment", "documents", "evaluation"];
     const tabsHtml = tabs
       .map(t => '<button type="button" class="tab ' + (activeRecordTab === t ? "active" : "") + '" data-rec-tab="' + t + '">' + t + '</button>')
       .join("");
@@ -374,11 +433,11 @@ document.addEventListener("DOMContentLoaded", () => {
     recViewBody.innerHTML =
       '<div class="profile">' +
       '<div class="profile-top"><div class="avatar">' + initials(r.name) + '</div>' +
-      '<div><div class="record-profile-name">' + esc(r.fullName || r.name) + ' <span class="status-badge ' + statusClass + '">' + esc(recordStatusLabel(r.status)) + '</span></div>' +
+      '<div><div class="record-profile-name">' + esc(r.fullName || r.name) + ' <span class="status-badge ' + statusClass + '">' + esc(recordStatusText(r)) + '</span></div>' +
       '<div class="profile-id font-mono">' + esc(r.studentId) + (r.age != null ? ' · <span title="Born ' + esc(r.birthdate) + '">' + r.age + ' yrs old</span>' : '') + '</div></div></div>' +
       '<div class="profile-meta">' +
       '<span>' + esc(typeAcronym(r.scholarshipType)) + ' Scholarship</span>' +
-      '<span>' + esc(r.currentSemester || r.semester) + ' &middot; <span class="font-mono">' + esc(r.sy) + '</span></span>' +
+      '<span>' + esc(r.currentSemester || r.semester) + ' &middot; <span class="font-mono">' + esc(r.displaySy || r.sy) + '</span></span>' +
       '<span>' + esc(formatDeptLine(r.program, r.major, r.yearLevel)) + '</span>' +
       '</div>' +
       '</div>' +
@@ -510,11 +569,16 @@ document.addEventListener("DOMContentLoaded", () => {
   if (filterSemester) filterSemester.addEventListener("change", resetRecordsPageAndRender);
   if (filterSy) filterSy.addEventListener("change", resetRecordsPageAndRender);
   if (filterProgram) filterProgram.addEventListener("change", resetRecordsPageAndRender);
+  if (filterYearLevel) filterYearLevel.addEventListener("change", resetRecordsPageAndRender);
 
-  function csvEscape(value: any): string {
-    const str = value == null ? "" : String(value);
-    if (/[",\n]/.test(str)) return '"' + str.replace(/"/g, '""') + '"';
-    return str;
+
+  // "records-BSIT-1st-Year-2026-10-02.xlsx" — names the filters that were applied.
+  function exportFileName(): string {
+    const picked = [filterProgram, filterYearLevel, filterType, filterStatus, filterSemester, filterSy]
+      .filter((el) => el && el.value && el.value !== "all")
+      .map((el) => (el as HTMLSelectElement).options[(el as HTMLSelectElement).selectedIndex].text)
+      .map((t) => t.replace(/[^A-Za-z0-9]+/g, "-").replace(/^-+|-+$/g, ""));
+    return ["records", ...picked, new Date().toISOString().slice(0, 10)].join("-");
   }
 
   function exportRecordsToCsv(): void {
@@ -524,31 +588,25 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    const headers = ["Student ID", "Name", "Scholarship Type", "Status", "Semester", "School Year", "Date Evaluated", "Remarks"];
-    const lines = [headers.map(csvEscape).join(",")];
+    const headers = ["Student ID", "Surname", "First Name", "Full Name", "Program", "Year Level", "Scholarship Type", "Semester", "School Year", "Status"];
+    const out = [headers];
 
     rows.forEach((r: any) => {
-      lines.push([
+      out.push([
         r.studentId,
+        r.lastName || "",
+        r.firstName || "",
         r.fullName || r.name,
+        r.programCode || r.program || "",
+        r.yearLevel || "",
         r.scholarshipType,
-        r.status,
-        r.semester,
-        r.sy,
-        dateOnly(r.dateEvaluated),
-        r.remarks || "",
-      ].map(csvEscape).join(","));
+        r.currentSemester || r.semester,
+        r.displaySy || r.sy,
+        recordStatusKey(r),
+      ]);
     });
 
-    const blob = new Blob([lines.join("\r\n")], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "scholarship-records-" + new Date().toISOString().slice(0, 10) + ".csv";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    (window as any).downloadXlsx({ filename: exportFileName(), sheet: "Records", rows: out });
   }
 
   if (exportBtn) {

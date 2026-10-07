@@ -6,11 +6,11 @@
     --green-900: #134e2a;
     --green-800: #1b6336;
     --green-700: #238f54;
-    --green-600: #2ea263;
-    --green-500: #3ab774;
-    --green-100: #e8f5e9;
-    --green-50: #f2faf4;
-    --green-border: #c8e6c9;
+    --green-600: #2f8a58;
+    --green-500: #4a9a6c;
+    --green-100: #e1eae2;
+    --green-50: #edf2ed;
+    --green-border: #c3d6c6;
 }
 
 .scholars-container {
@@ -46,7 +46,7 @@
 .rule-banner-info p {
     margin: 0;
     font-size: 13.5px;
-    color: #e8f5e9;
+    color: #e1eae2;
     line-height: 1.5;
 }
 
@@ -70,7 +70,7 @@
     justify-content: space-between;
     gap: 16px;
     margin-bottom: 24px;
-    background: #ffffff;
+    background: #fafbf9;
     padding: 16px 20px;
     border-radius: 12px;
     border: 1px solid #e2e8f0;
@@ -97,8 +97,8 @@
 }
 
 .filter-select:focus, .search-input-field:focus {
-    border-color: #2ea263;
-    background: #ffffff;
+    border-color: #2f8a58;
+    background: #fafbf9;
     box-shadow: 0 0 0 3px rgba(46, 162, 99, 0.15);
 }
 
@@ -111,7 +111,7 @@
 .search-wrapper i {
     position: absolute;
     left: 12px;
-    color: #2ea263;
+    color: #2f8a58;
     width: 16px;
     height: 16px;
 }
@@ -142,7 +142,7 @@
 }
 
 .table-card {
-    background: #ffffff;
+    background: #fafbf9;
     border-radius: 12px;
     border: 1px solid #e2e8f0;
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
@@ -157,11 +157,11 @@
 }
 
 .scholars-table th {
-    background: #f2faf4;
+    background: #edf2ed;
     padding: 14px 18px;
     font-weight: 700;
     color: #134e2a;
-    border-bottom: 1.5px solid #c8e6c9;
+    border-bottom: 1.5px solid #c3d6c6;
     font-size: 12.5px;
     text-transform: uppercase;
     letter-spacing: 0.5px;
@@ -175,16 +175,16 @@
 }
 
 .scholars-table tr:hover {
-    background-color: #f2faf4;
+    background-color: #edf2ed;
 }
 
 .badge-maintained {
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    background: #e8f5e9;
+    background: #e1eae2;
     color: #1b6336;
-    border: 1px solid #c8e6c9;
+    border: 1px solid #c3d6c6;
     padding: 4px 10px;
     border-radius: 20px;
     font-weight: 600;
@@ -205,13 +205,13 @@
 }
 
 .badge-year {
-    background: #f2faf4;
+    background: #edf2ed;
     color: #134e2a;
     padding: 3px 8px;
     border-radius: 6px;
     font-weight: 600;
     font-size: 12px;
-    border: 1px solid #c8e6c9;
+    border: 1px solid #c3d6c6;
 }
 
 .dept-tag {
@@ -249,14 +249,94 @@
 
 /* Modal Styling Enhancements to Match Green Theme */
 #scholarModalOverlay .custom-modal-header {
-    border-bottom: 2px solid #e8f5e9;
+    border-bottom: 2px solid #e1eae2;
 }
 
 #scholarModalOverlay .btn-primary {
-    background: linear-gradient(135deg, #2ea263 0%, #238f54 100%) !important;
-    border-color: #2ea263 !important;
+    background: linear-gradient(135deg, #2f8a58 0%, #238f54 100%) !important;
+    border-color: #2f8a58 !important;
 }
 
 #scholarModalOverlay .btn-primary:hover {
     background: linear-gradient(135deg, #238f54 0%, #1b6336 100%) !important;
 }
+
+/* Dean's Lister tag next to the scholar's name */
+.dl-tag {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: #d1fae5;   /* emerald */
+    color: #047857;
+    border: 1px solid #a7f3d0;
+    font-size: 11px;
+    font-weight: 600;
+    vertical-align: middle;
+    white-space: nowrap;
+}
+
+/* Search + 4 filters on one row: fixed-width filter boxes (long names are cut off with "...") */
+.filter-group-left .filter-select {
+    width: 155px;
+    text-overflow: ellipsis;
+}
+
+.filter-group-left .search-wrapper .search-input-field {
+    width: 220px;
+}
+
+/* Lucide replaces <i data-lucide> with <svg>: keep the search icon inside the box either way */
+.search-wrapper svg {
+    position: absolute;
+    left: 12px;
+    color: #2f8a58;
+    width: 16px;
+    height: 16px;
+    pointer-events: none;
+}
+
+
+/* Scholarship Type column */
+.sch-type {
+    display: block;
+    font-size: 13px;
+    font-weight: 500;
+    color: #334155;
+    line-height: 1.35;
+}
+
+/* Right side of the filter bar: trash icon (multi-select delete) + Scan Registrar Now */
+.scholars-actions { display: flex; align-items: center; gap: 10px; }
+.btn-scan-registrar { display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 16px; border-radius: 10px; border: none; background: linear-gradient(135deg, #134e2a 0%, #1b6336 100%); color: #fff; font-size: 13.5px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.btn-scan-registrar:hover { filter: brightness(1.08); }
+.btn-scan-registrar:disabled { opacity: .7; cursor: wait; }
+.btn-scan-registrar svg { width: 16px; height: 16px; }
+
+/* Result of Scan Registrar Now */
+.scan-result { margin: -8px 0 18px; padding: 12px 16px; border-radius: 12px; border: 1px solid #a7f3d0; background: #ecfdf5; color: #065f46; font-size: 13.5px; line-height: 1.5; display: flex; gap: 12px; align-items: flex-start; }
+.scan-result[hidden] { display: none; }
+.scan-result.is-error { border-color: #fecaca; background: #fef2f2; color: #991b1b; }
+.scan-result.is-none { border-color: #e2e8f0; background: #f8fafc; color: #334155; }
+.scan-result strong { font-weight: 700; }
+.scan-result .scan-result-text { flex: 1; }
+.scan-result .scan-result-sub { display: block; margin-top: 2px; font-size: 12.5px; opacity: .85; }
+.scan-result-close { border: none; background: none; color: inherit; cursor: pointer; font-size: 18px; line-height: 1; padding: 0 2px; opacity: .7; }
+.scan-result-close:hover { opacity: 1; }
+
+/* Grade Year badge stays on one line ("Year 2" was wrapping in the narrow column) */
+.badge-year { white-space: nowrap; display: inline-block; }
+
+/* Export (Student ID through School Year of the scholars shown) */
+.btn-export-scholars { display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 16px; border-radius: 10px; border: 1px solid #c3d6c6; background: #fff; color: #134e2a; font-size: 13.5px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.btn-export-scholars:hover { background: #edf2ed; }
+.btn-export-scholars svg { width: 16px; height: 16px; }
+
+/* Keep search + 3 filters + Export / Scan on one row at laptop widths */
+.filter-group-left .search-wrapper .search-input-field { width: 190px; }
+.btn-export-scholars, .btn-scan-registrar { padding: 0 14px; }
+.filters-bar { gap: 12px; }
+.filter-group-left .filter-select { width: 140px; }
+.filter-group-left .search-wrapper .search-input-field { width: 180px; }
+.scan-result .scan-result-line { display: block; }
+.scan-result .scan-result-line + .scan-result-line { margin-top: 8px; }

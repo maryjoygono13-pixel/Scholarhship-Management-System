@@ -1,5 +1,8 @@
 <?php
 require_once __DIR__ . '/init.php';
+require_once __DIR__ . '/../includes/records_helper.php';
+require_once __DIR__ . '/../includes/enrollment_verification_helper.php';   // evSplitFullName()
+require_once __DIR__ . '/../includes/deans_list_helper.php';               // "Dean's Lister" filter
 
 try {
     $pdo = getDB();
@@ -25,9 +28,11 @@ try {
             logActivity($pdo, 'Record Updated', 'Records', $name . ' (Student ID: ' . $studentId . ') record was updated.', $id);
             sendJson(['success' => true, 'id' => $id, 'message' => 'Record updated successfully.']);
         } else {
-            $stmt = $pdo->prepare("INSERT INTO records (student_id, name, scholarship_type, status, semester, sy, date_evaluated, remarks) VALUES (?, ?, ?, ?, ?, ?, CURDATE(), ?)");
-            $stmt->execute([$studentId, $name, $type, $status, $semester, $sy, $remarks]);
-            $newId = (int)$pdo->lastInsertId();
+            $saved = saveTermRecord($pdo, ['student_id' => $studentId, 'name' => $name, 'scholarship_type' => $type, 'status' => $status, 'semester' => $semester, 'sy' => $sy, 'remarks' => $remarks, 'origin' => 'evaluation']);
+            if (!$saved['created']) {
+                sendError("$name already has a $type record for $semester $sy. Edit that record instead.", 409);
+            }
+            $newId = $saved['id'];
             logActivity($pdo, 'Record Added', 'Records', $name . ' (Student ID: ' . $studentId . ') record was added.', $newId);
             sendJson(['success' => true, 'id' => $newId, 'message' => 'Record created successfully.']);
         }
@@ -63,7 +68,7 @@ try {
 
     // Look up the applicant behind each record (if any) for richer academic details.
     $appStmt = $pdo->prepare("
-        SELECT id, birthdate, age, first_name, middle_name, last_name, program, major, year_level, semester, gwa, gwa_req, failing_grades, units, enrolled, docs_complete
+        SELECT id, birthdate, age, first_name, middle_name, last_name, program, major, year_level, semester, gwa, gwa_req, failing_grades, units, enrolled, docs_complete, scholarship_type, transcript_file, coe_file, good_moral_file
         FROM applicants
         WHERE id = ? OR student_id = ?
         ORDER BY id DESC
@@ -71,6 +76,21 @@ try {
     ");
 
     $gradeStmt = $pdo->prepare("SELECT subject_code, grade FROM student_grades WHERE student_id = ?");
+    // No application behind the record (e.g. a Dean's Lister from the Registrar scan): program and
+    // year level come from their Scholars entry instead, or else from the Registrar's database.
+    $scholarStmt = $pdo->prepare("SELECT department, year_level FROM scholars WHERE student_id = ? ORDER BY id DESC LIMIT 1");
+    $registrarStudent = function (string $studentId): ?array {
+        static $stmt = null, $failed = false;
+        if ($failed) return null;
+        try {
+            $stmt ??= getRegistrarDB()->prepare('SELECT program, year_level FROM ' . REGISTRAR_STUDENTS_TABLE . ' WHERE student_id = ?');
+            $stmt->execute([trim($studentId)]);
+            return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+        } catch (Throwable $e) {
+            $failed = true;   // Registrar's database unreachable: leave the fields blank
+            return null;
+        }
+    };
 
     // Each semester's own GWA, so a record shows the GWA of ITS semester (a 1st Semester
     // record must not pick up the student's 2nd Semester grades).
@@ -84,9 +104,23 @@ try {
 
     $ageUpdate = $pdo->prepare("UPDATE applicants SET age = ? WHERE id = ?");
 
-    $data = array_map(function($r) use ($appStmt, $gradeStmt, $semesterStats, $sentToRenewal, $pdo, $ageUpdate) {
+    $data = array_map(function($r) use ($appStmt, $gradeStmt, $semesterStats, $sentToRenewal, $pdo, $ageUpdate, $scholarStmt, $registrarStudent) {
         $appStmt->execute([(int)($r['applicant_id'] ?? 0), $r['student_id']]);
         $app = $appStmt->fetch();
+        $scholarRow = null;
+        if (!$app) {
+            $scholarStmt->execute([$r['student_id']]);
+            $scholarRow = $scholarStmt->fetch() ?: null;
+        }
+        // Scholars stores the department's display name ("B Elementary Education"), so map it back.
+        $fallbackProgram = $scholarRow
+            ? (resolveProgramName((string)$scholarRow['department']) ?? (array_search((string)$scholarRow['department'], PROGRAM_DISPLAY_NAMES, true) ?: (string)$scholarRow['department']))
+            : null;
+        $fallbackYear = $scholarRow && (int)$scholarRow['year_level'] > 0 ? ['', '1st Year', '2nd Year', '3rd Year', '4th Year'][min(4, (int)$scholarRow['year_level'])] : '';
+        if (!$app && !$scholarRow && ($reg = $registrarStudent((string)$r['student_id']))) {
+            $fallbackProgram = (string)$reg['program'];
+            $fallbackYear = (string)$reg['year_level'];
+        }
 
         // Age always follows the birthdate, so it goes up on the scholar's birthday. The
         // stored applicants.age is brought up to date too whenever it has fallen behind.
@@ -119,7 +153,22 @@ try {
         // prefer the linked applicant's structured name for a middle initial, but that meant an
         // edited record name never actually appeared, which was the wrong tradeoff.)
         $shortName = $r['name'];
+
+        // [surname, first name] for A–Z sorting and the export.
+        [$splitLast, $splitFirst] = evSplitFullName((string)$r['name']);
+        $appLast = trim((string)($app['last_name'] ?? ''));
+        $surnameParts = ($appLast !== '' && stripos(' ' . $r['name'] . ' ', ' ' . $appLast . ' ') !== false)
+            ? [$appLast, trim((string)($app['first_name'] ?? '')) ?: $splitFirst]
+            : [$splitLast, $splitFirst];
         $fullName = $r['name'];
+
+        // Each record shows its own term (a renewal decision is a record of its own for its term), and
+        // the program / year level saved with it — the student's at that time — before today's.
+        $displaySemester = normalizeSemesterName($r['semester']);
+        $displaySy = $r['sy'];
+        $programForDept = trim((string)($r['program'] ?? '')) !== '' ? (string)$r['program'] : ($app['program'] ?? $fallbackProgram ?? '');
+        $yearForRecord = trim((string)($r['year_level'] ?? '')) !== '' ? (string)$r['year_level'] : ($app['year_level'] ?? $fallbackYear);
+        $canonicalProgram = resolveProgramName((string)$programForDept);
 
         return [
             'id' => (int)$r['id'],
@@ -131,6 +180,10 @@ try {
             // pre-fill the Edit form so saving never overwrites it with a same-Student-ID
             // applicant's (possibly different/mismatched) name.
             'recordName' => $r['name'],
+            // Surname / first name for sorting (A–Z by surname) and the export: the applicant's own
+            // last name when it's part of the record name, otherwise read from the record name.
+            'lastName' => $surnameParts[0],
+            'firstName' => $surnameParts[1],
             'age' => $age,
             'birthdate' => $app['birthdate'] ?? '',
             'scholarshipType' => $r['scholarship_type'],
@@ -140,17 +193,24 @@ try {
             // The Semester column follows the Active Semester in Settings > Portal
             // Configuration live, the same way Renewal & Retention's does — not the term the
             // record was originally evaluated in (that's still `semester`, used for matching).
-            'currentSemester' => getActiveSemester($pdo),
+            'currentSemester' => $displaySemester,
+            'displaySy' => $displaySy,
+            // Renewed in Renewal & Retention (shown as "Renewed"; still an approved record).
+            'renewed' => ($r['origin'] ?? '') === 'renewal' && strtolower(trim((string)$r['status'])) === 'approved',
+            // Terminated in Renewal & Retention (shown as "Terminated"; a rejected record).
+            'terminated' => ($r['origin'] ?? '') === 'renewal' && strtolower(trim((string)$r['status'])) === 'rejected',
+            'origin' => $r['origin'] ?? 'evaluation',
+            'department' => $canonicalProgram !== null ? (PROGRAM_DISPLAY_NAMES[$canonicalProgram] ?? $canonicalProgram) : (string)$programForDept,
             'sy' => $r['sy'],
             'renewalStatus' => strtolower(trim((string)$r['status'])) === 'rejected' ? null : ($sentToRenewal[trim($r['student_id']) . '|' . trim($r['sy']) . '|' . $recordSem . '|' . strtolower(trim((string)$r['scholarship_type']))] ?? null),
             'sentToRenewal' => strtolower(trim((string)$r['status'])) !== 'rejected' && isset($sentToRenewal[trim($r['student_id']) . '|' . trim($r['sy']) . '|' . $recordSem . '|' . strtolower(trim((string)$r['scholarship_type']))]),
             'dateEvaluated' => $r['date_evaluated'],
             'date_evaluated' => $r['date_evaluated'],
             'remarks' => $r['remarks'],
-            'program' => $app['program'] ?? null,
-            'programCode' => programAcronym($app['program'] ?? ''),
+            'program' => $programForDept !== '' ? $programForDept : null,
+            'programCode' => programAcronym($programForDept),
             'major' => $app['major'] ?? '',
-            'yearLevel' => $app['year_level'] ?? '',
+            'yearLevel' => $yearForRecord,
             'gwa' => $recordGwa,
             'semesterGwa' => [
                 'first' => $semesterStats[(string)$r['student_id']]['1st Semester']['gwa'] ?? null,
@@ -158,10 +218,16 @@ try {
                 'summer' => $semesterStats[(string)$r['student_id']]['Summer Term']['gwa'] ?? null,
             ],
             'gwaReq' => $app ? (float)$app['gwa_req'] : null,
+            // Newest graded semester: GWA 1.50 or better and no subject grade of 2.00 or worse.
+            // Dean's Lister badge for THIS record: its own semester's GWA 1.50 or better and no subject
+            // grade of 2.00 or worse (any scholarship type, e.g. a CMSP scholar who is also a Dean's Lister).
+            'deansLister' => $termStats !== null && deansListQualifies($termStats),
             'failingGrades' => $recordFailing,
             'units' => $app ? (int)$app['units'] : null,
             'enrolled' => $app ? (bool)$app['enrolled'] : null,
             'docsComplete' => $app ? (bool)$app['docs_complete'] : null,
+            // The documents the applicant submitted for this record's scholarship (same list Evaluation shows).
+            'documents' => $app ? evaluateApplicantDocuments($pdo, array_merge($app, ['scholarship_type' => $r['scholarship_type']])) : [],
             'grades' => (object)$grades,
         ];
     }, $rows);

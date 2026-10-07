@@ -29,6 +29,42 @@ try {
             sendError('Scholarship name and code are required.');
         }
 
+        // MERIT-BASED: the Full / Half Merit GWA ranges and the Basic Education requirement are
+        // edited on the form and become the rules every Merit decision uses. The GWA requirement
+        // then follows them: collegiate = the Half Merit limit; Basic Education = none.
+        $meritRanges = null;
+        if (isMeritScholarshipType($type)) {
+            $num = fn($k, $def) => is_numeric($_POST[$k] ?? null) ? round((float)$_POST[$k], 2) : $def;
+            $meritRanges = [
+                'full_min' => $num('merit_full_min', MERIT_DEFAULT_RANGES['full_min']),
+                'full_max' => $num('merit_full_max', MERIT_DEFAULT_RANGES['full_max']),
+                'half_min' => $num('merit_half_min', MERIT_DEFAULT_RANGES['half_min']),
+                'half_max' => $num('merit_half_max', MERIT_DEFAULT_RANGES['half_max']),
+                'basic_criteria' => trim((string)($_POST['merit_basic_criteria'] ?? '')) ?: MERIT_DEFAULT_RANGES['basic_criteria'],
+            ];
+            foreach (['full_min', 'full_max', 'half_min', 'half_max'] as $k) {
+                if ($meritRanges[$k] < 1.00 || $meritRanges[$k] > 5.00) {
+                    sendError('Merit GWA values must be between 1.00 and 5.00.');
+                }
+            }
+            if ($meritRanges['full_min'] > $meritRanges['full_max'] || $meritRanges['half_min'] > $meritRanges['half_max']) {
+                sendError('In each Merit range, the "from" GWA cannot be higher than the "to" GWA.');
+            }
+            if ($meritRanges['half_min'] <= $meritRanges['full_max']) {
+                sendError('Half Merit must start after Full Merit ends (e.g. Full Merit up to 1.30, Half Merit from 1.31).');
+            }
+            if (mb_strlen($meritRanges['basic_criteria']) > 255) {
+                sendError('The Basic Education requirement is too long (255 characters max).');
+            }
+            $gwaReq = meritGwaRequirementFor($educationLevel, $meritRanges);
+        }
+        // Stores the Merit rules on the program (only for MERIT-BASED programs).
+        $saveMeritRanges = function (int $programId) use ($pdo, $meritRanges): void {
+            if ($meritRanges === null) return;
+            $pdo->prepare("UPDATE scholarships SET merit_full_min = ?, merit_full_max = ?, merit_half_min = ?, merit_half_max = ?, merit_basic_criteria = ? WHERE id = ?")
+                ->execute([$meritRanges['full_min'], $meritRanges['full_max'], $meritRanges['half_min'], $meritRanges['half_max'], $meritRanges['basic_criteria'], $programId]);
+        };
+
         // Capacity taken is always counted live from actual applicants (scholarshipTakenCount),
         // never trusted from a stored counter — that counter is the exact thing that drifted out
         // of sync before (showing "0 available" on programs nobody had actually applied to). The
@@ -45,6 +81,7 @@ try {
                 $pdo->prepare("UPDATE scholarship_subtypes SET gwa_requirement = ? WHERE name = ? AND type_id = (SELECT id FROM scholarship_types WHERE name = ?)")
                     ->execute([$gwaReq, $subtype, $type]);
             }
+            $saveMeritRanges($id);
             logActivity($pdo, 'Scholarship Updated', 'Scholarships', $name . ' (' . $code . ') was updated.', $id);
             sendJson(['success' => true, 'id' => $id, 'message' => 'Scholarship updated successfully.']);
         } else {
@@ -52,6 +89,7 @@ try {
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
             $stmt->execute([$name, $code, $description, $type, $subtype, $gwaReq, $slots, $liveAvailable, $unlimited, $coverage, $status, $educationLevel, $schoolYear, $applicationStart, $applicationDeadline]);
             $newId = (int)$pdo->lastInsertId();
+            $saveMeritRanges($newId);
             logActivity($pdo, 'Scholarship Added', 'Scholarships', $name . ' (' . $code . ') was added.', $newId);
             sendJson(['success' => true, 'id' => $newId, 'message' => 'Scholarship added successfully.']);
         }
@@ -85,6 +123,8 @@ try {
             'schoolYear' => $r['school_year'] ?? '',
             'applicationStart' => $r['application_start'] ?? '',
             'applicationDeadline' => $r['application_deadline'] ?? '',
+            // MERIT-BASED rules as set on this program (defaults until edited).
+            'meritRanges' => meritRangesFromRow($r),
         ];
     }, $rows);
 

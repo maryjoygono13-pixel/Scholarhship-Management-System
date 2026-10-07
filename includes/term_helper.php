@@ -124,7 +124,21 @@ function changeActiveTerm(PDO $pdo, string $newSemester, string $newSchoolYear):
         . ($roll['skipped'] > 0 ? '; ' . $roll['skipped'] . ' already had a record for that semester and were left as they are.' : '.')
     );
 
-    return ['changed' => true, 'moved' => $roll['moved'], 'skipped' => $roll['skipped'], 'semester' => $newSemester, 'schoolYear' => $newSchoolYear];
+    // New term: ask the Registrar's database who is still officially enrolled (Renewal & Retention).
+    $enrollment = null;
+    try {
+        require_once __DIR__ . '/renewal_enrollment_helper.php';
+        $enrollment = syncRenewalEnrollment($pdo);
+        if ($enrollment['checked'] > 0) {
+            logActivity($pdo, 'Enrollment Checked', 'Renewal & Retention', $enrollment['reachable']
+                ? "Checked {$enrollment['checked']} Renewal & Retention entr" . ($enrollment['checked'] === 1 ? 'y' : 'ies') . " against the Registrar's database for {$enrollment['term']}: {$enrollment['enrolled']} officially enrolled, {$enrollment['notEnrolled']} dropped / not enrolled" . ($enrollment['notFound'] ? ", {$enrollment['notFound']} not in the Registrar's database" : '') . '.'
+                : "Couldn't reach the Registrar's database to check enrollment for {$enrollment['term']}.");
+        }
+    } catch (Throwable $e) {
+        $enrollment = ['reachable' => false, 'checked' => 0, 'enrolled' => 0, 'notEnrolled' => 0, 'notFound' => 0, 'term' => "$newSemester $newSchoolYear"];
+    }
+
+    return ['changed' => true, 'moved' => $roll['moved'], 'skipped' => $roll['skipped'], 'semester' => $newSemester, 'schoolYear' => $newSchoolYear, 'enrollment' => $enrollment];
 }
 
 /*
@@ -145,6 +159,10 @@ function rollScholarsForward(PDO $pdo, string $oldSemester, string $newSemester,
     foreach ($records as $rec) {
         // Only scholars approved in the term that is ending.
         if (normalizeSemesterName($rec['semester']) !== $oldSemester) continue;
+        // The Dean's List is recognition by grades, not a scholarship: never renewed.
+        if (strcasecmp(trim((string)$rec['scholarship_type']), "Dean's List") === 0) continue;
+        // A record made by a Renew / Terminate decision: the original Renewal entry already tracks this scholar.
+        if (($rec['origin'] ?? '') === 'renewal') continue;
 
         // One entry per student AND scholarship type, so a second scholarship is not skipped.
         $studentKey = (trim((string)$rec['student_id']) !== '' ? 's:' . trim($rec['student_id']) : 'r:' . $rec['id']) . '|' . strtolower(trim((string)$rec['scholarship_type']));

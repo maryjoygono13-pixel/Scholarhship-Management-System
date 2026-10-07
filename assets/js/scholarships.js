@@ -111,10 +111,80 @@ document.addEventListener("DOMContentLoaded", () => {
         if (typeof lucide !== "undefined") lucide.createIcons();
     }
 
+    // MERIT-BASED: eligibility follows the Education Level — collegiate Full Merit (GWA 1.00–1.30) /
+    // Half Merit (1.31–1.50), Basic Education Top 1 or Top 2. The GWA field is set and locked to
+    // match (1.50 = the Half Merit limit; none for Basic Education). The server enforces the same.
+    function isMeritType(name) {
+      const t = String(name || "").trim().toLowerCase();
+      return t === "merit-based academic scholarship" || t === "academic merit";
+    }
+    // Editable Merit rules (saved on the program; the server re-checks them).
+    const MERIT_DEFAULTS = { full_min: 1.00, full_max: 1.30, half_min: 1.31, half_max: 1.50, basic_criteria: "Top 1 or Top 2 in class" };
+    function meritInputValue(id, fallback) {
+      const el = document.getElementById(id);
+      return el && el.value !== "" ? el.value : fallback;
+    }
+    // Edit: the program's own rules. Add: the defaults.
+    function fillMeritInputs(r) {
+      const m = r || MERIT_DEFAULTS;
+      const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+      set("schMeritFullMin", Number(m.full_min).toFixed(2));
+      set("schMeritFullMax", Number(m.full_max).toFixed(2));
+      set("schMeritHalfMin", Number(m.half_min).toFixed(2));
+      set("schMeritHalfMax", Number(m.half_max).toFixed(2));
+      set("schMeritBasicCriteria", m.basic_criteria || MERIT_DEFAULTS.basic_criteria);
+    }
+    function validateMeritRules() {
+      if (!isMeritType(schType ? schType.value : "")) return null;
+      const v = (id) => Number(meritInputValue(id, "NaN"));
+      const fMin = v("schMeritFullMin"), fMax = v("schMeritFullMax"), hMin = v("schMeritHalfMin"), hMax = v("schMeritHalfMax");
+      if ([fMin, fMax, hMin, hMax].some((x) => !(x >= 1 && x <= 5))) return "Merit GWA values must be between 1.00 and 5.00.";
+      if (fMin > fMax || hMin > hMax) return "In each Merit range, the \"from\" GWA cannot be higher than the \"to\" GWA.";
+      if (hMin <= fMax) return "Half Merit must start after Full Merit ends (e.g. Full Merit up to 1.30, Half Merit from 1.31).";
+      return null;
+    }
+    ["schMeritHalfMax"].forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener("input", applyMeritRules);
+    });
+    function applyMeritRules() {
+      const panel = document.getElementById("schMeritRules");
+      const merit = isMeritType(schType ? schType.value : "");
+      const level = schEducationLevel ? schEducationLevel.value : "Collegiate";
+      if (panel) panel.hidden = !merit;
+      const coll = document.getElementById("schMeritCollegiate");
+      const basic = document.getElementById("schMeritBasic");
+      if (coll) coll.hidden = level === "Basic Education";
+      if (basic) basic.hidden = level === "Collegiate";
+      if (!schGwa) return;
+      // The Merit Eligibility ranges replace the GWA Requirement box for MERIT-BASED (its value is
+      // still filled in from the Half Merit "to" GWA and sent, and the server sets it the same way).
+      const gwaField = schGwa.closest(".field");
+      if (gwaField) gwaField.style.display = merit ? "none" : "";
+      if (merit) {
+        schGwa.value = level === "Basic Education" ? "" : meritInputValue("schMeritHalfMax", "1.50");
+        schGwa.readOnly = true;
+        schGwa.title = level === "Basic Education" ? "Basic Education Merit is for the Top 1 or Top 2 student in class" : "Follows the Half Merit \"to\" GWA above";
+      } else if (schGwa.readOnly) {
+        schGwa.readOnly = false;
+        schGwa.title = "";
+      }
+    }
+    // How a Merit program's requirement reads in the Scholarship Overview.
+    function meritRulesText(level, r) {
+      const m = r || MERIT_DEFAULTS;
+      const f = (v) => Number(v).toFixed(2);
+      const coll = "Full Merit: GWA " + f(m.full_min) + "–" + f(m.full_max) + " · Half Merit: GWA " + f(m.half_min) + "–" + f(m.half_max);
+      const basic = "Basic Education: " + (m.basic_criteria || MERIT_DEFAULTS.basic_criteria);
+      return level === "Basic Education" ? basic : level === "Both" ? coll + " · " + basic : coll;
+    }
+    if (schEducationLevel) schEducationLevel.addEventListener("change", applyMeritRules);
+
     function selectType(id, name) {
         selectedTypeId = id;
         pickedSubtypes = [];
         if (schType) schType.value = name;
+    applyMeritRules();
         if (schSubtype) schSubtype.value = "";
         renderTypePicker(name);
         renderSubtypePicker();
@@ -565,6 +635,9 @@ document.addEventListener("DOMContentLoaded", () => {
             <td>
                 <span class="font-mono">
                     ${s.unlimitedSlots ? "Unlimited" : `${s.slotsTaken ?? 0} &nbsp;/&nbsp; ${s.slots ?? 0}`}
+          ${!s.unlimitedSlots && (s.slots ?? 0) > 0 && (s.slotsTaken ?? 0) >= (s.slots ?? 0)
+            ? `<span class="sch-slot-full" title="${(s.slotsTaken ?? 0) > (s.slots ?? 0) ? "More applicants than slots (added before the slot limit was enforced). No new applicants are accepted." : "Not shown as available on the application form."}">${(s.slotsTaken ?? 0) > (s.slots ?? 0) ? "Over limit" : "Full"}</span>`
+            : ""}
                 </span>
             </td>
 
@@ -800,7 +873,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 <div class="detail-item">
                     <span class="detail-label">GWA Requirement</span>
-                    <span class="detail-value mono font-mono">${Number(s.gwaRequirement) > 0 ? "&le; " + escapeHtml(s.gwaRequirement) : "No GWA requirement"}</span>
+                    <span class="detail-value mono font-mono">${isMeritType(s.type) ? meritRulesText(s.educationLevel, s.meritRanges) : (Number(s.gwaRequirement) > 0 ? "&le; " + escapeHtml(s.gwaRequirement) : "No GWA requirement")}</span>
                 </div>
 
                 <div class="detail-item">
@@ -1193,6 +1266,7 @@ document.addEventListener("DOMContentLoaded", () => {
             alert("Please select a scholarship Type.");
             return;
         }
+        if (schWizardStep === 1) { const meritError = validateMeritRules(); if (meritError) { alert(meritError); return; } }
         if (schWizardStep === 2) {
           const badThreshold = collectCriteriaPayload().some((c) => THRESHOLD_CRITERIA.includes(c.type) && !(Number(c.value) > 0));
           if (badThreshold) {
@@ -1303,6 +1377,8 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
 
+        fillMeritInputs(editItem ? editItem.meritRanges : null);
+        applyMeritRules();
         syncUnlimitedSlots();
         schFormOverlay.classList.add("open");
         if (typeof lucide !== "undefined") lucide.createIcons();
@@ -1587,6 +1663,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     alert("Please select a scholarship Type.");
                     return;
                 }
+                { const meritError = validateMeritRules(); if (meritError) { alert(meritError); return; } }
 
                 // Several sub-types picked in Add mode: create one program per pick.
                 if (isAddMode() && pickedSubtypes.length > 1) {

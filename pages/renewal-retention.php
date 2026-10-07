@@ -37,23 +37,6 @@ include __DIR__ . '/../includes/header.php';
         </div>
 
         <div class="select-wrap">
-          <select id="SchoolYearFilter">
-            <option value="">School Years</option>
-          </select>
-          <i data-lucide="chevron-down"></i>
-        </div>
-
-        <div class="select-wrap">
-          <select id="semesterFilter">
-            <option value="">Semesters</option>
-            <option value="1st Semester">1st Semester</option>
-            <option value="2nd Semester">2nd Semester</option>
-            <option value="Summer Term">Summer Term</option>
-          </select>
-          <i data-lucide="chevron-down"></i>
-        </div>
-
-        <div class="select-wrap">
           <select id="scholarshipFilter">
             <option value="">Scholarship Types</option>
           </select>
@@ -62,17 +45,24 @@ include __DIR__ . '/../includes/header.php';
 
         <div class="select-wrap">
           <select id="programFilter">
-            <option value="">Programs</option>
-            <?php foreach (PROGRAM_ACRONYMS as $programAcronym): ?>
-            <option value="<?= $programAcronym ?>"><?= $programAcronym ?></option>
+            <option value="">Departments</option>
+            <?php foreach (PROGRAM_DISPLAY_NAMES as $programCanonical => $departmentName): ?>
+            <option value="<?= htmlspecialchars(PROGRAM_ACRONYMS[$programCanonical]) ?>"><?= htmlspecialchars($departmentName) ?></option>
             <?php endforeach; ?>
           </select>
           <i data-lucide="chevron-down"></i>
         </div>
 
         <div class="select-wrap">
+          <select id="SchoolYearFilter">
+            <option value="">School Years</option>
+          </select>
+          <i data-lucide="chevron-down"></i>
+        </div>
+
+        <div class="select-wrap">
           <select id="statusFilter">
-            <option value="">Statuses</option>
+            <option value="">Status</option>
             <option value="pending">Pending</option>
             <option value="eligible">Renewed</option>
             <option value="terminated">Terminated</option>
@@ -122,7 +112,7 @@ include __DIR__ . '/../includes/header.php';
         <p class="modal-id font-mono" id="modalId" style="font-size: 13px; color: #6b7280; margin-top: 2px;">—</p>
       </div>
       <div style="display: flex; align-items: center; gap: 12px;">
-        <span id="modalSemesterBadge" class="font-mono" style="font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 99px; border: 1px solid #d1d5db; background: #fff; color: #134e2a;" title="Set by the Active Semester in Settings">—</span>
+        <button type="button" class="msg-icon-btn" id="modalMsgBtn" title="Message this scholar" aria-label="Message this scholar"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></button>
         <button type="button" class="custom-modal-close" id="modalClose"><i data-lucide="x"></i></button>
       </div>
     </div>
@@ -165,4 +155,8 @@ include __DIR__ . '/../includes/header.php';
     </div>
   </div>
 </div>
+<!-- Message a scholar from the detail window (same window as Evaluation's message icon) -->
+<script src="<?= SITE_BASE ?>/assets/js/evaluation-message.js?v=<?= time() ?>"></script>
+<!-- Excel export shared by every page (api/export_xlsx.php) -->
+<script src="<?= SITE_BASE ?>/assets/js/export-xlsx.js?v=<?= time() ?>"></script>
 <?php include __DIR__ . '/../includes/footer.php'; ?>

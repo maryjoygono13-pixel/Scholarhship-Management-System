@@ -16,7 +16,8 @@ require_once __DIR__ . '/curriculum_helper.php';
 const FAILING_GRADE_ABOVE = 3.00;
 
 /*
- * Returns [studentId => [semesterName => ['gwa' => float, 'failing' => int, 'count' => int]]],
+ * Returns [studentId => [semesterName => ['gwa' => float, 'failing' => int, 'count' => int, 'worst' => float]]],
+ * ('worst' = the lowest grade that semester, i.e. the highest number on the 1.0–5.0 scale)
  * where semesterName is one of TERM_SEMESTERS (legacy spellings are merged).
  */
 function getSemesterGradeStats(PDO $pdo, array $studentIds): array {
@@ -34,6 +35,7 @@ function getSemesterGradeStats(PDO $pdo, array $studentIds): array {
         $acc[$sid][$sem]['sum'] = ($acc[$sid][$sem]['sum'] ?? 0) + (float)$row['grade'];
         $acc[$sid][$sem]['count'] = ($acc[$sid][$sem]['count'] ?? 0) + 1;
         $acc[$sid][$sem]['failing'] = ($acc[$sid][$sem]['failing'] ?? 0) + ((float)$row['grade'] > FAILING_GRADE_ABOVE ? 1 : 0);
+        $acc[$sid][$sem]['worst'] = max($acc[$sid][$sem]['worst'] ?? 0, (float)$row['grade']);
     }
 
     $stats = [];
@@ -43,6 +45,7 @@ function getSemesterGradeStats(PDO $pdo, array $studentIds): array {
                 'gwa' => round($a['sum'] / $a['count'], 2),
                 'failing' => (int)$a['failing'],
                 'count' => (int)$a['count'],
+                'worst' => (float)$a['worst'],
             ];
         }
     }

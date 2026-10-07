@@ -301,6 +301,14 @@ function createSystemNotification(
         if ($isApplyingForType && findScholarshipTermination($pdo, $studentId, $scholarshipType)) {
             sendError(terminationBlockMessage($scholarshipType), 422);
         }
+        // A new application (or a move to another program) takes a slot: never past the limit.
+        if ($isApplyingForType) {
+            scholarshipSlotLock($pdo);   // held until this request ends
+            $slotProgram = scholarshipForType($pdo, $scholarshipType);
+            if ($slotProgram && scholarshipIsFull($pdo, $slotProgram)) {
+                sendError(scholarshipFullMessage($slotProgram['name']), 409);
+            }
+        }
         /*
         * ============================================================
         * GET COORDINATES
@@ -844,7 +852,6 @@ function createSystemNotification(
         // The student may already have imported grades (e.g. applying for a second scholarship):
         // pick their GWA up now instead of waiting for the next import.
         recalculateApplicantGwa($pdo, $studentId);
-        syncMeritScholars($pdo);   // every applicant is considered for the Merit-based scholarship
 
         $fullName =
             trim(

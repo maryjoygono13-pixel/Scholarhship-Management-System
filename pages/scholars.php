@@ -4,6 +4,7 @@ $page_css = 'scholars.css';
 include __DIR__ . '/../includes/header.php';
 require_once __DIR__ . '/../config/db_helper.php';
 require_once __DIR__ . '/../includes/term_helper.php';
+require_once __DIR__ . '/../includes/programs_helper.php';   // PROGRAM_DISPLAY_NAMES
 $activeSchoolYear = getActiveSchoolYear(getDB());
 ?>
 
@@ -36,12 +37,9 @@ $activeSchoolYear = getActiveSchoolYear(getDB());
             <!-- Department Filter -->
             <select id="filterDepartment" class="filter-select">
                 <option value="all">Departments</option>
-                <option value="Nursing">Nursing</option>
-                <option value="Information Technology">Information Technology</option>
-                <option value="Accountancy">Accountancy</option>
-                <option value="Business Administration">Business Administration</option>
-                <option value="Liberal Arts and Education">Liberal Arts and Education</option>
-                <option value="Food Preparation & Service Technology">Food Preparation & Service Technology</option>
+                <?php foreach (PROGRAM_DISPLAY_NAMES as $deptName): ?>
+                <option value="<?= htmlspecialchars($deptName) ?>"><?= htmlspecialchars($deptName) ?></option>
+                <?php endforeach; ?>
             </select>
 
             <!-- Grade Year Filter (1 to 4) -->
@@ -53,14 +51,30 @@ $activeSchoolYear = getActiveSchoolYear(getDB());
                 <option value="4">4th Year (Year 4)</option>
             </select>
 
-            <!-- Status Filter -->
-            <select id="filterStatus" class="filter-select">
-                <option value="above" selected>Meets GWA Requirement</option>
-                <option value="below">Below GWA Requirement</option>
+            <!-- Scholarship Type (filled in from the loaded scholars) + "Dean's Listers":
+                 newest graded semester GWA 1.50 or better, no subject grade of 2.00 or worse -->
+            <select id="filterScholarType" class="filter-select">
+                <option value="all">Scholarship Types</option>
             </select>
         </div>
 
-        <div style="display:flex; gap:10px; align-items:center;">
+        <div class="scholars-actions">
+            <!-- Multi-select delete (assets/js/bulk-delete.js): trash icon, shown once scholars are ticked -->
+            <span class="bulk-delete-host" id="scholarBulkDeleteHost"></span>
+            <!-- Exports the scholars shown (current filters): Student ID through School Year -->
+            <button type="button" class="btn-export-scholars" id="exportScholarsBtn" title="Export the scholars shown to Excel (CSV)">
+                <i data-lucide="download"></i>
+                Export
+            </button>
+            <!-- Looks through the Registrar's database for new Dean's Listers (assets/js/deans-scan.js) -->
+            <button type="button" class="btn-scan-registrar" id="scanRegistrarBtn" title="Find students holding a scholarship program and Dean's Listers in the Registrar's database, and add the new ones to Scholars and Records">
+                <i data-lucide="scan-search"></i>
+                Scan Registrar Now
+            </button>
+        </div>
+
+        <!-- Map and Add Scholar are hidden (kept in the page so its scripts still find them) -->
+        <div style="display:none; gap:10px; align-items:center;" hidden>
             <a href="<?= SITE_BASE ?>/scholar-map" class="btn-add-scholar" style="background: linear-gradient(135deg, #134e2a 0%, #1b6336 100%); text-decoration:none;">
                 <i data-lucide="map-pin"></i>
                 Map
@@ -72,13 +86,18 @@ $activeSchoolYear = getActiveSchoolYear(getDB());
         </div>
     </div>
 
+    <!-- Result of "Scan Registrar Now" -->
+    <div class="scan-result" id="scanResult" hidden></div>
+
     <!-- Scholars Table -->
     <div class="table-card">
         <table class="scholars-table">
             <thead>
                 <tr>
+                    <th class="select-head"><input type="checkbox" id="selectAllScholars" title="Select all on this page" aria-label="Select all scholars on this page"></th>
                     <th>Student ID</th>
                     <th>Name</th>
+                    <th>Scholarship Type</th>
                     <th>Department</th>
                     <th>Grade Year</th>
                     <th>1st Sem GWA</th>
@@ -129,12 +148,9 @@ $activeSchoolYear = getActiveSchoolYear(getDB());
                 <div style="grid-column: span 1;">
                     <label style="display:block; font-size:13px; font-weight:600; margin-bottom:6px; color:#334155;">Department *</label>
                     <select id="modalDepartment" required class="filter-select" style="width:100%;">
-                        <option value="Nursing">Nursing</option>
-                        <option value="Information Technology">Information Technology</option>
-                        <option value="Accountancy">Accountancy</option>
-                        <option value="Business Administration">Business Administration</option>
-                        <option value="Liberal Arts and Education">Liberal Arts and Education</option>
-                        <option value="Food Preparation & Service Technology">Food Preparation & Service Technology</option>
+                        <?php foreach (PROGRAM_DISPLAY_NAMES as $deptName): ?>
+                        <option value="<?= htmlspecialchars($deptName) ?>"><?= htmlspecialchars($deptName) ?></option>
+                        <?php endforeach; ?>
                     </select>
                 </div>
 
@@ -189,5 +205,17 @@ $activeSchoolYear = getActiveSchoolYear(getDB());
     </div>
 </div>
 
+<script src="<?= SITE_BASE ?>/assets/js/export-xlsx.js?v=<?= time() ?>"></script>
 <script src="<?= SITE_BASE ?>/assets/js/scholars.js?v=<?= time() ?>"></script>
+<script src="<?= SITE_BASE ?>/assets/js/deans-scan.js?v=<?= time() ?>"></script>
+<!-- Multi-select delete: trash icon + confirmation (shared with Applicants, Evaluation, Records) -->
+<script src="<?= SITE_BASE ?>/assets/js/bulk-delete.js?v=<?= time() ?>"></script>
+<script>
+    setupBulkDelete({
+        host: "#scholarBulkDeleteHost", rows: "#scholarsTableBody", selectAll: "#selectAllScholars",
+        endpoint: "delete_scholar.php", noun: ["scholar", "scholars"],
+        label: (tr) => (tr.cells[2].querySelector("strong") || tr.cells[2]).textContent.trim() + " (" + tr.cells[1].textContent.trim() + ")",
+        reload: () => (typeof loadScholarsData === "function" ? loadScholarsData() : location.reload()),
+    });
+</script>
 <?php include __DIR__ . '/../includes/footer.php'; ?>

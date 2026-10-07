@@ -8,6 +8,13 @@ try {
     $query = "SELECT * FROM notifications WHERE 1=1";
     $params = [];
 
+    // One person's messages (Evaluation's message button): everything sent to their email.
+    $emailParam = trim($_GET['email'] ?? '');
+    if ($emailParam !== '') {
+        $query .= " AND LOWER(recipient_email) = LOWER(?)";
+        $params[] = $emailParam;
+    }
+
     if ($typeParam !== '' && strtolower($typeParam) !== 'all') {
         $query .= " AND type = ?";
         $params[] = $typeParam;

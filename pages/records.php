@@ -14,7 +14,7 @@ include __DIR__ . '/../includes/header.php';
     <div class="table-header-toolbar">
         <div class="toolbar">
             <div class="search-wrap">
-                <input type="text" placeholder="Search applicant...">
+                <input type="text" placeholder="Search name, ID, department, school year...">
                 <i data-lucide="search"></i>
             </div>
 
@@ -24,12 +24,23 @@ include __DIR__ . '/../includes/header.php';
                 </select>
                 <i data-lucide="chevron-down"></i>
             </div>
+
             <div class="select-wrap">
                 <select id="filterProgram">
-                    <option value="all">Programs</option>
-                    <?php foreach (PROGRAM_ACRONYMS as $programAcronym): ?>
-                    <option value="<?= $programAcronym ?>"><?= $programAcronym ?></option>
+                    <option value="all">Departments</option>
+                    <?php foreach (PROGRAM_DISPLAY_NAMES as $programCanonical => $departmentName): ?>
+                    <option value="<?= htmlspecialchars(PROGRAM_ACRONYMS[$programCanonical]) ?>"><?= htmlspecialchars($departmentName) ?></option>
                     <?php endforeach; ?>
+                </select>
+                <i data-lucide="chevron-down"></i>
+            </div>
+            <div class="select-wrap">
+                <select id="filterYearLevel">
+                    <option value="all">Year Levels</option>
+                    <option value="1st Year">1st Year</option>
+                    <option value="2nd Year">2nd Year</option>
+                    <option value="3rd Year">3rd Year</option>
+                    <option value="4th Year">4th Year</option>
                 </select>
                 <i data-lucide="chevron-down"></i>
             </div>
@@ -39,6 +50,9 @@ include __DIR__ . '/../includes/header.php';
                     <option value="pending">Pending</option>
                     <option value="approved">Approved</option>
                     <option value="rejected">Rejected</option>
+                    <!-- Decisions made in Renewal & Retention -->
+                    <option value="renewed">Renewed</option>
+                    <option value="terminated">Terminated</option>
                 </select>
                 <i data-lucide="chevron-down"></i>
             </div>
@@ -59,6 +73,8 @@ include __DIR__ . '/../includes/header.php';
             </div>
         </div>
         <div class="toolbar-actions">
+            <!-- Multi-select delete (assets/js/bulk-delete.js): trash icon, shown once records are ticked -->
+            <span class="bulk-delete-host" id="recBulkDeleteHost"></span>
             <button class="btn-primary btn-export" id="exportRecordsBtn">
                 <i data-lucide="download"></i>
                 Export
@@ -71,9 +87,10 @@ include __DIR__ . '/../includes/header.php';
             <table class="records-table">
                 <thead>
                     <tr>
+                        <th class="select-head"><input type="checkbox" id="selectAllRecords" title="Select all on this page" aria-label="Select all records on this page"></th>
                         <th>Student ID</th>
                         <th>Name</th>
-                        <th>Age</th>
+                        <th>Department</th>
                         <th>Scholarship Type</th>
                         <th>Status</th>
                         <th>Semester</th>
@@ -183,4 +200,16 @@ include __DIR__ . '/../includes/header.php';
     </div>
 </div>
 
+<!-- Multi-select delete: trash icon + confirmation (shared with Applicants, Evaluation, Scholars) -->
+<script src="<?= SITE_BASE ?>/assets/js/bulk-delete.js?v=<?= time() ?>"></script>
+<script>
+    setupBulkDelete({
+        host: "#recBulkDeleteHost", rows: "#tableBody", selectAll: "#selectAllRecords",
+        endpoint: "delete_record.php", noun: ["record", "records"],
+        label: (tr) => tr.cells[2].textContent.trim() + " (" + tr.cells[1].textContent.trim() + ")",
+        reload: () => (window.reloadRecords ? window.reloadRecords() : location.reload()),
+    });
+</script>
+<!-- Excel export shared by every page (api/export_xlsx.php) -->
+<script src="<?= SITE_BASE ?>/assets/js/export-xlsx.js?v=<?= time() ?>"></script>
 <?php include __DIR__ . '/../includes/footer.php'; ?>

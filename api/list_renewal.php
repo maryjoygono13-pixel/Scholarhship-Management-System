@@ -1,5 +1,7 @@
 <?php
 require_once __DIR__ . '/init.php';
+require_once __DIR__ . '/../includes/recipients.php';
+require_once __DIR__ . '/../includes/renewal_enrollment_helper.php';
 
 try {
     $pdo = getDB();
@@ -43,6 +45,9 @@ try {
 
         // Renew/Terminate are always clickable and always succeed regardless of GWA status
         // (missing grades, or GWA above/below the requirement) — staff decide manually now.
+        if ($action === 'renew' && renewalRegistrarNotEnrolled($pdo, $cand)) {
+            sendError('Cannot renew: the Registrar\'s database shows this scholar is not enrolled for ' . getActiveSemester($pdo) . ' ' . getActiveSchoolYear($pdo) . ' (' . $cand['enrollment_status'] . '). Terminate the scholarship instead.', 422);
+        }
         if ($action === 'renew' && $origin === 'rejected') {
             sendError('Cannot renew: this applicant was rejected in Evaluation.', 422);
         }
@@ -75,9 +80,8 @@ try {
                     : 'Terminated') . ' (' . normalizeSemesterName($cand['semester']) . ' ' . $cand['school_year'] . ').');
         }
 
-        // The Record follows the decision: renewed = approved, terminated = rejected. Matched
-        // using $cand's ORIGINAL semester/school_year (captured before the update above) — that
-        // is the term the underlying Record itself was actually filed under.
+        // The decision becomes the record for this term (renewed = approved, terminated = rejected);
+        // the original term's record stays as it was, so Records keeps the history.
         $recordStatus = syncRecordWithRenewal($pdo, $cand, $action);
 
         if ($action === 'renew') {
@@ -100,6 +104,10 @@ try {
     $semFilter = trim($_GET['sem'] ?? '');
     $typeFilter = trim($_GET['type'] ?? '');
     $search = trim($_GET['search'] ?? '');
+
+    // Entries not yet checked for the active term are checked against the Registrar's database now
+    // (a term change checks them all — see changeActiveTerm()).
+    syncRenewalEnrollment($pdo, true);
 
     $query = "SELECT * FROM renewal_retention WHERE 1=1";
     $params = [];
@@ -142,15 +150,11 @@ try {
     // school year, semester and scholarship type — the same key sendRecordToRenewal() uses),
     // so a Records edit (name, etc.) is reflected immediately and a deleted Record's shadow
     // row disappears from view instead of lingering as an orphan.
-    $recordByKey = [];
-    foreach ($pdo->query("SELECT student_id, sy, semester, scholarship_type, name FROM records ORDER BY id ASC")->fetchAll(PDO::FETCH_ASSOC) as $rec) {
-        $key = trim((string)$rec['student_id']) . '|' . trim((string)$rec['sy']) . '|' . normalizeSemesterName($rec['semester']) . '|' . strtolower(trim((string)$rec['scholarship_type']));
-        $recordByKey[$key] = $rec; // later (higher id) rows win on a duplicate key
-    }
+    $recordByKey = renewalRecordIndex($pdo); // shared with the Dashboard (includes/renewal_helper.php)
 
     $data = [];
     foreach ($rows as $r) {
-        $recordKey = trim((string)$r['student_id']) . '|' . trim((string)$r['school_year']) . '|' . normalizeSemesterName($r['semester']) . '|' . strtolower(trim((string)$r['scholarship_type']));
+        $recordKey = renewalRecordKey((string)$r['student_id'], (string)$r['school_year'], (string)$r['semester'], (string)$r['scholarship_type']);
         $matchedRecord = $recordByKey[$recordKey] ?? null;
         if ($matchedRecord === null) {
             continue; // No Record behind this entry (deleted, or old data) — don't show it.
@@ -193,10 +197,9 @@ try {
         $r['gwa'] = $live['gwa'];
         $r['failing_grades'] = $live['failing'];
 
-        $statusVal = strtolower(trim((string)$r['status']));
         // A decided entry that's now open for reassessment reads as "Pending" again for the
         // new cycle — last year's real decision stays on file, only the display resets.
-        $displayStatus = (in_array($statusVal, ['eligible', 'terminated'], true) && $decidable) ? 'pending' : $r['status'];
+        $displayStatus = renewalDisplayStatus($pdo, $r);
 
         $data[] = [
             'gwaRequirement' => $required,
@@ -213,12 +216,17 @@ try {
             'id' => (int)$r['id'],
             'studentId' => $r['student_id'],
             'student_id' => $r['student_id'],
+            'email' => resolveEmailForStudent($pdo, (string)$r['student_id']),
             // The Record's own current name — never the stale copy taken when this row was made.
             'name' => $matchedRecord['name'],
             'gwa' => (float)$r['gwa'],
             'failingGrades' => (int)$r['failing_grades'],
             'failing_grades' => (int)$r['failing_grades'],
             'enrolled' => (bool)$r['enrolled'],
+            // What the Registrar's database says for the active term (null = not checked yet).
+            'enrollmentStatus' => ($r['enrollment_term'] ?? '') === $activeSem . ' ' . $activeSy ? ($r['enrollment_status'] ?: null) : null,
+            'enrollmentTerm' => $activeSem . ' ' . $activeSy,
+            'registrarNotEnrolled' => renewalRegistrarNotEnrolled($pdo, $r),
             'status' => $displayStatus,
             'schoolYear' => $r['school_year'],
             'school_year' => $r['school_year'],
@@ -231,7 +239,8 @@ try {
             'origin' => $originVal,
             'locked' => $locked,
             // Both buttons are enabled regardless of GWA status — staff decide manually now.
-            'canRenew' => $decidable && $originVal !== 'rejected',
+            // ...except Renew for a scholar the Registrar says isn't enrolled this term (dropped / didn't enroll).
+            'canRenew' => $decidable && $originVal !== 'rejected' && !renewalRegistrarNotEnrolled($pdo, $r),
             'canTerminate' => $decidable,
         ];
     }

@@ -1,5 +1,6 @@
     <?php
     require_once __DIR__ . '/init.php';
+    require_once __DIR__ . '/../includes/xlsx_helper.php';
 
     /*
     * Parses a single "packed" grades cell so one row can carry a whole
@@ -52,8 +53,26 @@
         $createdGradeIds = [];
         $nameMismatches = [];
         $invalidPrograms = [];   // rows skipped because their Program isn't one the school offers
+        $fullPrograms = [];      // rows skipped because their scholarship program has no slot left
 
-        if ($ext === 'csv' && ($handle = fopen($fileTmp, "r")) !== FALSE) {
+        // .xlsx is read with includes/xlsx_helper.php and fed through the same CSV logic below.
+        $parsePath = $fileTmp;
+        $tmpCsv = null;
+        if ($ext === 'xlsx') {
+            try {
+                $xlsxRows = readXlsxRows($fileTmp);
+            } catch (Throwable $e) {
+                sendError('The Excel file could not be read: ' . $e->getMessage());
+            }
+            $tmpCsv = tempnam(sys_get_temp_dir(), 'xlsx');
+            $out = fopen($tmpCsv, 'w');
+            foreach ($xlsxRows as $xr) fputcsv($out, $xr);
+            fclose($out);
+            $parsePath = $tmpCsv;
+        }
+        $isReadable = in_array($ext, ['csv', 'xlsx'], true);
+
+        if ($isReadable && ($handle = fopen($parsePath, "r")) !== FALSE) {
             $header = fgetcsv($handle, 2000, ",");
 
             if ($header === false) {
@@ -292,6 +311,13 @@
                             // "CMSP (CHED Merit Scholarship Program)" or the full name alone is stored as "CMSP".
                             $scholarshipTypeVal = normalizeScholarshipType($pdo, $scholarshipTypeVal);
 
+                            // A new applicant takes a slot: a full program gets no more.
+                            $slotProgram = scholarshipForType($pdo, $scholarshipTypeVal);
+                            if ($slotProgram && scholarshipIsFull($pdo, $slotProgram)) {
+                                $fullPrograms[$slotProgram['name']] = ($fullPrograms[$slotProgram['name']] ?? 0) + 1;
+                                continue;
+                            }
+
                             $insertStmt = $pdo->prepare("
                                 INSERT INTO applicants
                                     (student_id, first_name, last_name, gender, age, birthdate, email, phone, school, address,
@@ -430,11 +456,9 @@
                 recalculateApplicantGwa($pdo, (string)$sid);
             }
         } else {
-            $processed = rand(15, 45); // Simulated row count — no Excel parser is available on this server
+            $processed = 0; // old binary .xls files can't be read — only .csv and .xlsx
         }
 
-        // New grades / new applicants may make students qualify for the Merit-based scholarship.
-        syncMeritScholars($pdo);
 
         $fileSize = $_FILES['file']['size'] ?? 0;
         $recordsProcessed = max(1, $processed);
@@ -456,7 +480,7 @@
         $stmt = $pdo->prepare("INSERT INTO imported_files (file_type, file_name, file_size, records_count, imported_by, status, stored_path, created_applicant_ids, created_grade_ids, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)");
         $stmt->execute([$type, $fileName, $fileSize, $recordsProcessed, $_SESSION['user_identifier'] ?? 'Registrar Staff', 'Active', $storedPath, $createdIdsJson, $createdGradeIdsJson]);
 
-        if ($type === 'enrollment' && $ext === 'csv') {
+        if ($type === 'enrollment' && $isReadable) {
             $message = "Imported $fileName: updated $matchedCount existing applicant(s)";
             if ($createdCount > 0) {
                 $message .= " and added $createdCount new applicant(s) to Evaluation";
@@ -469,20 +493,23 @@
             if (!empty($invalidPrograms)) {
                 $message .= " SKIPPED " . count($invalidPrograms) . " row(s) because the program doesn't exist (" . implode('; ', array_slice($invalidPrograms, 0, 6)) . "). Valid programs: " . implode(', ', array_keys(KNOWN_PROGRAMS)) . ".";
             }
+            if (!empty($fullPrograms)) {
+                $message .= " SKIPPED " . array_sum($fullPrograms) . " new applicant(s) because their scholarship program is full (" . implode('; ', array_map(fn($n, $c) => "$n: $c", array_keys($fullPrograms), $fullPrograms)) . ").";
+            }
             if (!empty($nameMismatches)) {
                 $preview = array_slice($nameMismatches, 0, 5);
                 $message .= " WARNING: " . count($nameMismatches) . " Student ID(s) were updated even though the imported name didn't match the name on file — please review: " . implode('; ', $preview) . ".";
             }
         } elseif ($type === 'enrollment') {
-            $message = "$fileName was logged, but automatic enrollment matching only supports CSV files — Excel files are not parsed.";
-        } elseif ($type === 'grades' && $ext === 'csv') {
+            $message = "$fileName was logged, but old .xls files can't be read. Please save it as .xlsx or .csv and import again.";
+        } elseif ($type === 'grades' && $isReadable) {
             $message = "Imported $fileName: recorded $matchedCount grade(s) for " . count($affectedGradeStudentIds) . " student(s) out of $recordsProcessed row(s).";
             if (!empty($unmatchedIds)) {
                 $preview = array_slice($unmatchedIds, 0, 5);
                 $message .= " " . count($unmatchedIds) . " row(s) were skipped (no matching applicant, missing subject code, or an invalid grade) — e.g. " . implode(', ', $preview) . ".";
             }
         } elseif ($type === 'grades') {
-            $message = "$fileName was logged, but automatic grade matching only supports CSV files — Excel files are not parsed.";
+            $message = "$fileName was logged, but old .xls files can't be read. Please save it as .xlsx or .csv and import again.";
         } else {
             $message = "Successfully imported $type records from $fileName ($recordsProcessed records processed).";
         }

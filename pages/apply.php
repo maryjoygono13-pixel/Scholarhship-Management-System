@@ -6,6 +6,7 @@ require_once __DIR__ . '/../includes/programs_helper.php';
 require_once __DIR__ . '/../includes/scholarship_type_helper.php';
 require_once __DIR__ . '/../includes/scholarship_criteria_helper.php';
 require_once __DIR__ . '/../includes/special_qualification_helper.php';
+require_once __DIR__ . '/../includes/apply_guard_helper.php';
 
 $pdo = getDB();
 $studentId = trim($_GET['student_id'] ?? '');
@@ -16,26 +17,38 @@ $step = $studentId !== '' ? 2 : 1;
 // stored decrement counter, so a program never shows "Limit Reached" from stale drift when
 // no one has actually applied for it.
 $programs = $pdo->query("
-    SELECT id, name, type, subtype, slots, slots_available, unlimited_slots
+    SELECT id, name, code, type, subtype, slots, slots_available, unlimited_slots
     FROM scholarships
     WHERE LOWER(status) = 'active'
     ORDER BY type, name
 ")->fetchAll(PDO::FETCH_ASSOC);
 foreach ($programs as &$p) {
     $p['slots_available'] = scholarshipSlotsAvailable($pdo, $p);
+    $p['is_full'] = !$p['unlimited_slots'] && (int)$p['slots'] > 0 && (int)$p['slots_available'] <= 0;
 }
 unset($p);
 
+// Step 1 lists one option per scholarship TYPE: a type with a single program is that program;
+// a type with several (e.g. NEED-BASED) is one option with a dropdown to pick the program.
+$programGroups = [];
+foreach ($programs as $p) {
+    $key = strtolower(trim($p['type']));
+    $programGroups[$key] ??= ['type' => $p['type'], 'programs' => []];
+    $programGroups[$key]['programs'][] = $p;
+}
+$programGroups = array_values($programGroups);
+
 // Each program's own required documents (registrar-configured on the Scholarships page),
 // keyed by program name — Step 6 swaps its file fields to match whichever program the
-// applicant picked in Step 5, instead of the same fixed 3 fields for every program.
+// applicant picked in Step 1, instead of the same fixed 3 fields for every program.
 $programDocuments = [];
 foreach ($programs as $p) {
-    $docs = getScholarshipDocuments($pdo, (int)$p['id']);
+    $docs = getApplicationDocuments($pdo, (int)$p['id']); // includes the universal COE
     $programDocuments[$p['name']] = array_map(fn($d) => [
         'type' => $d['document_type'],
         'label' => DOCUMENT_TYPES[$d['document_type']] ?? $d['document_type'],
         'required' => (bool)$d['required'],
+        'hint' => trim((string)($d['description'] ?? '')),
     ], $docs);
 }
 
@@ -48,6 +61,14 @@ foreach ($programs as $p) {
 
 // Talent / Community Service / Other Discounts programs ask one extra question (label +
 // options), keyed by program name. Programs of any other type are simply left out.
+// Programs applied for on an outside site (e.g. CHED's CMSP / COSCHO -> CHED StuFAPs), keyed
+// by program name. Picking one and clicking Next sends the applicant there (apply.js).
+$programExternalUrl = [];
+foreach ($programs as $p) {
+    $url = externalApplicationUrl($p);
+    if ($url !== null) $programExternalUrl[$p['name']] = $url;
+}
+
 $programQualification = [];
 foreach ($programs as $p) {
     $cfg = specialQualificationConfig((string)$p['type']);
@@ -116,8 +137,84 @@ foreach ($programs as $p) {
 
         <form id="apApplyForm" enctype="multipart/form-data">
             <input type="hidden" name="studentId" value="<?= htmlspecialchars($studentId) ?>">
+            <!-- Safeguards (includes/apply_guard_helper.php): a signed token tying this form to the
+                 Student ID and the time it was opened, and a hidden field only bots fill in. -->
+            <input type="hidden" name="formToken" value="<?= htmlspecialchars(applyFormToken($studentId)) ?>">
+            <div class="ap-hp" aria-hidden="true">
+                <label for="apWebsite">Website</label>
+                <input type="text" id="apWebsite" name="<?= APPLY_HONEYPOT_FIELD ?>" tabindex="-1" autocomplete="off">
+            </div>
 
             <div class="ap-step active" data-step="1">
+                <div class="ap-section">
+                    <h3>Scholarship Program</h3>
+                    <p class="ap-note">Slots are first come, first served — a program marked "Limit Reached" is no longer accepting applicants.</p>
+                    <div class="ap-programs" id="apPrograms">
+                        <?php if (empty($programs)): ?>
+                            <p class="ap-empty">No scholarship programs are currently open.</p>
+                        <?php endif; ?>
+                        <?php foreach ($programGroups as $gi => $group): ?>
+                            <?php if (count($group['programs']) === 1): $p = $group['programs'][0]; $full = $p['is_full']; ?>
+                                <label class="ap-program-option <?= $full ? 'ap-program-full' : '' ?>">
+                                    <input type="radio" name="scholarship" value="<?= htmlspecialchars($p['name']) ?>" required <?= $full ? 'disabled' : '' ?>>
+                                    <div class="ap-program-info">
+                                        <span class="ap-program-name"><?= htmlspecialchars($p['name']) ?></span>
+                                        <span class="ap-program-meta"><?= htmlspecialchars($p['type']) ?></span>
+                                    </div>
+                                    <?php if ($full): ?>
+                                        <span class="ap-program-badge ap-badge-full">Limit Reached</span>
+                                    <?php elseif ($p['unlimited_slots']): ?>
+                                        <span class="ap-program-badge ap-badge-open">Open</span>
+                                    <?php else: ?>
+                                        <span class="ap-program-badge ap-badge-open"><?= (int)$p['slots_available'] ?> slot<?= (int)$p['slots_available'] === 1 ? '' : 's' ?> left</span>
+                                    <?php endif; ?>
+                                </label>
+                            <?php else: $allFull = !array_filter($group['programs'], fn($p) => !$p['is_full']); ?>
+                                <?php /* Several programs under one type: one option, then pick the program.
+                                         The radio's value becomes the chosen program's name (apply.js), so
+                                         the submitted `scholarship` is still a specific program. */ ?>
+                                <label class="ap-program-option <?= $allFull ? 'ap-program-full' : '' ?>">
+                                    <input type="radio" name="scholarship" value="" data-group="<?= $gi ?>" required <?= $allFull ? 'disabled' : '' ?>>
+                                    <div class="ap-program-info">
+                                        <span class="ap-program-name"><?= htmlspecialchars($group['type']) ?></span>
+                                        <span class="ap-program-meta"><?= count($group['programs']) ?> programs — choose yours after selecting</span>
+                                    </div>
+                                    <span class="ap-program-badge <?= $allFull ? 'ap-badge-full' : 'ap-badge-open' ?>"><?= $allFull ? 'Limit Reached' : 'Open' ?></span>
+                                </label>
+                                <div class="ap-field ap-group-field" data-group-field="<?= $gi ?>" hidden>
+                                    <label for="apGroupSelect<?= $gi ?>"><?= htmlspecialchars($group['type']) ?> Program *</label>
+                                    <select id="apGroupSelect<?= $gi ?>" class="ap-group-select" data-group="<?= $gi ?>" disabled>
+                                        <option value="">Select</option>
+                                        <?php foreach ($group['programs'] as $p): ?>
+                                            <option value="<?= htmlspecialchars($p['name']) ?>" <?= $p['is_full'] ? 'disabled' : '' ?>>
+                                                <?= htmlspecialchars($p['name']) ?><?= $p['is_full'] ? ' — Limit Reached' : ($p['unlimited_slots'] ? '' : ' — ' . (int)$p['slots_available'] . ' slot' . ((int)$p['slots_available'] === 1 ? '' : 's') . ' left') ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                            <?php endif; ?>
+                        <?php endforeach; ?>
+                    </div>
+                    <div class="ap-field" id="apQualField" hidden>
+                        <label for="apQualSelect" id="apQualLabel">Special Field / Area of Involvement *</label>
+                        <select id="apQualSelect" name="specialQualification" disabled></select>
+                    </div>
+                    <div class="ap-field" id="apQualOtherField" hidden>
+                        <label for="apQualOther">Please specify *</label>
+                        <input type="text" id="apQualOther" name="specialQualificationOther" maxlength="255" title="Please describe it — this cannot be blank." disabled>
+                    </div>
+                    <div class="ap-field ap-income-field" id="apIncomeField" hidden>
+                        <label for="apFamilyIncome">Total Monthly Family Income (₱) *</label>
+                        <input type="number" id="apFamilyIncome" name="familyIncome" min="0" step="0.01" inputmode="decimal" placeholder="e.g. 12000" disabled>
+                    </div>
+                </div>
+                <div class="ap-step-nav">
+                    <span></span>
+                    <button type="button" class="ap-btn-primary ap-btn-next">Next</button>
+                </div>
+            </div>
+
+            <div class="ap-step" data-step="2">
                 <div class="ap-section">
                     <h3>Personal Details</h3>
                     <div class="ap-grid">
@@ -139,12 +236,12 @@ foreach ($programs as $p) {
                     </div>
                 </div>
                 <div class="ap-step-nav">
-                    <span></span>
+                    <button type="button" class="ap-btn-secondary ap-btn-back">Back</button>
                     <button type="button" class="ap-btn-primary ap-btn-next">Next</button>
                 </div>
             </div>
 
-            <div class="ap-step" data-step="2">
+            <div class="ap-step" data-step="3">
                 <div class="ap-section">
                     <h3>Address</h3>
                     <div class="ap-grid">
@@ -171,7 +268,7 @@ foreach ($programs as $p) {
                 </div>
             </div>
 
-            <div class="ap-step" data-step="3">
+            <div class="ap-step" data-step="4">
                 <div class="ap-section">
                     <h3>Parents' Information</h3>
                     <div class="ap-grid">
@@ -187,7 +284,7 @@ foreach ($programs as $p) {
                 </div>
             </div>
 
-            <div class="ap-step" data-step="4">
+            <div class="ap-step" data-step="5">
                 <div class="ap-section">
                     <h3>Academic Information</h3>
                     <div class="ap-grid">
@@ -195,8 +292,8 @@ foreach ($programs as $p) {
                             <label>Department *</label>
                             <select name="department" required>
                                 <option value="">Select department</option>
-                                <?php foreach (array_keys(KNOWN_PROGRAMS) as $prog): ?>
-                                    <option value="<?= htmlspecialchars($prog) ?>"><?= htmlspecialchars($prog) ?></option>
+                                <?php foreach (PROGRAM_DISPLAY_NAMES as $prog => $progName): ?>
+                                    <option value="<?= htmlspecialchars($prog) ?>"><?= htmlspecialchars($progName) ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
@@ -217,58 +314,12 @@ foreach ($programs as $p) {
                 </div>
             </div>
 
-            <div class="ap-step" data-step="5">
-                <div class="ap-section">
-                    <h3>Scholarship Program</h3>
-                    <p class="ap-note">Slots are first come, first served — a program marked "Limit Reached" is no longer accepting applicants.</p>
-                    <div class="ap-programs" id="apPrograms">
-                        <?php if (empty($programs)): ?>
-                            <p class="ap-empty">No scholarship programs are currently open.</p>
-                        <?php endif; ?>
-                        <?php foreach ($programs as $p): $full = !$p['unlimited_slots'] && (int)$p['slots'] > 0 && (int)$p['slots_available'] <= 0; ?>
-                            <label class="ap-program-option <?= $full ? 'ap-program-full' : '' ?>">
-                                <input type="radio" name="scholarship" value="<?= htmlspecialchars($p['name']) ?>" required <?= $full ? 'disabled' : '' ?>>
-                                <div class="ap-program-info">
-                                    <span class="ap-program-name"><?= htmlspecialchars($p['name']) ?></span>
-                                    <span class="ap-program-meta"><?= htmlspecialchars($p['type']) ?></span>
-                                </div>
-                                <?php if ($full): ?>
-                                    <span class="ap-program-badge ap-badge-full">Limit Reached</span>
-                                <?php elseif ($p['unlimited_slots']): ?>
-                                    <span class="ap-program-badge ap-badge-open">Open</span>
-                                <?php else: ?>
-                                    <span class="ap-program-badge ap-badge-open"><?= (int)$p['slots_available'] ?> slot<?= (int)$p['slots_available'] === 1 ? '' : 's' ?> left</span>
-                                <?php endif; ?>
-                            </label>
-                        <?php endforeach; ?>
-                    </div>
-                    <div class="ap-field" id="apQualField" hidden>
-                        <label for="apQualSelect" id="apQualLabel">Special Field / Area of Involvement *</label>
-                        <select id="apQualSelect" name="specialQualification" disabled></select>
-                        <span class="ap-note">Upload proof of this in the Required Documents step — the Scholarship Office verifies it.</span>
-                    </div>
-                    <div class="ap-field" id="apQualOtherField" hidden>
-                        <label for="apQualOther">Please specify *</label>
-                        <input type="text" id="apQualOther" name="specialQualificationOther" maxlength="255" title="Please describe it — this cannot be blank." disabled>
-                    </div>
-                    <div class="ap-field ap-income-field" id="apIncomeField" hidden>
-                        <label for="apFamilyIncome">Total Monthly Family Income (₱) *</label>
-                        <input type="number" id="apFamilyIncome" name="familyIncome" min="0" step="0.01" inputmode="decimal" placeholder="e.g. 12000" disabled>
-                        <span class="ap-note">Combined monthly income of everyone in your household. This program considers family income as part of eligibility.</span>
-                    </div>
-                </div>
-                <div class="ap-step-nav">
-                    <button type="button" class="ap-btn-secondary ap-btn-back">Back</button>
-                    <button type="button" class="ap-btn-primary ap-btn-next">Next</button>
-                </div>
-            </div>
-
             <div class="ap-step" data-step="6">
                 <div class="ap-section">
                     <h3>Required Documents</h3>
                     <p class="ap-note">PNG images only. Documents required depend on the scholarship program you selected.</p>
                     <div class="ap-grid" id="apDocumentsGrid">
-                        <!-- Filled in by apply.js based on the Step 5 selection -->
+                        <!-- Filled in by apply.js based on the Step 1 selection -->
                     </div>
                 </div>
                 <div class="ap-step-nav">
@@ -283,9 +334,12 @@ foreach ($programs as $p) {
 </div>
 
 <script>
+window.APPLY_MAX_FILE_BYTES = <?= APPLY_MAX_FILE_BYTES ?>;
+window.APPLY_MAX_TOTAL_BYTES = <?= APPLY_MAX_TOTAL_BYTES ?>;
 window.SCHOLARSHIP_DOCUMENTS = <?= json_encode($programDocuments) ?>;
 window.SCHOLARSHIP_NEEDS_INCOME = <?= json_encode($programNeedsIncome) ?>;
 window.SCHOLARSHIP_QUALIFICATION = <?= json_encode($programQualification, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>;
+window.SCHOLARSHIP_EXTERNAL_URL = <?= json_encode($programExternalUrl, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_SLASHES) ?>;
 </script>
 <?php endif; ?>
 

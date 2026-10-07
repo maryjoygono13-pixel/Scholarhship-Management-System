@@ -16,6 +16,19 @@ const KNOWN_PROGRAMS = [
     'BA Political Science' => ['bapolsci', 'political science', 'bachelor of arts in political science', 'ab political science'],
     'Bachelor of Elementary Education' => ['beed', 'elementary education', 'bs elementary education'],
     'Bachelor of Secondary Education' => ['bsed', 'secondary education', 'bs secondary education'],
+    'BIT Food Preparation and Services Technology' => ['bit fpst', 'bit-fpst', 'fpst', 'food preparation and services technology', 'bachelor in industrial technology major in food preparation and services technology', 'food service'],
+];
+
+// How each program is named in the Departments dropdowns, in the order they're listed.
+const PROGRAM_DISPLAY_NAMES = [
+    'BS Nursing' => 'BS Nursing',
+    'BS Information Technology' => 'BS Information Technology',
+    'BS Accountancy' => 'BS Accountancy',
+    'BS Business Administration' => 'BS Business Administration',
+    'BA Political Science' => 'BA PolSci',
+    'Bachelor of Elementary Education' => 'B Elementary Education',
+    'Bachelor of Secondary Education' => 'B Secondary Education',
+    'BIT Food Preparation and Services Technology' => 'BIT Food Preparation and Services Technology',
 ];
 
 // How each program is written as an acronym (the Program filters on Records and Renewal & Retention).
@@ -27,6 +40,7 @@ const PROGRAM_ACRONYMS = [
     'BA Political Science' => 'BAPolSci',
     'Bachelor of Elementary Education' => 'BEEd',
     'Bachelor of Secondary Education' => 'BSEd',
+    'BIT Food Preparation and Services Technology' => 'BIT-FPST',
 ];
 
 // "BS Nursing · 2nd Year", "Bachelor of Science in Nursing (BSN)", "  bs   nursing " -> comparable form

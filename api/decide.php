@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/init.php';
+require_once __DIR__ . '/../includes/records_helper.php';
 
 try {
     $id = (int)($_POST['id'] ?? 0);
@@ -31,23 +32,22 @@ try {
     $app = $stmtApp->fetch();
 
     if ($app && in_array($decision, ['approved', 'rejected'])) {
-        $stmtRec = $pdo->prepare("INSERT INTO records (applicant_id, student_id, name, scholarship_type, status, semester, sy, date_evaluated, remarks) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, CURDATE(), ?)");
-        $stmtRec->execute([
-            $app['id'],
-            $app['student_id'],
-            trim($app['first_name'] . ' ' . $app['last_name']),
-            $app['scholarship_type'],
-            $decision,   // the record carries the same status as the decision
-            normalizeSemesterName($app['semester'] ?? getActiveSemester($pdo)),
-            trim((string)($app['school_year'] ?? '')) !== '' ? trim($app['school_year']) : getActiveSchoolYear($pdo),
-            $remarks ?: ($decision === 'approved' ? 'Approved by committee' : 'Rejected by committee')
-        ]);
+        // One record per student / scholarship / school year / semester: deciding again in the same
+        // term updates that record instead of adding another (includes/records_helper.php).
+        $saved = saveTermRecord($pdo, [
+            'applicant_id' => $app['id'],
+            'student_id' => $app['student_id'],
+            'name' => trim($app['first_name'] . ' ' . $app['last_name']),
+            'scholarship_type' => $app['scholarship_type'],
+            'status' => $decision,   // the record carries the same status as the decision
+            'semester' => normalizeSemesterName($app['semester'] ?? getActiveSemester($pdo)),
+            'sy' => trim((string)($app['school_year'] ?? '')) !== '' ? trim($app['school_year']) : getActiveSchoolYear($pdo),
+            'remarks' => $remarks ?: ($decision === 'approved' ? 'Approved by committee' : 'Rejected by committee'),
+            'origin' => 'evaluation',
+        ], true);
 
         // Approved and rejected alike go to Renewal & Retention as pending (locked until the next semester).
-        $newRecord = $pdo->prepare("SELECT * FROM records WHERE id = ?");
-        $newRecord->execute([(int)$pdo->lastInsertId()]);
-        $recordRow = $newRecord->fetch(PDO::FETCH_ASSOC);
+        $recordRow = $saved['created'] ? $saved['record'] : null;
         if ($recordRow) {
             sendRecordToRenewal($pdo, $recordRow, 'pending', null, $decision);
         }

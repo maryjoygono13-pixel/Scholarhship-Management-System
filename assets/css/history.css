@@ -2,9 +2,11 @@
    HISTORY / AUDIT TRAIL PAGE
 ========================================================= */
 
+/* Same size as the Scholars page (.scholars-container in scholars.css). */
 .page {
-    max-width: 1100px;
-    margin: 0 auto;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 24px;
 }
 
 /* =========================================================
@@ -19,7 +21,7 @@
 }
 
 .history-stat-card {
-    background: #fff;
+    background: #fafbf9;
     border: 1px solid var(--slate-200, #e2e8f0);
     border-radius: 14px;
     padding: 18px 20px;
@@ -41,9 +43,9 @@
 
 .history-stat-icon svg { width: 20px; height: 20px; }
 
-.history-stat-icon.total { background: #e8f5e9; color: var(--green-900, #134e2a); }
+.history-stat-icon.total { background: #e1eae2; color: var(--green-900, #134e2a); }
 .history-stat-icon.today { background: #dbeafe; color: #2563eb; }
-.history-stat-icon.user { background: #fef3c7; color: #b45309; }
+.history-stat-icon.user { background: #f3e8c9; color: #b45309; }
 
 .history-stat-label {
     display: block;
@@ -82,7 +84,7 @@
     font-size: 13.5px;
     color: #374151;
     outline: none;
-    background: #fff;
+    background: #fafbf9;
 }
 
 /* =========================================================
@@ -153,7 +155,7 @@
 .action-approved { background: #dcfce7; color: #15803d; }
 .action-rejected { background: #ffe4e6; color: #be123c; }
 .action-auth { background: #ede9fe; color: #6d28d9; }
-.action-status { background: #fef3c7; color: #b45309; }
+.action-status { background: #f3e8c9; color: #b45309; }
 .action-default { background: #f3f4f6; color: #374151; }
 
 /* =========================================================
@@ -189,7 +191,7 @@
     min-width: 32px;
     padding: 0 10px;
     border: 1.5px solid #9ca3af;
-    background: #fff;
+    background: #fafbf9;
     border-radius: 8px;
     cursor: pointer;
     font-size: 13px;
@@ -282,3 +284,63 @@
     height: 16px;
     flex-shrink: 0;
 }
+
+/* Delete history entries (checkboxes, row trash icon, bulk button) */
+.history-table .history-select-cell { width: 34px; text-align: center; padding-left: 14px; padding-right: 4px; }
+.history-table .history-select-cell input { width: 16px; height: 16px; accent-color: #134e2a; cursor: pointer; }
+.history-table .history-actions-cell { width: 52px; text-align: right; }
+.history-table tbody tr.is-selected { background: #edf2ed; }
+.history-bulk-delete { display: inline-flex; align-items: center; gap: 8px; }
+.history-bulk-delete[hidden] { display: none !important; }
+
+/* One-row toolbar: search, date and the two dropdowns share the width; Clear Filters and
+   Delete Browsing Data keep their size and stay on the same row. */
+.table-header-toolbar .toolbar { flex-wrap: nowrap; gap: 10px; }
+.table-header-toolbar .toolbar .search-wrap { flex: 1 1 200px; min-width: 150px; }
+.table-header-toolbar .toolbar .search-wrap input { width: 100%; }
+.table-header-toolbar .toolbar .history-date-input { flex: 0 0 150px; width: 150px; }
+.table-header-toolbar .toolbar .select-wrap { flex: 1 1 140px; min-width: 120px; }
+.table-header-toolbar .toolbar .select-wrap select { width: 100%; }
+.table-header-toolbar .toolbar .header-actions { flex: 0 0 auto; gap: 10px; }
+
+/* Delete Browsing Data: same height and alignment as Clear Filters, normal-size icon. */
+.table-header-toolbar .toolbar .header-actions .btn-danger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    height: 40px;
+    padding: 0 16px;
+    box-sizing: border-box;
+    margin: 0;
+    white-space: nowrap;
+    line-height: 1;
+    font-size: 14px;
+}
+.table-header-toolbar .toolbar .header-actions .btn-danger svg,
+.table-header-toolbar .toolbar .header-actions .btn-danger i {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+}
+
+/* Narrow screens: let the row wrap so nothing gets squeezed. */
+@media (max-width: 1220px) {   /* sidebar + one-row toolbar needs about 1220px */
+    .table-header-toolbar .toolbar { flex-wrap: wrap; }
+    .table-header-toolbar .toolbar .header-actions { width: 100%; justify-content: flex-end; }
+}
+
+/* History table on a white card instead of showing the page background. */
+#historyTableWrap {
+    background: #ffffff;
+    border: 1px solid #e2e6df;
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+.history-table { background: #ffffff; }
+.history-table th { background: #f6f7f4; }
+.history-table tbody tr { background: #ffffff; }
+.history-table tbody tr:hover { background: #f6f7f4; }
+.history-table tbody tr.is-selected { background: #edf2ed; }
+#historyTableWrap .empty { background: #ffffff; }

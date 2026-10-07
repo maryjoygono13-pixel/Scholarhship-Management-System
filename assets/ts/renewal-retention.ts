@@ -92,6 +92,23 @@ document.addEventListener("DOMContentLoaded", () => {
     fill(scholarshipFilter, "Scholarship Type", ledgerData.map((r: any) => r.scholarshipType));
   }
 
+
+  // Enrollment for the active term, as the Registrar's database reports it (checked whenever the
+  // Active Semester / Academic Year changes). Falls back to the stored flag when not checked yet.
+  const enrEsc = (v: any) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" } as any)[c]);
+  function enrollmentText(r: any): string {
+    if (r.enrollmentStatus) return r.enrollmentStatus;
+    return r.enrolled ? "Enrolled" : "Not Enrolled";
+  }
+  function enrollmentCell(r: any): string {
+    if (!r.enrollmentStatus) return r.enrolled ? "Enrolled" : "Not Enrolled";
+    const cls = r.registrarNotEnrolled ? "enroll-pill bad" : (r.enrolled ? "enroll-pill ok" : "enroll-pill none");
+    return '<span class="' + cls + '" title="Registrar\'s database, ' + enrEsc(r.enrollmentTerm) + '">' + enrEsc(r.enrollmentStatus) + '</span>';
+  }
+  function enrollmentDetail(r: any): string {
+    if (!r.enrollmentStatus) return r.enrolled ? "Validated Enrollment" : "Unconfirmed Enrollment";
+    return enrEsc(r.enrollmentStatus) + ' <span style="color:#6b7280; font-size:12px;">— Registrar\'s database, ' + enrEsc(r.enrollmentTerm) + '</span>';
+  }
   function renderLedger(): void {
     if (!ledgerBody) return;
     const query = searchBox ? searchBox.value.toLowerCase().trim() : "";
@@ -132,7 +149,7 @@ document.addEventListener("DOMContentLoaded", () => {
         <td>${r.scholarshipType}</td>
         <td><span class="font-mono" style="color:${r.meetsGwa === false ? '#be123c' : 'inherit'};">${r.gwa.toFixed(2)}</span><div style="font-size:11px; color:#6b7280;">${r.gwaSemester || r.semester || "1st Semester"} GWA · Req. ≤ ${Number(r.gwaRequirement).toFixed(2)}</div></td>
         <td>${r.failingGrades > 0 ? `<span class="font-mono" style="color:red;">${r.failingGrades} Failing</span>` : (r.gwa > 0 ? "Passed All" : "No grades yet")}</td>
-        <td>${r.enrolled ? "Enrolled" : "Not Enrolled"}</td>
+        <td>${enrollmentCell(r)}</td>
         <td><span class="font-mono">${r.decisionSemester || r.semester || "1st Semester"}</span>${r.decisionSchoolYear && r.decisionSchoolYear !== r.schoolYear ? `<div style="font-size:11px; color:#6b7280;">${r.decisionSchoolYear}</div>` : ""}</td>
         <td><span class="status-badge ${statusBadge}">${renewalStatusLabel(r)}</span>${r.locked ? '<div style="font-size:11px; color:#6b7280; margin-top:2px;">Locked · view only</div>' : ""}</td>
         <td class="actions-cell">
@@ -199,8 +216,17 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Read-only: shows the term a renew/terminate decision here takes effect in — the
     // term right after the one the scholar was evaluated for, not that term itself.
-    const modalSemesterBadge = document.getElementById("modalSemesterBadge");
-    if (modalSemesterBadge) modalSemesterBadge.textContent = normalizeSemesterValue(selectedRecord.decisionSemester || selectedRecord.semester);
+    // Message icon: opens the same message window as Evaluation (templates, Sent log), with a
+    // starting template that fits this scholar's renewal status.
+    const modalMsgBtn = document.getElementById("modalMsgBtn");
+    if (modalMsgBtn) {
+      const rec = selectedRecord;
+      modalMsgBtn.onclick = () => {
+        if (!(window as any).openApplicantMessage) return;
+        const defaultType = rec.status === "terminated" || rec.status === "at-risk" ? "failed_retention" : (rec.status === "pending" ? "renewal_deadline" : "approval_status");
+        (window as any).openApplicantMessage({ kind: "renewal", id: rec.id, name: rec.name, studentId: rec.studentId, email: rec.email || "", defaultType });
+      };
+    }
 
     if (modalCriteria) {
       modalCriteria.innerHTML = `
@@ -221,9 +247,13 @@ document.addEventListener("DOMContentLoaded", () => {
             <span class="detail-label">Failing Grades</span>
             <span class="detail-value font-mono ${selectedRecord.failingGrades > 0 ? 'metric fail' : 'metric pass'}">${selectedRecord.failingGrades}</span>
           </div>
+          <div class="detail-item">
+            <span class="detail-label">Semester</span>
+            <span class="detail-value font-mono" title="The term a Renew/Terminate decision takes effect in (set by the Active Semester in Settings)">${normalizeSemesterValue(selectedRecord.decisionSemester || selectedRecord.semester)}</span>
+          </div>
           <div class="detail-item full-width">
             <span class="detail-label">Enrollment Status</span>
-            <span class="detail-value">${selectedRecord.enrolled ? "Validated Enrollment" : "Unconfirmed Enrollment"}</span>
+            <span class="detail-value">${enrollmentDetail(selectedRecord)}</span>
           </div>
         </div>
       `;
@@ -237,6 +267,7 @@ document.addEventListener("DOMContentLoaded", () => {
       else if (r.status === "terminated" && r.locked) note = "Terminated for " + (r.decidedSchoolYear || r.schoolYear) + ". Locked until a new Academic Year begins (Settings > Portal Configuration).";
       else if (r.status === "eligible" || r.status === "terminated") note = "A new Academic Year has begun — this entry can now be reassessed (Renew or Terminate).";
       else if (r.locked) note = "Locked: view only. This entry can be renewed or terminated once the Active Semester moves past " + r.semester + " (Settings > Portal Configuration).";
+      else if (r.registrarNotEnrolled) note = "The Registrar's database shows this scholar is not enrolled for " + r.enrollmentTerm + " (" + r.enrollmentStatus + "): the scholarship can only be terminated.";
       else if (r.origin === "rejected") note = "Rejected in Evaluation: this entry can only be terminated (closed). The applicant can still apply again.";
       else if (!(r.gwa > 0)) note = "No grades are recorded for " + (r.gwaSemester || r.semester) + " yet — Renew or Terminate can still be decided manually.";
       else if (r.meetsGwa) note = "GWA meets the requirement — Renew or Terminate can be decided manually.";
@@ -337,11 +368,6 @@ document.addEventListener("DOMContentLoaded", () => {
   if (scholarshipFilter) scholarshipFilter.addEventListener("change", resetRenewalPageAndRender);
   if (programFilter) programFilter.addEventListener("change", resetRenewalPageAndRender);
 
-  function csvEscape(value: any): string {
-    const str = value == null ? "" : String(value);
-    if (/[",\n\r]/.test(str)) return '"' + str.replace(/"/g, '""') + '"';
-    return str;
-  }
 
   // Exports the whole ledger (every term, every status), not just what the
   // current search/filters happen to show.
@@ -355,10 +381,10 @@ document.addEventListener("DOMContentLoaded", () => {
       "Student ID", "Name", "Scholarship Type", "GWA", "GWA Semester", "Required GWA", "Meets GWA",
       "Failing Grades", "Enrollment", "School Year", "Decision Semester", "Status", "Remarks"
     ];
-    const lines = [headers.map(csvEscape).join(",")];
+    const out = [headers];
 
     ledgerData.forEach((r: any) => {
-      lines.push([
+      out.push([
         r.studentId,
         r.name,
         r.scholarshipType,
@@ -367,24 +393,15 @@ document.addEventListener("DOMContentLoaded", () => {
         Number(r.gwaRequirement).toFixed(2),
         !(r.gwa > 0) ? "No grades yet" : (r.meetsGwa === false ? "No" : "Yes"),
         r.failingGrades,
-        r.enrolled ? "Enrolled" : "Not Enrolled",
+        enrollmentText(r),
         r.schoolYear,
         r.decisionSemester || r.semester,
         r.status,
         r.remarks || "",
-      ].map(csvEscape).join(","));
+      ]);
     });
 
-    // BOM so Excel reads names with accents (ñ) correctly.
-    const blob = new Blob(["\ufeff" + lines.join("\r\n")], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "renewal-retention-" + new Date().toISOString().slice(0, 10) + ".csv";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    (window as any).downloadXlsx({ filename: "renewal-retention-" + new Date().toISOString().slice(0, 10), sheet: "Renewal & Retention", rows: out, numberCols: [3, 5, 7] });
   }
 
   const exportRenewalBtn = document.getElementById("exportRenewalBtn");

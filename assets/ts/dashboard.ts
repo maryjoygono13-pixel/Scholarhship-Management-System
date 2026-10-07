@@ -5,6 +5,7 @@ document.addEventListener("DOMContentLoaded", () => {
     types: DistributionItem[];
     totalApproved: number;
     totalTypes: number;
+    totalPrograms: number;   // active programs on the Scholarships page
     mostPopular: DistributionItem | null;
   }
 
@@ -25,7 +26,7 @@ document.addEventListener("DOMContentLoaded", () => {
     return lines;
   }
 
-  const chartColors: string[] = ["#238f54", "#2ea263", "#3ab774", "#1b6336", "#42c082", "#5fd39a"];
+  const chartColors: string[] = ["#238f54", "#2f8a58", "#4a9a6c", "#1b6336", "#5f9e78", "#7fb08f"];
 
   /* =========================================================
      MONTHLY APPLICATIONS
@@ -129,7 +130,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (el) el.textContent = text;
     };
     setText("distTotalApproved", String(data.totalApproved ?? 0));
-    setText("distTotalTypes", String(data.totalTypes ?? 0));
+    setText("distTotalPrograms", String(data.totalPrograms ?? 0));
     setText(
       "distMostPopular",
       data.mostPopular ? `${data.mostPopular.type} (${data.mostPopular.count})` : "—"

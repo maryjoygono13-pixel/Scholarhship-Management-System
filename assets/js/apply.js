@@ -47,6 +47,14 @@ document.addEventListener("DOMContentLoaded", () => {
         if (nextBtn) {
             nextBtn.addEventListener("click", () => {
                 if (!validateStep(stepEl)) return;
+                // Some programs (CHED's CMSP / COSCHO) are applied for on an outside site, not
+                // through this form — send the applicant there once they've picked one.
+                const picked = form.querySelector('input[name="scholarship"]:checked');
+                const externalUrl = picked && picked.value ? (window.SCHOLARSHIP_EXTERNAL_URL || {})[picked.value] : null;
+                if (stepEl.contains(picked) && externalUrl) {
+                    window.location.href = externalUrl;
+                    return;
+                }
                 goToStep(n + 1);
             });
         }
@@ -65,13 +73,17 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (file && file.type && file.type !== "image/png") {
                     showFlash(`"${file.name}" is not a PNG image. Please choose a .png file.`);
                     input.value = "";
+                } else if (file && file.size > (window.APPLY_MAX_FILE_BYTES || 5242880)) {
+                    // Same limit the server enforces (includes/apply_guard_helper.php).
+                    showFlash(`"${file.name}" is larger than 5 MB. Please upload a smaller image.`);
+                    input.value = "";
                 }
             });
         });
     }
     wireFileTypeChecks();
 
-    // Step 6's document fields depend on which scholarship program was picked in Step 5 —
+    // Step 6's document fields depend on which scholarship program was picked in Step 1 —
     // each program can require a different set of documents (see pages/apply.php, which
     // embeds window.SCHOLARSHIP_DOCUMENTS keyed by program name).
     const documentsGrid = document.getElementById("apDocumentsGrid");
@@ -159,16 +171,65 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     if (qualSelect) qualSelect.addEventListener("change", renderQualOther);
 
-    form.querySelectorAll('input[name="scholarship"]').forEach((radio) => {
-        radio.addEventListener("change", () => {
-            renderDocumentFields();
-            renderIncomeField();
-            renderQualificationField();
+    // Sub-fields (qualification dropdown, its "Please specify" box, family income) sit right
+    // under the program they belong to — below a group's program dropdown when it has one —
+    // instead of at the bottom of the list.
+    function placeSubFields() {
+        const checked = form.querySelector('input[name="scholarship"]:checked');
+        if (!checked) return;
+        let anchor = checked.closest(".ap-program-option");
+        if (checked.dataset.group !== undefined) {
+            anchor = form.querySelector('[data-group-field="' + checked.dataset.group + '"]') || anchor;
+        }
+        if (!anchor) return;
+        [incomeField, qualOtherField, qualField].forEach((el) => {
+            if (el) anchor.insertAdjacentElement("afterend", el);
+        });
+    }
+
+    function renderProgramDependents() {
+        placeSubFields();
+        renderDocumentFields();
+        renderIncomeField();
+        renderQualificationField();
+    }
+
+    // A type with several programs (e.g. NEED-BASED) is one radio plus a dropdown. Picking a
+    // program copies its name into the radio's value, so everything above (and the submitted
+    // `scholarship` field) keeps working off a specific program. Leaving the group clears it.
+    function syncProgramGroups() {
+        form.querySelectorAll('input[name="scholarship"][data-group]').forEach((radio) => {
+            const field = form.querySelector('[data-group-field="' + radio.dataset.group + '"]');
+            const select = field ? field.querySelector("select") : null;
+            if (!field || !select) return;
+            const active = radio.checked;
+            field.hidden = !active;
+            select.disabled = !active;
+            select.required = active;
+            if (!active) {
+                select.value = "";
+                radio.value = "";
+            } else {
+                radio.value = select.value; // e.g. a choice the browser restored after a reload
+            }
+        });
+    }
+    form.querySelectorAll(".ap-group-select").forEach((select) => {
+        select.addEventListener("change", () => {
+            const radio = form.querySelector('input[name="scholarship"][data-group="' + select.dataset.group + '"]');
+            if (radio) radio.value = select.value;
+            renderProgramDependents();
         });
     });
-    renderDocumentFields();
-    renderIncomeField();
-    renderQualificationField();
+
+    form.querySelectorAll('input[name="scholarship"]').forEach((radio) => {
+        radio.addEventListener("change", () => {
+            syncProgramGroups();
+            renderProgramDependents();
+        });
+    });
+    syncProgramGroups();
+    renderProgramDependents();
 
     // Belt-and-suspenders against a double submission (e.g. a fast double-click, or Enter
     // pressed again before the button's own `disabled` state has visually registered) — this
@@ -179,8 +240,16 @@ document.addEventListener("DOMContentLoaded", () => {
         e.preventDefault();
         if (isSubmitting) return;
 
-        if (!form.querySelector('input[name="scholarship"]:checked')) {
+        const pickedProgram = form.querySelector('input[name="scholarship"]:checked');
+        if (!pickedProgram || !pickedProgram.value) {
             showFlash("Please select a scholarship program.");
+            return;
+        }
+        // All documents together must stay within the server's limit (25 MB).
+        const totalBytes = Array.from(form.querySelectorAll('input[type="file"]'))
+            .reduce((sum, input) => sum + (input.files && input.files[0] ? input.files[0].size : 0), 0);
+        if (totalBytes > (window.APPLY_MAX_TOTAL_BYTES || 26214400)) {
+            showFlash("Your documents are too large together (25 MB at most). Please upload smaller images.");
             return;
         }
 

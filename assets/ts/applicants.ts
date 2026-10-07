@@ -21,7 +21,7 @@ let loadedApplicants: any[] = [];
 let editingApplicantId: number | null = null;
 let deletingApplicantId: number | null = null;
 
-const APPLICANTS_PAGE_SIZE = 10;
+const APPLICANTS_PAGE_SIZE = 100;
 let applicantsCurrentPage = 1;
 
 const checkIcon = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>`;
@@ -113,6 +113,7 @@ function renderTable(): void {
     const formattedStatus = app.status ? app.status.charAt(0).toUpperCase() + app.status.slice(1) : 'Pending';
 
     tr.innerHTML = `
+      <td class="row-select-cell"><input type="checkbox" class="row-select" data-id="${app.id}" aria-label="Select applicant"></td>
       <td><strong class="font-mono">${app.studentId || '-'}</strong></td>
       <td>${app.name}</td>
       <td>${app.scholarshipType}</td>
@@ -129,7 +130,7 @@ function renderTable(): void {
     `;
 
     tr.addEventListener('click', (e: MouseEvent) => {
-      if (e.target && (e.target as HTMLElement).closest && (e.target as HTMLElement).closest('.actions-cell, .btn-icon-action')) {
+      if (e.target && (e.target as HTMLElement).closest && (e.target as HTMLElement).closest('.actions-cell, .btn-icon-action, .row-select-cell')) {
         return;
       }
       openViewModal(app);

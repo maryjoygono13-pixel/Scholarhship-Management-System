@@ -1,9 +1,11 @@
 "use strict";
 let loadedScholarsList = [];
+// Everything the server returned; the Scholarship Type filter (incl. Dean's Listers) narrows it here.
+let allScholarsList = [];
 let editingScholarId = null;
 let deletingScholarId = null;
 
-const SCHOLARS_PAGE_SIZE = 10;
+const SCHOLARS_PAGE_SIZE = 100;
 let scholarsCurrentPage = 1;
 
 function getScholarEl(id) {
@@ -43,10 +45,45 @@ async function loadScholarsData() {
             loadedScholarsList = json.data || [];
         }
 
-        renderScholarsTable();
+        allScholarsList = loadedScholarsList;
+        applyScholarClientFilters();
     } catch (err) {
         console.error("Error loading scholars data:", err);
     }
+}
+
+// Scholarship Type filter, which also offers "Dean's Listers" (applied to the loaded list, no reload).
+function applyScholarClientFilters() {
+    const typeSel = getScholarEl("filterScholarType");
+    if (typeSel) {
+        const current = typeSel.value;
+        const types = Array.from(new Set(allScholarsList.map((s) => (s.scholarshipType || "").trim()).filter((t) => t && t !== "Dean's List"))).sort();   // the "Dean's Listers" option covers it
+        typeSel.innerHTML = '<option value="all">Scholarship Types</option><option value="deans">Dean&#39;s Listers</option>' + types.map((t) => `<option value="${t.replace(/"/g, "&quot;")}">${t}</option>`).join("");
+        typeSel.value = current === "deans" || types.includes(current) ? current : "all";
+    }
+    const typeVal = typeSel ? typeSel.value : "all";
+    loadedScholarsList = allScholarsList.filter((s) =>
+        typeVal === "all" || (typeVal === "deans" ? !!s.deansLister : (s.scholarshipType || "").trim() === typeVal));
+    renderScholarsTable();
+}
+
+// Export: the scholars shown right now (search and filters applied), Student ID through School Year.
+function exportScholarsToCsv() {
+    if (!loadedScholarsList.length) {
+        alert("No scholars to export for the current filters.");
+        return;
+    }
+    const gwa = (v) => (v === null || v === undefined ? "" : Number(v).toFixed(2));
+    const out = [["Student ID", "Name", "Scholarship Type", "Department", "Grade Year", "1st Sem GWA", "2nd Sem GWA", "School Year"]];
+    loadedScholarsList.forEach((s) => {
+        out.push([s.student_id, s.name, s.scholarshipType || "", s.department, "Year " + s.year_level, gwa(s.gwa_first), gwa(s.gwa_second), s.school_year || ""]);
+    });
+    // "scholars-Dean-s-Listers-BS-Nursing-2026-10-03.xlsx" — names the filters that were applied.
+    const picked = ["filterDepartment", "filterYear", "filterScholarType"]
+        .map((id) => getScholarEl(id))
+        .filter((el) => el && el.value !== "all")
+        .map((el) => el.options[el.selectedIndex].text.replace(/[^A-Za-z0-9]+/g, "-").replace(/^-+|-+$/g, ""));
+    window.downloadXlsx({ filename: ["scholars", ...picked, new Date().toISOString().slice(0, 10)].join("-"), sheet: "Scholars", rows: out, numberCols: [5, 6] });
 }
 
 function renderScholarsTable() {
@@ -87,16 +124,17 @@ function renderScholarsTable() {
             : "No grades imported \u00b7 required \u2264 " + required.toFixed(2);
 
         tr.innerHTML = `
+      <td class="row-select-cell"><input type="checkbox" class="row-select" data-id="${s.id}" aria-label="Select ${s.name}"></td>
       <td><strong class="font-mono">${s.student_id}</strong></td>
-      <td><strong>${s.name}</strong>${s.scholarshipType ? '<span class="status-sub">' + s.scholarshipType + '</span>' : ""}</td>
+      <td><strong>${s.name}</strong>${s.deansLister ? '<span class="dl-tag">Dean\'s Lister</span>' : ""}</td>
+      <td>${s.scholarshipType ? '<span class="sch-type">' + s.scholarshipType + '</span>' + (s.meritTier ? '<span class="status-sub">' + s.meritTier + '</span>' : '') : '<span class="status-sub">\u2014</span>'}</td>
       <td><span class="dept-tag">${s.department}</span></td>
       <td><span class="badge-year">Year ${s.year_level}</span></td>
       <td>${semGwaPill(s.gwa_first)}</td>
       <td>${semGwaPill(s.gwa_second)}</td>
       <td><span class="font-mono">${s.school_year || '2025-2026'}</span></td>
       <td>
-        <span class="${badgeClass}">${statusText}</span>
-        <span class="status-sub">${gwaBasis}</span>
+        <span class="${badgeClass}" title="${gwaBasis}">${statusText}</span>
       </td>
       <td class="actions-cell">
         <button type="button" class="btn-icon-action edit" title="Edit Scholar" onclick="editScholarEntry(event, ${s.id})">
@@ -191,7 +229,7 @@ window.editScholarEntry = async function (event, id) {
 
     if (fStudentId) fStudentId.value = scholar.student_id || "";
     if (fName) fName.value = scholar.name || "";
-    if (fDepartment) fDepartment.value = scholar.department || "Information Technology";
+    if (fDepartment) fDepartment.value = scholar.department || "BS Information Technology";
     if (fYearLevel) fYearLevel.value = String(scholar.year_level || 1);
     if (fSchoolYear) fSchoolYear.value = scholar.school_year || "2025-2026";
     if (fRemarks) fRemarks.value = scholar.remarks || "";
@@ -286,7 +324,7 @@ function initScholarsPage() {
                 id: editingScholarId,
                 student_id: fStudentId ? fStudentId.value.trim() : "",
                 name: fName ? fName.value.trim() : "",
-                department: fDepartment ? fDepartment.value : "Information Technology",
+                department: fDepartment ? fDepartment.value : "BS Information Technology",
                 year_level: fYearLevel ? Number(fYearLevel.value) : 1,
                 school_year: fSchoolYear ? fSchoolYear.value.trim() : "2025-2026",
                 remarks: fRemarks ? fRemarks.value.trim() : "",
@@ -326,6 +364,14 @@ function initScholarsPage() {
 
     const searchInput = getScholarEl("searchScholarInput");
     if (searchInput) searchInput.addEventListener("input", resetScholarsPageAndLoad);
+
+    ["filterScholarType"].forEach((id) => {
+        const el = getScholarEl(id);
+        if (el) el.addEventListener("change", () => { scholarsCurrentPage = 1; applyScholarClientFilters(); });
+    });
+
+    const exportBtn = getScholarEl("exportScholarsBtn");
+    if (exportBtn) exportBtn.addEventListener("click", exportScholarsToCsv);
 
     loadScholarsData();
 }

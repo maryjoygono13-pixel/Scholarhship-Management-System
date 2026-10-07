@@ -2,9 +2,11 @@
    NOTIFICATION PAGE STYLING
 =================================*/
 
+/* Same size as the Scholars page (.scholars-container in scholars.css). */
 .page {
-  max-width: 1000px;
+  max-width: 1400px;
   margin: 0 auto;
+  padding: 24px;
 }
 
 /* ---------- Stat cards grid ---------- */
@@ -20,7 +22,7 @@
 }
 
 .stat-card {
-  background: #ffffff;
+  background: #fafbf9;
   border: 1px solid #e5e7eb;
   border-radius: 12px;
   padding: 16px 20px;
@@ -78,7 +80,7 @@
 
 .pill-btn.active,
 .pill-btn.active.type-all {
-  background: #e8f5e9 !important;
+  background: #e1eae2 !important;
   color: #134e2a !important;
   font-weight: 700;
 }
@@ -107,7 +109,7 @@
 
 /* ---------- Table Card & Notification Table ---------- */
 .table-card {
-  background: #ffffff;
+  background: #fafbf9;
   border: 1px solid #e5e7eb;
   border-radius: 14px;
   overflow: hidden;
@@ -177,7 +179,7 @@
   height: 32px;
   border-radius: 8px;
   border: 1px solid #e5e7eb;
-  background: #ffffff;
+  background: #fafbf9;
   color: #4b5563;
   cursor: pointer;
   transition: all 0.15s ease;
@@ -216,7 +218,7 @@
   width: 100%;
   max-width: 640px;
   max-height: 90vh;
-  background: #ffffff;
+  background: #fafbf9;
   border-radius: 16px;
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2);
   overflow: hidden;
@@ -280,14 +282,14 @@
   padding: 8px 0;
   border-radius: 8px;
   border: 1px solid #d1d5db;
-  background: #ffffff;
+  background: #fafbf9;
   color: #4b5563;
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
 .mode-btn.active {
-  background: #f2faf4;
+  background: #edf2ed;
   color: #134e2a;
   border-color: #a5d6a7;
 }
@@ -335,7 +337,7 @@
   color: #111827;
   outline: none;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
-  background: #ffffff;
+  background: #fafbf9;
 }
 
 .field input:focus,
@@ -436,7 +438,7 @@
   padding: 0 14px;
   border: 1px solid #d1d5db;
   border-radius: 8px;
-  background: #fff;
+  background: #fafbf9;
   font-size: 13.5px;
   outline: none;
 }
@@ -475,7 +477,7 @@
   margin-bottom: 16px;
   border: 1px solid #e5e7eb;
   border-radius: 10px;
-  background: #ffffff;
+  background: #fafbf9;
 }
 .gmail-status { display: flex; align-items: center; gap: 10px; font-size: 13.5px; font-weight: 600; color: #374151; min-width: 0; overflow-wrap: anywhere; }
 .gmail-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -486,7 +488,7 @@
 .gmail-dot.off { background: #9ca3af; }
 .gmail-hint { margin: -8px 0 16px; font-size: 12.5px; color: #6b7280; overflow-wrap: anywhere; }
 .gmail-flash { margin-bottom: 16px; padding: 10px 14px; border-radius: 8px; font-size: 13px; font-weight: 500; }
-.gmail-flash.ok { background: #e8f5e9; color: #134e2a; border: 1px solid #c8e6c9; }
+.gmail-flash.ok { background: #e1eae2; color: #134e2a; border: 1px solid #c3d6c6; }
 .gmail-flash.error { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
 
 .src-tag { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px; background: #fee2e2; color: #b91c1c; font-size: 10.5px; font-weight: 700; vertical-align: middle; }
@@ -514,3 +516,18 @@
 .inbox-thread[hidden],
 .inbox-reply[hidden],
 #inboxViewReplyBtn[hidden] { display: none !important; }
+
+/* Inbox and Sent log tables sit on a white card instead of showing the page background. */
+#inboxTableWrap,
+#notifTableWrap {
+  background: #ffffff;
+  border: 1px solid #e2e6df;
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+#inboxTableWrap.hide,
+#notifTableWrap.hide { display: none; }
+#inboxTableWrap .notification-table th,
+#notifTableWrap .notification-table th { background: #f6f7f4; }
+.empty-state { background: #ffffff; border: 1px solid #e2e6df; border-radius: 14px; }

@@ -126,6 +126,33 @@ include __DIR__ . '/../includes/header.php';
                         <input type="text" id="schSchoolYear" name="school_year" placeholder="e.g. 2025-2026" class="sch-input">
                     </div>
                 </div>
+                <!-- MERIT-BASED only: editable eligibility rules, saved on the program and used for
+                     every Merit decision (see includes/merit_helper.php) -->
+                <div class="merit-rules" id="schMeritRules" hidden>
+                    <div class="merit-rules-title">MERIT-BASED Eligibility</div>
+                    <div class="merit-rules-cols">
+                    <div class="merit-rules-group" id="schMeritCollegiate">
+                        <span class="merit-rules-level">Collegiate (GWA)</span>
+                        <div class="merit-rules-row">
+                            <span class="merit-tier merit-tier-full">Full Merit</span>
+                            <input type="number" step="0.01" min="1" max="5" class="merit-gwa-input" id="schMeritFullMin" name="merit_full_min" value="1.00" aria-label="Full Merit from GWA">
+                            <span>–</span>
+                            <input type="number" step="0.01" min="1" max="5" class="merit-gwa-input" id="schMeritFullMax" name="merit_full_max" value="1.30" aria-label="Full Merit to GWA">
+                        </div>
+                        <div class="merit-rules-row">
+                            <span class="merit-tier merit-tier-half">Half Merit</span>
+                            <input type="number" step="0.01" min="1" max="5" class="merit-gwa-input" id="schMeritHalfMin" name="merit_half_min" value="1.31" aria-label="Half Merit from GWA">
+                            <span>–</span>
+                            <input type="number" step="0.01" min="1" max="5" class="merit-gwa-input" id="schMeritHalfMax" name="merit_half_max" value="1.50" aria-label="Half Merit to GWA">
+                        </div>
+                    </div>
+                    <div class="merit-rules-group" id="schMeritBasic">
+                        <span class="merit-rules-level">Basic Education</span>
+                        <textarea class="merit-basic-input" id="schMeritBasicCriteria" name="merit_basic_criteria" rows="2" maxlength="255" placeholder="e.g. Top 1 or Top 2 in class">Top 1 or Top 2 in class</textarea>
+                        <span class="merit-rules-hint">Verified by the registrar.</span>
+                    </div>
+                    </div>
+                </div>
                 <div class="field-row">
                     <div class="field">
                         <label style="font-size:13px; font-weight:600; color:#374151;">Application Start</label>
@@ -168,7 +195,7 @@ include __DIR__ . '/../includes/header.php';
 
                 <!-- Step 3: Required Documents -->
                 <div class="sch-step" data-step="3">
-                    <p class="sch-step-note">Every document listed here is what applicants for this program will be asked to upload — not necessarily the same 3 for every scholarship.</p>
+                    <p class="sch-step-note">Every document listed here is what applicants for this program will be asked to upload — not necessarily the same 3 for every scholarship. The <strong>Certificate of Enrollment (COE)</strong> is always required for every program (proof of being a bonafide CM student), so you don't need to add it here. <strong>NEED-BASED</strong> programs also always require <strong>Academic Records</strong> and one <strong>ITR or Certificate of Indigency</strong> upload (either one is enough) — a separate ITR / Certificate of Indigency added here is folded into that single upload. <strong>Community Service or Leadership</strong> programs always require a <strong>Documented Record of Leadership Role or Community Involvement</strong>.</p>
                     <div id="schDocumentRows"></div>
                     <button type="button" class="btn-secondary" id="schDocumentAddBtn" style="align-self:flex-start;"><i data-lucide="plus"></i> Add Document</button>
                 </div>

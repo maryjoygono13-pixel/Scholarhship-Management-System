@@ -1,22 +1,23 @@
 <?php
+/*
+ * Deletes Records (moved to the Trash Bin).
+ *   POST id=5             -> that record (the row's delete icon)
+ *   POST ids[]=5&ids[]=6  -> several at once (multi-select delete on the Records page)
+ */
 require_once __DIR__ . '/init.php';
 
-try {
-    $id = (int)($_POST['id'] ?? $_GET['id'] ?? 0);
-
-    if ($id <= 0) {
-        sendError('Invalid record ID.');
-    }
-
-    $pdo = getDB();
-
+/*
+ * Moves one record to the Trash Bin, with its own application and (when it was the student's last
+ * record) their Scholars entry / map pin. Returns its title, or null when the record doesn't exist.
+ */
+function trashRecord(PDO $pdo, int $id): ?string {
     // Get the record first
     $stmtSelect = $pdo->prepare("SELECT * FROM records WHERE id = ?");
     $stmtSelect->execute([$id]);
     $rec = $stmtSelect->fetch();
 
     if (!$rec) {
-        sendError('Record not found.');
+        return null;
     }
 
     // Get student ID so we can remove the map location
@@ -86,13 +87,48 @@ try {
 
     $stmt->execute([$id]);
 
-    logActivity($pdo, 'Record Deleted', 'Records', $title . ' was moved to Trash Bin.', $id);
+    return $title;
+}
 
+try {
+    $raw = $_POST['ids'] ?? null;
+    $bulk = $raw !== null;
+    $ids = $bulk
+        ? array_values(array_unique(array_filter(array_map('intval', is_array($raw) ? $raw : explode(',', (string)$raw)), fn($v) => $v > 0)))
+        : array_filter([(int)($_POST['id'] ?? $_GET['id'] ?? 0)], fn($v) => $v > 0);
+    if (!$ids) {
+        sendError($bulk ? 'No records were selected.' : 'Invalid record ID.');
+    }
+    if (count($ids) > 1000) {
+        sendError('Please delete at most 1,000 records at a time.');
+    }
+
+    $pdo = getDB();
+    $titles = [];
+    $pdo->beginTransaction();
+    foreach ($ids as $id) {
+        $title = trashRecord($pdo, $id);
+        if ($title !== null) $titles[$id] = $title;
+    }
+    $pdo->commit();
+
+    if (!$bulk && !$titles) {
+        sendError('Record not found.');
+    }
+    if (count($titles) === 1) {
+        logActivity($pdo, 'Record Deleted', 'Records', reset($titles) . ' was moved to Trash Bin.', (int)array_key_first($titles));
+    } elseif ($titles) {
+        $preview = implode(', ', array_slice($titles, 0, 10)) . (count($titles) > 10 ? ', and ' . (count($titles) - 10) . ' more' : '');
+        logActivity($pdo, 'Record Deleted', 'Records', count($titles) . ' records were moved to Trash Bin: ' . $preview . '.');
+    }
+
+    $n = count($titles);
     sendJson([
         'success' => true,
-        'message' => 'Record moved to Trash Bin and removed from the Scholar Map.'
+        'deleted' => $n,
+        'message' => $bulk ? "$n record" . ($n === 1 ? '' : 's') . ' moved to Trash Bin.' : 'Record moved to Trash Bin and removed from the Scholar Map.',
     ]);
-
 } catch (Exception $e) {
+    if (isset($pdo) && $pdo->inTransaction()) $pdo->rollBack();
     sendError($e->getMessage(), 500);
-}   
+}

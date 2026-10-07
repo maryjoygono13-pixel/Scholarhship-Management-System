@@ -6,11 +6,11 @@
     --green-900: #134e2a;
     --green-800: #1b6336;
     --green-700: #238f54;
-    --green-600: #2ea263;
-    --green-500: #3ab774;
-    --green-100: #e8f5e9;
-    --green-50: #f2faf4;
-    --green-border: #c8e6c9;
+    --green-600: #2f8a58;
+    --green-500: #4a9a6c;
+    --green-100: #e1eae2;
+    --green-50: #edf2ed;
+    --green-border: #c3d6c6;
 }
 
 .trash-container {
@@ -46,7 +46,7 @@
 .trash-banner-info p {
     margin: 0;
     font-size: 13.5px;
-    color: #e8f5e9;
+    color: #e1eae2;
     line-height: 1.5;
 }
 
@@ -57,7 +57,7 @@
     justify-content: space-between;
     gap: 16px;
     margin-bottom: 24px;
-    background: #ffffff;
+    background: #fafbf9;
     padding: 16px 20px;
     border-radius: 12px;
     border: 1px solid #e2e8f0;
@@ -77,8 +77,8 @@
 }
 
 .trash-type-filter:focus {
-    border-color: #2ea263;
-    background: #ffffff;
+    border-color: #2f8a58;
+    background: #fafbf9;
     box-shadow: 0 0 0 3px rgba(46, 162, 99, 0.15);
 }
 
@@ -86,7 +86,7 @@
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    background: linear-gradient(135deg, #2ea263 0%, #238f54 100%);
+    background: linear-gradient(135deg, #2f8a58 0%, #238f54 100%);
     color: #ffffff;
     border: none;
     padding: 7px 14px;
@@ -131,18 +131,18 @@
 }
 
 .item-type-applicant { background: #e0f2fe; color: #0369a1; }
-.item-type-scholar { background: #e8f5e9; color: #134e2a; border: 1px solid #c8e6c9; }
-.item-type-scholarship { background: #fef3c7; color: #b45309; }
+.item-type-scholar { background: #e1eae2; color: #134e2a; border: 1px solid #c3d6c6; }
+.item-type-scholarship { background: #f3e8c9; color: #b45309; }
 .item-type-record { background: #f3e8ff; color: #6b21a8; }
 .item-type-notification { background: #ffe4e6; color: #be123c; }
 .item-type-import { background: #f1f5f9; color: #475569; }
 
 .scholars-table th {
-    background: #f2faf4 !important;
+    background: #edf2ed !important;
     color: #134e2a !important;
-    border-bottom: 1.5px solid #c8e6c9 !important;
+    border-bottom: 1.5px solid #c3d6c6 !important;
 }
 
 .scholars-table tr:hover {
-    background-color: #f2faf4 !important;
+    background-color: #edf2ed !important;
 }

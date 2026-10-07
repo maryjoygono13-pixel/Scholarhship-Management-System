@@ -193,3 +193,6 @@ body { background: #f4f7f5; min-height: 100vh; position: relative; overflow-x: h
 .ap-period-closed { color: #991b1b; }
 .ap-period-not_yet_open { color: #92400e; }
 .ap-badge-soon { background: #fef3c7; color: #92400e; }
+
+/* Hidden spam trap (people never see or fill it in; bots that fill every field do). */
+.ap-hp { position: absolute; left: -10000px; top: auto; width: 1px; height: 1px; overflow: hidden; }

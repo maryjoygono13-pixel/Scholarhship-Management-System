@@ -1,5 +1,7 @@
 <?php
 require_once __DIR__ . '/init.php';
+require_once __DIR__ . '/../includes/records_helper.php';
+require_once __DIR__ . '/../includes/deans_list_helper.php';   // "Dean's Listers" in the Scholarship Type filter
 
 try {
     $pdo = getDB();
@@ -53,6 +55,7 @@ try {
 
         // Each semester's own GWA / failing count, from the imported academic records.
         $semesterStats = getSemesterGradeStats($pdo, $studentIds);
+        $deansListers = deansListerIds($pdo, $studentIds);
 
         // The question's label ("Special Field / Area of Involvement" or "Scholarship / Discount
         // Qualification") follows the program's type, looked up only when an answer exists.
@@ -66,7 +69,7 @@ try {
             return $cfg ? $cfg['label'] : 'Declared Qualification';
         };
 
-        $data = array_map(function ($r) use ($gradesMap, $pdo, $semesterStats, $specialQualificationLabel) {
+        $data = array_map(function ($r) use ($gradesMap, $pdo, $semesterStats, $specialQualificationLabel, $deansListers) {
             $stats = $semesterStats[(string)$r['student_id']] ?? [];
             $currentSem = normalizeSemesterName($r['semester'] ?? '');
             // Scholars with no grades on file yet but a stored GWA (entered before
@@ -84,6 +87,7 @@ try {
                 'fullName' => buildFullName($r['first_name'], $r['middle_name'] ?? '', $r['last_name']),
 
                 'studentId' => $r['student_id'],
+                'deansLister' => isset($deansListers[trim((string)$r['student_id'])]),
                 'program' => $r['program'],
                 'major' => $r['major'] ?? '',
                 'yearLevel' => $r['year_level'],
@@ -113,6 +117,11 @@ try {
                 // applicant's real status is untouched, so the Applicants page keeps showing it.
                 'status' => isGwaRequirementUnmet($pdo, $r) ? STATUS_NON_COMPLIANT : $r['status'],
                 'remarks' => $r['remarks'] ?? '',
+                'email' => $r['email'] ?? '',
+                // Confirmed in the Registrar's records (CHED list check / Registrar fetch): officially
+                // enrolled even without an uploaded Certificate of Enrollment.
+                'enrollmentVerified' => !empty($r['enrollment_verified']),
+                'enrollmentVerifiedSource' => $r['enrollment_verified_source'] ?? '',
                 // Declared on the Apply page (Talent / Community Service / Other Discounts) —
                 // informational only, verified by the registrar against the documents.
                 'specialQualification' => formatSpecialQualification($r['special_qualification'] ?? '', $r['special_qualification_other'] ?? ''),
@@ -299,41 +308,23 @@ if ($status !== null && in_array(strtolower($status), ['approved', 'rejected']))
 
         if (!$existingRecord) {
 
-            $insert = $pdo->prepare("
-                INSERT INTO records
-                (
-                    applicant_id,
-                    student_id,
-                    name,
-                    scholarship_type,
-                    status,
-                    semester,
-                    sy,
-                    date_evaluated,
-                    remarks
-                )
-                VALUES
-                (
-                    ?, ?, ?, ?, ?, ?, ?, CURDATE(), ?
-                )
-            ");
-
-            $insert->execute([
-                $id,
-                $applicant['student_id'],
-                $name,
-                $applicant['scholarship_type'],
-                $recordStatus,
-                $recordSemester,
-                $recordSy,
-                $applicant['remarks'] ?? ''
+            // One record per student / scholarship / school year / semester, with their program and
+            // year level at this time (includes/records_helper.php).
+            $saved = saveTermRecord($pdo, [
+                'applicant_id' => $id,
+                'student_id' => $applicant['student_id'],
+                'name' => $name,
+                'scholarship_type' => $applicant['scholarship_type'],
+                'status' => $recordStatus,
+                'semester' => $recordSemester,
+                'sy' => $recordSy,
+                'remarks' => $applicant['remarks'] ?? '',
+                'origin' => 'evaluation',
             ]);
 
             // Approved and rejected applicants both enter Renewal & Retention as pending. The row
             // is view-only until the Active Semester moves on (see isRenewalLocked).
-            $newRecord = $pdo->prepare("SELECT * FROM records WHERE id = ?");
-            $newRecord->execute([(int)$pdo->lastInsertId()]);
-            $recordRow = $newRecord->fetch(PDO::FETCH_ASSOC);
+            $recordRow = $saved['created'] ? $saved['record'] : null;
             if ($recordRow) {
                 sendRecordToRenewal($pdo, $recordRow, 'pending', null, $recordStatus);
             }

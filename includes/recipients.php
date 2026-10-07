@@ -49,38 +49,50 @@ function individualKindForType(string $notifType): string {
 }
 
 /**
- * The people who can be picked in "Individual" mode for a given notification type.
- * Each item: id (that source row's id — pair it with 'kind' when sending), studentId, name.
+ * The people who can be picked in "Individual" mode. Everyone the registrar can see is
+ * listed, whatever stage they're at, so nobody becomes unreachable once they move on:
+ *   - Applicants          -> everyone on the Applicants / Evaluation pages (pending or for review)
+ *   - Records             -> everyone already decided (approved or rejected), as on the Records page
+ *   - Renewal & Retention -> listed too for the renewal notice types
+ * The notification type only decides which group comes first.
+ * Each item: id (that source row's id — pair it with 'kind' when sending), kind, group,
+ * studentId, name.
  */
 function listIndividualRecipients(PDO $pdo, string $notifType): array {
-    $kind = individualKindForType($notifType);
+    $groups = [];
 
+    $applicants = $pdo->query("SELECT id, student_id, first_name, last_name FROM applicants WHERE LOWER(status) IN ('pending', 'review') ORDER BY last_name, first_name")->fetchAll(PDO::FETCH_ASSOC);
+    $groups['applicant'] = array_map(fn($r) => [
+        'id' => (int)$r['id'], 'kind' => 'applicant', 'group' => 'Applicants',
+        'studentId' => $r['student_id'] ?? '', 'name' => trim(($r['first_name'] ?? '') . ' ' . ($r['last_name'] ?? '')),
+    ], $applicants);
+
+    $records = $pdo->query("SELECT id, student_id, name, status FROM records WHERE LOWER(status) IN ('approved', 'rejected') ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
+    $groups['record'] = array_map(fn($r) => [
+        'id' => (int)$r['id'], 'kind' => 'record', 'group' => 'Records',
+        'studentId' => $r['student_id'] ?? '', 'name' => trim((string)$r['name']) . ' — ' . ucfirst(strtolower((string)$r['status'])),
+    ], $records);
+
+    $kind = individualKindForType($notifType);
     if ($kind === 'renewal') {
         // Renewal deadline = due for renewal; Failed retention = fell short of it.
         $statuses = $notifType === 'failed_retention' ? ['at-risk', 'terminated'] : ['eligible', 'pending'];
         $in = implode(',', array_fill(0, count($statuses), '?'));
         $stmt = $pdo->prepare("SELECT id, student_id, name FROM renewal_retention WHERE LOWER(status) IN ($in) ORDER BY name");
         $stmt->execute($statuses);
-    } elseif ($kind === 'record') {
-        $stmt = $pdo->prepare("SELECT id, student_id, name FROM records WHERE LOWER(status) IN ('approved', 'rejected') ORDER BY name");
-        $stmt->execute();
-    } else {
-        $pending = "LOWER(status) IN ('pending', 'review', 'interview')";
-        $stmt = $pdo->query("SELECT id, student_id, first_name, last_name FROM applicants WHERE $pending AND docs_complete = 0 ORDER BY last_name, first_name");
+        $groups['renewal'] = array_map(fn($r) => [
+            'id' => (int)$r['id'], 'kind' => 'renewal', 'group' => 'Renewal & Retention',
+            'studentId' => $r['student_id'] ?? '', 'name' => trim((string)$r['name']),
+        ], $stmt->fetchAll(PDO::FETCH_ASSOC));
     }
 
-    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-    return array_map(function ($r) use ($kind) {
-        return [
-            'id' => (int)$r['id'],
-            'kind' => $kind,
-            'studentId' => $r['student_id'] ?? '',
-            'name' => $kind === 'applicant'
-                ? trim(($r['first_name'] ?? '') . ' ' . ($r['last_name'] ?? ''))
-                : trim((string)($r['name'] ?? '')),
-        ];
-    }, $rows);
+    // The group that fits the notification type first, then the rest.
+    $order = array_unique(array_merge([$kind], ['applicant', 'record', 'renewal']));
+    $list = [];
+    foreach ($order as $k) {
+        foreach ($groups[$k] ?? [] as $item) $list[] = $item;
+    }
+    return $list;
 }
 
 function resolveRecipients(PDO $pdo, string $mode, string $segment, string $individualId = '', string $individualKind = 'applicant'): array {

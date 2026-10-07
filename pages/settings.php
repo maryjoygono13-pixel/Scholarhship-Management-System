@@ -23,6 +23,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             );
             $success = $term['changed']
                 ? 'Active term is now ' . $term['semester'] . ', ' . $term['schoolYear'] . '. ' . $term['moved'] . ' scholar(s) were sent to Renewal & Retention for reassessment.' . (($term['skipped'] ?? 0) > 0 ? ' ' . $term['skipped'] . ' scholar(s) already had a record for this semester and were left as they are.' : '')
+                  . (!empty($term['enrollment']['checked'])
+                      ? ($term['enrollment']['reachable']
+                          ? ' Enrollment checked with the Registrar: ' . $term['enrollment']['enrolled'] . ' officially enrolled, ' . $term['enrollment']['notEnrolled'] . ' dropped / not enrolled' . ($term['enrollment']['notFound'] ? ', ' . $term['enrollment']['notFound'] . " not in the Registrar's database" : '') . '.'
+                          : " Couldn't reach the Registrar's database to check enrollment.")
+                      : '')
                 : 'Portal configuration saved.';
         } catch (Throwable $e) {
             $errors[] = 'Could not change the active term: ' . $e->getMessage();
@@ -306,16 +311,6 @@ for ($y = $startYear - 2; $y <= $startYear + 3; $y++) {
         if (Array.from(yearSelect.options).some(function (o) { return o.value === target; })) {
             yearSelect.value = target;
         }
-    });
-
-    form.addEventListener('submit', function (e) {
-        if (semSelect.value === currentSem && yearSelect.value === currentYear) return;
-        const ok = confirm(
-            'Change the active term to ' + semSelect.value + ' ' + yearSelect.value + '?\n\n' +
-            'Scholars approved in ' + currentSem + ' ' + currentYear + ' will be sent to Renewal & Retention ' +
-            'and back to Evaluation for the new term. Their earlier grades are kept.'
-        );
-        if (!ok) e.preventDefault();
     });
 })();
 </script>

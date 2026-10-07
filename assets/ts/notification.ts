@@ -66,8 +66,8 @@ const TEMPLATES: Record<string, TemplateInfo> = {
     showDeadline: false,
   },
   approval_status: {
-    subject: "Update on your scholarship application",
-    message: "Hi {{first_name}},\n\nWe have an update regarding your scholarship application. Please contact our office for details.\n\nThank you!",
+    subject: "Approved Scholarship Application",
+    message: "Hi {{first_name}},\n\nWe have an update regarding your scholarship application. Your application has been approved. Our registrar committee is truly happy for you. Keep up the good work and always SOAR HIGHER!",
     showDeadline: false,
   },
 };
@@ -313,9 +313,24 @@ function applyTemplate(): void {
   if (deadlineField) deadlineField.style.display = tpl.showDeadline ? "block" : "none";
 }
 
-/* Who shows up in the Individual dropdown depends on the notification type:
-   Missing requirements -> Applicants with a document missing; Renewal deadline /
-   Failed retention -> Renewal & Retention entries; Approval status -> Records. */
+/* Everyone the registrar can see, in labelled sections (Applicants, Records, and
+   Renewal & Retention for renewal notices), so a person can still be messaged after
+   their application has been reviewed. The notification type only sets the order. */
+type IndividualOption = { id: number; kind: string; group?: string; studentId: string; name: string };
+function renderIndividualOptions(options: IndividualOption[]): string {
+  const esc = (s: unknown) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" } as Record<string, string>)[c]);
+  const groups: { label: string; items: IndividualOption[] }[] = [];
+  options.forEach((o) => {
+    const label = o.group || "Recipients";
+    let g = groups.find((x) => x.label === label);
+    if (!g) { g = { label, items: [] }; groups.push(g); }
+    g.items.push(o);
+  });
+  return groups.map((g) => `<optgroup label="${esc(g.label)} (${g.items.length})">` +
+    g.items.map((o) => `<option value="${esc(o.kind)}:${o.id}">${esc(o.name)}${o.studentId ? " (" + esc(o.studentId) + ")" : ""}</option>`).join("") +
+    "</optgroup>").join("");
+}
+
 async function loadIndividualOptions(): Promise<void> {
   if (!individualSelect) return;
   const type = notifType ? notifType.value : "";
@@ -326,7 +341,7 @@ async function loadIndividualOptions(): Promise<void> {
     if (!json.success) throw new Error(json.message || "Failed to load recipients.");
     const options = (json.data || []) as { id: number; kind: string; studentId: string; name: string }[];
     individualSelect.innerHTML = options.length
-      ? options.map(o => `<option value="${o.kind}:${o.id}">${o.name}${o.studentId ? " (" + o.studentId + ")" : ""}</option>`).join("")
+      ? renderIndividualOptions(options)
       : `<option value="">No matching recipients</option>`;
   } catch (err) {
     individualSelect.innerHTML = `<option value="">Couldn't load recipients</option>`;

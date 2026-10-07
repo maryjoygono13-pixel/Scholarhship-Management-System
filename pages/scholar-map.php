@@ -23,9 +23,10 @@
                         <option value="Information Technology">BS Information Technology</option>
                         <option value="Accountancy">BS Accountancy</option>
                         <option value="Business Administration">BS Business Administration</option>
-                        <option value="Political Science">BA Political Science</option>
-                        <option value="Elementary Education">BE Elementary Education</option>
-                        <option value="Secondary Education">BS Secondary Education</option>
+                        <option value="Political Science">BA PolSci</option>
+                        <option value="Elementary Education">B Elementary Education</option>
+                        <option value="Secondary Education">B Secondary Education</option>
+                        <option value="Food Preparation and Services Technology">BIT Food Preparation and Services Technology</option>
                     </select>
                 </div>
             </div>
@@ -46,34 +47,40 @@
                 </div>
 
                 <div class="legend-item">
-                    <span class="legend-dot" style="background:#2563eb;"></span>
+                    <span class="legend-dot" style="background:#dc2626;"></span>
                     <span>BS Information Technology</span>
                 </div>
 
                 <div class="legend-item">
-                    <span class="legend-dot" style="background:#7c3aed;"></span>
+                    <span class="legend-dot" style="background:#f59e0b;"></span>
                     <span>BS Accountancy</span>
                 </div>
 
                 <div class="legend-item">
-                    <span class="legend-dot" style="background:#f59e0b;"></span>
+                    <span class="legend-dot" style="background:#16a34a;"></span>
                     <span>BS Business Administration</span>
                 </div>
 
                 <div class="legend-item">
-                    <span class="legend-dot" style="background:#84cc16;"></span>
-                    <span>BA Political Science</span>
-            </div>
-
-                <div class="legend-item">
-                    <span class="legend-dot" style="background:#16a34a;"></span>
-                    <span>BE Elementary Education</span>
+                    <span class="legend-dot" style="background:#800000;"></span>
+                    <span>BA PolSci</span>
                 </div>
 
                 <div class="legend-item">
-                    <span class="legend-dot" style="background:#06b6d4;"></span>
-                    <span>BS Secondary Education</span>
+                    <span class="legend-dot" style="background:#89cff0;"></span>
+                    <span>B Elementary Education</span>
                 </div>
+
+                <div class="legend-item">
+                    <span class="legend-dot" style="background:#2563eb;"></span>
+                    <span>B Secondary Education</span>
+                </div>
+
+                <div class="legend-item">
+                    <span class="legend-dot" style="background:#7c3aed;"></span>
+                    <span>BIT Food Preparation and Services Technology</span>
+                </div>
+
 
                 </div>
 

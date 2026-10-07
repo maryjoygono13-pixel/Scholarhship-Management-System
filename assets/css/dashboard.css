@@ -40,7 +40,7 @@
 }
 
 .card {
-    background: #ffffff;
+    background: #fafbf9;
     padding: 20px;
     border-radius: 12px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.04);
@@ -92,10 +92,10 @@
     stroke-width: 2.25;
 }
 
-.card.green .card-header-icon { background: #e8f5e9; color: #134e2a; }
+.card.green .card-header-icon { background: #e1eae2; color: #134e2a; }
 .card.emerald .card-header-icon { background: #e6f4ea; color: #1b6336; }
 .card.teal .card-header-icon { background: #e0f2f1; color: #238f54; }
-.card.amber .card-header-icon { background: #f2faf4; color: #2ea263; }
+.card.amber .card-header-icon { background: #edf2ed; color: #2f8a58; }
 
 .card-text {
     display: block;
@@ -121,7 +121,7 @@
        wide screens, so the charts only used half the width). */
     grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
     gap: 24px;
-    background: #ffffff;
+    background: #fafbf9;
     padding: 24px;
     border-radius: 12px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.04);
@@ -134,7 +134,7 @@
 }
 
 .chart-block {
-    background: #ffffff;
+    background: #fafbf9;
 }
 
 .chart-title {
@@ -146,7 +146,7 @@
 
 /* NOTIFICATIONS */
 .notification-container {
-    background: #ffffff;
+    background: #fafbf9;
     padding: 24px;
     border-radius: 12px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.04);
@@ -166,8 +166,8 @@
     gap: 14px;
     padding: 14px 16px;
     border-radius: 8px;
-    background: var(--green-50, #f2faf4);
-    border: 1px solid var(--green-100, #e8f5e9);
+    background: var(--green-50, #edf2ed);
+    border: 1px solid var(--green-100, #e1eae2);
     margin-bottom: 12px;
 }
 
@@ -266,7 +266,7 @@
     padding: 0 34px 0 12px;
     border: 1px solid #d1d5db;
     border-radius: 8px;
-    background: #fff;
+    background: #fafbf9;
     font-size: 13.5px;
     color: #1f2937;
     cursor: pointer;
@@ -279,7 +279,7 @@
 
 /* Scholarship Application Status panel */
 .app-period-panel {
-    background: #ffffff;
+    background: #fafbf9;
     padding: 24px;
     border-radius: 12px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.04);
@@ -297,7 +297,50 @@
 .app-period-table tr:last-child td { border-bottom: none; }
 .app-period-type { font-size: 11.5px; color: #9ca3af; }
 .app-period-badge { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; white-space: nowrap; }
-.app-period-open { background: #d1fae5; color: #065f46; }
+.app-period-open { background: #d5e8da; color: #065f46; }
 .app-period-closed { background: #fee2e2; color: #991b1b; }
-.app-period-not_yet_open { background: #fef3c7; color: #92400e; }
+.app-period-not_yet_open { background: #f3e8c9; color: #92400e; }
 .app-period-not_set { background: #f3f4f6; color: #6b7280; }
+
+/* Active Scholarship Programs panel */
+.programs-panel {
+    background: #fafbf9;
+    padding: 24px;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    border: 1px solid rgba(0,0,0,0.05);
+    margin-bottom: 24px;
+}
+.programs-panel-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 14px; }
+.programs-panel-head h3 { margin: 0; font-size: 16px; color: #1f2937; }
+.programs-count { font-size: 12px; font-weight: 600; color: #134e2a; background: #e1eae2; padding: 3px 10px; border-radius: 999px; }
+.programs-empty { margin: 0; font-size: 13px; color: #6b7280; }
+.programs-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
+.program-item { border: 1px solid #e2e6df; border-left: 3px solid #238f54; border-radius: 10px; padding: 12px 14px; background: #f5f7f3; display: flex; flex-direction: column; gap: 4px; }
+.program-item-name { font-size: 13.5px; font-weight: 600; color: #1f2937; line-height: 1.3; }
+.program-item-type { font-size: 11.5px; color: #6b7280; }
+.program-item-meta { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 6px; }
+.program-slots { font-size: 11.5px; font-weight: 600; color: #1b6336; }
+.program-slots.is-full { color: #991b1b; }
+.program-level { font-size: 11px; color: #6b7280; background: #e9ece6; padding: 2px 8px; border-radius: 999px; }
+
+/* About panel (below Recent Activity & Alerts) */
+.about-container {
+    background: #fafbf9;
+    padding: 24px;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    border: 1px solid rgba(0,0,0,0.04);
+    margin-top: 24px;
+}
+.about-container h3 { margin: 0 0 10px; font-size: 16px; color: #1f2937; }
+.about-container p { margin: 0 0 12px; font-size: 13.5px; line-height: 1.6; color: #374151; }
+.about-list { margin: 0 0 12px; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; }
+.about-list li { font-size: 13.5px; line-height: 1.5; color: #374151; }
+.about-list strong { color: #134e2a; }
+.about-container .about-note { margin: 0; font-size: 12.5px; color: #6b7280; }
+/* About: centered paragraphs under a larger centered heading */
+.about-container { text-align: center; padding: 32px 28px; }
+.about-container h3 { font-size: 22px; font-weight: 700; color: #134e2a; margin: 0 0 16px; }
+.about-container p { font-size: 14px; line-height: 1.7; max-width: 820px; margin: 0 auto 12px; }
+.about-container p:last-child { margin-bottom: 0; }

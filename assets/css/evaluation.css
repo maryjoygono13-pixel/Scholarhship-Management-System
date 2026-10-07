@@ -1,10 +1,31 @@
+/* Status colors the Evaluation page uses (they were referenced but never defined, so
+   green/red/amber status text fell back to plain black). Matches the site palette. */
+:root {
+  --green: #1b6336;
+  --green-bg: #d5e8da;
+  --red: #b91c1c;
+  --red-bg: #fee2e2;
+  --amber: #b45309;
+  --blue: #1d4ed8;
+  --blue-bg: #dbeafe;
+  --purple: #6d28d9;
+  --purple-bg: #ede9fe;
+  --ink: #1f2937;
+  --ink-soft: #6b7280;
+  --line: #e2e6df;
+  --panel: #fafbf9;
+  --slate-200: #e2e8f0;
+}
+
 /* =========================================================
    EVALUATION PAGE
 ========================================================= */
 
+/* Same size as the Scholars page (.scholars-container in scholars.css). */
 .page {
-    max-width: 1000px;
-    margin: 0 auto;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 24px;
 }
 
 .evaluation-main-content {
@@ -118,7 +139,7 @@
     padding: 0px 36px 0px 14px;
     color: #374151;
     border-radius: 8px;
-    background: #fff;
+    background: #fafbf9;
     font-size: 13.5px;
     outline: none;
     appearance: none;
@@ -156,7 +177,7 @@
     width: 100%;
     min-width: 900px;
     box-sizing: border-box;
-    background: #fff;
+    background: #fafbf9;
     border: 1px solid var(--slate-200);
     border-radius: 14px;
     overflow: hidden;
@@ -181,7 +202,7 @@ table {
 }
 
 thead th {
-    background: #ffffff;
+    background: #fafbf9;
 
     text-align: left;
 
@@ -206,7 +227,7 @@ tbody td {
 }
 
 tbody tr.active {
-    background: #e8f5e9 !important;
+    background: #e1eae2 !important;
 }
 
 tbody tr:hover {
@@ -520,7 +541,7 @@ tbody tr:hover {
 
     padding: 12px;
 
-    background: #ffffff;
+    background: #fafbf9;
 
     text-align: center;
 }
@@ -633,7 +654,7 @@ textarea {
 
     outline: none;
 
-    background: #ffffff;
+    background: #fafbf9;
 
     box-sizing: border-box;
 }
@@ -784,7 +805,7 @@ textarea {
 }
 
 .import-card {
-    background: #fff;
+    background: #fafbf9;
 
     border-radius: 12px;
 
@@ -835,16 +856,16 @@ textarea {
 
 #gradeBtn,
 #enrollmentBtn {
-    background: #f2faf4;
+    background: #edf2ed;
 
     color: var(--green-900, #134e2a);
 
-    border: 1px solid var(--green-100, #e8f5e9);
+    border: 1px solid var(--green-100, #e1eae2);
 }
 
 #gradeBtn:hover,
 #enrollmentBtn:hover {
-    background: #e8f5e9;
+    background: #e1eae2;
 }
 
 .import-btn {
@@ -1029,3 +1050,10 @@ textarea {
     color: #64748b;
     margin-top: 1px;
 }
+/* ---------- Message an applicant (icon on the applicant card + its window) ---------- */
+.profile { position: relative; }
+.profile-msg-btn { position: absolute; top: 12px; right: 12px; width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; border-radius: 10px; border: 1px solid #c3d6c6; background: #edf2ed; color: #134e2a; cursor: pointer; transition: background .15s ease, color .15s ease; }
+.profile-msg-btn:hover { background: #134e2a; color: #fff; border-color: #134e2a; }
+.profile-top { padding-right: 44px; }
+
+/* The message window's own styles are in style.css (also used by Renewal & Retention). */

@@ -5,14 +5,17 @@
  * Two sources count toward a type:
  *   - approved records (a record is created/updated/removed whenever a scholar is approved,
  *     edited or deleted), and
- *   - the Scholars list, for scholarships that add students automatically (the MERIT-BASED
- *     Academic Scholarship): a scholar counts while their GWA still meets its requirement.
+ *   - the Scholars list, for scholars whose entry names a scholarship: a scholar counts while their
+ *     GWA still meets its requirement.
+ * Dean's Listers aren't counted: the Dean's List is a recognition, not a scholarship program.
  * The list of types is read live from the Scholarships module — nothing here is hardcoded,
  * so a new type appears (with 0) the moment it is created.
  */
 
 require_once __DIR__ . '/grades_helper.php';
 require_once __DIR__ . '/gwa_helper.php';
+require_once __DIR__ . '/merit_helper.php';
+require_once __DIR__ . '/deans_list_rules.php';
 
 const DISTRIBUTION_UNCLASSIFIED = 'Unclassified';
 
@@ -101,6 +104,7 @@ function getScholarshipDistribution(PDO $pdo, ?string $schoolYear = null): array
     $recordStmt->execute($schoolYear !== null ? [$schoolYear] : []);
     $rows = $recordStmt->fetchAll(PDO::FETCH_ASSOC);
     foreach ($rows as $r) {
+        if (isDeansListType((string)$r['scholarship_type'])) continue;
         $type = $resolve((string)$r['scholarship_type']);
         $scholar = trim((string)$r['student_id']) !== '' ? 's:' . trim($r['student_id']) : 'r:' . $r['id'];
         $counts[$type][$scholar] = true;
@@ -114,13 +118,19 @@ function getScholarshipDistribution(PDO $pdo, ?string $schoolYear = null): array
     $scholarRows = $scholarStmt->fetchAll(PDO::FETCH_ASSOC);
     if ($scholarRows) {
         $gradeStats = getSemesterGradeStats($pdo, array_column($scholarRows, 'student_id'));
+        $meritRanges = getMeritRanges($pdo);
         foreach ($scholarRows as $sc) {
+            if (isDeansListType((string)$sc['scholarship_type'])) continue;
             $sid = trim((string)$sc['student_id']);
             $gwa = (float)$sc['gwa'];   // stored figure, unless imported grades say otherwise
             foreach (['Summer Term', '2nd Semester', '1st Semester'] as $sem) {
                 if (isset($gradeStats[$sid][$sem])) { $gwa = $gradeStats[$sid][$sem]['gwa']; break; }
             }
-            if (!gwaMeetsRequirement((float)$gwa, resolveGwaRequirement($pdo, (string)$sc['scholarship_type']))) continue;
+            // Same standing rule as the Scholars page: Merit by its Full / Half Merit ranges.
+            $stillQualifies = isMeritScholarshipType((string)$sc['scholarship_type'])
+                ? meritTierForGwa((float)$gwa, $meritRanges) !== null
+                : gwaMeetsRequirement((float)$gwa, resolveGwaRequirement($pdo, (string)$sc['scholarship_type']));
+            if (!$stillQualifies) continue;
 
             $type = $resolve((string)$sc['scholarship_type']);
             $counts[$type]['s:' . $sid] = true;   // same key as a record, so nobody is counted twice per type
@@ -139,7 +149,9 @@ function getScholarshipDistribution(PDO $pdo, ?string $schoolYear = null): array
     usort($items, fn($a, $b) => ($a['type'] === DISTRIBUTION_UNCLASSIFIED) <=> ($b['type'] === DISTRIBUTION_UNCLASSIFIED));
 
     $totalApproved = array_sum(array_column($items, 'count'));
-    $totalTypes = count(array_filter($items, fn($i) => $i['type'] !== DISTRIBUTION_UNCLASSIFIED));
+    // Scholarship types as the Scholarships page shows them: every type that has at least one
+    // scholarship program set up (a type with no program yet isn't counted).
+    $totalTypes = (int)$pdo->query("SELECT COUNT(DISTINCT LOWER(TRIM(type))) FROM scholarships WHERE TRIM(COALESCE(type, '')) != ''")->fetchColumn();
     // Most populated type = highest count (the earlier one in the fixed order wins a tie).
     $top = null;
     foreach ($items as $item) {
@@ -152,6 +164,8 @@ function getScholarshipDistribution(PDO $pdo, ?string $schoolYear = null): array
         'types' => $items,
         'totalApproved' => $totalApproved,
         'totalTypes' => $totalTypes,
+        // Active scholarship programs on the Scholarships page (the Dashboard's "Total Scholarship Programs").
+        'totalPrograms' => (int)$pdo->query("SELECT COUNT(*) FROM scholarships WHERE LOWER(TRIM(status)) = 'active'")->fetchColumn(),
         'mostPopular' => $top,
         'schoolYear' => $schoolYear ?? 'all',
         'generatedAt' => date('c'),

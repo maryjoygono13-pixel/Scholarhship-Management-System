@@ -58,6 +58,11 @@ const DOCUMENT_TYPES = [
     'certificate_of_award' => 'Certificate of Award / Recognition',
     'proof_of_involvement' => 'Proof of Involvement / Membership',
     'medical_certificate' => 'Medical Certificate',
+    // Need-Based programs: ONE file that is either document (see NEED_BASED_REQUIRED_DOCUMENTS).
+    'itr_or_indigency' => 'Income Tax Return (ITR) or Certificate of Indigency',
+    'academic_records' => 'Academic Records (Copy of Grades)',
+    // Community Service or Leadership programs (see COMMUNITY_SERVICE_REQUIRED_DOCUMENTS).
+    'leadership_record' => 'Documented Record of Leadership Role or Community Involvement',
     'other' => 'Other Document',
 ];
 
@@ -126,6 +131,89 @@ function getScholarshipDocuments(PDO $pdo, int $scholarshipId): array {
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
+// Documents every applicant must submit, whatever the program — on top of the program's own
+// list. The Certificate of Enrollment proves the applicant is a bonafide CM student.
+const UNIVERSAL_REQUIRED_DOCUMENTS = [
+    'coe' => 'Proof that you are a bonafide CM student.',
+];
+
+// Every NEED-BASED program also requires these. An ITR *or* a Certificate of Indigency is
+// enough, so the two are asked for as one upload instead of two separate required files.
+const NEED_BASED_REQUIRED_DOCUMENTS = [
+    'academic_records' => 'Copy of your grades / academic records.',
+    'itr_or_indigency' => 'Upload EITHER your family\'s Income Tax Return OR a Certificate of Indigency.',
+];
+// Program-level types folded into the combined "ITR or Certificate of Indigency" upload.
+const ITR_OR_INDIGENCY_TYPES = ['income_tax_return', 'certificate_of_indigency'];
+
+// Every Community Service or Leadership program also requires proof of the applicant's
+// leadership role or community involvement (e.g. certificate, appointment letter).
+const COMMUNITY_SERVICE_REQUIRED_DOCUMENTS = [
+    'leadership_record' => 'A documented record of your leadership role or community involvement.',
+];
+
+function isCommunityServiceScholarshipType(string $type): bool {
+    return stripos($type, 'community service') !== false || stripos($type, 'leadership scholarship') !== false;
+}
+
+function isNeedBasedScholarshipType(string $type): bool {
+    return stripos($type, 'need-based') !== false || stripos($type, 'need based') !== false;
+}
+
+/*
+ * The full document list an applicant faces for one program: the universal documents first
+ * (always required — even if the program lists one as optional), then the Need-Based ones
+ * for Need-Based programs, then the program's own. Built-in documents not in the program's
+ * list get id 0 (no scholarship_documents row).
+ */
+function getApplicationDocuments(PDO $pdo, int $scholarshipId): array {
+    $docs = getScholarshipDocuments($pdo, $scholarshipId);
+
+    $required = UNIVERSAL_REQUIRED_DOCUMENTS;
+    $typeStmt = $pdo->prepare("SELECT type FROM scholarships WHERE id = ?");
+    $typeStmt->execute([$scholarshipId]);
+    $programType = (string)$typeStmt->fetchColumn();
+    if (isNeedBasedScholarshipType($programType)) {
+        $required += NEED_BASED_REQUIRED_DOCUMENTS;
+        // Separate ITR / Certificate of Indigency entries are replaced by the combined one.
+        $docs = array_filter($docs, fn($d) => !in_array($d['document_type'], ITR_OR_INDIGENCY_TYPES, true));
+    }
+    if (isCommunityServiceScholarshipType($programType)) {
+        $required += COMMUNITY_SERVICE_REQUIRED_DOCUMENTS;
+    }
+
+    $builtIn = [];
+    foreach ($required as $type => $description) {
+        $existing = null;
+        foreach ($docs as $i => $d) {
+            if ($d['document_type'] === $type) { $existing = $d; unset($docs[$i]); break; }
+        }
+        $builtIn[] = $existing
+            ? array_merge($existing, ['required' => 1])
+            : ['id' => 0, 'scholarship_id' => $scholarshipId, 'document_type' => $type, 'description' => $description, 'required' => 1, 'sort_order' => -1];
+    }
+    return array_merge($builtIn, array_values($docs));
+}
+
+// Programs applied for on an outside site instead of this form, keyed by program code/acronym.
+// The Apply page sends the applicant there when they pick one; the submit API refuses them.
+const EXTERNAL_APPLICATION_PROGRAMS = [
+    'CMSP' => 'https://ched.gov.ph/stufaps',     // CHED Merit Scholarship Program
+    'COSCHO' => 'https://ched.gov.ph/stufaps',   // Scholarship for Coconut Farmers and Their Families
+];
+
+// The outside application URL for a program row (matched on its code, or the acronym that
+// starts its name/sub-type, e.g. "CMSP (CHED Merit Scholarship Program)"), or null.
+function externalApplicationUrl(array $program): ?string {
+    foreach ([$program['code'] ?? '', $program['subtype'] ?? '', $program['name'] ?? ''] as $value) {
+        if (preg_match('/^\s*([A-Za-z]+)\b/', (string)$value, $m)) {
+            $key = strtoupper($m[1]);
+            if (isset(EXTERNAL_APPLICATION_PROGRAMS[$key])) return EXTERNAL_APPLICATION_PROGRAMS[$key];
+        }
+    }
+    return null;
+}
+
 function getScholarshipBenefits(PDO $pdo, int $scholarshipId): array {
     $stmt = $pdo->prepare("SELECT * FROM scholarship_benefits WHERE scholarship_id = ? ORDER BY sort_order ASC, id ASC");
     $stmt->execute([$scholarshipId]);
@@ -146,6 +234,17 @@ function getManualReview(PDO $pdo, int $applicantId, int $criterionId): ?array {
     $stmt->execute([$applicantId, $criterionId]);
     $row = $stmt->fetch(PDO::FETCH_ASSOC);
     return $row ?: null;
+}
+
+// Whether the applicant has a Certificate of Enrollment on file (legacy coe_file, or a "coe"
+// upload in applicant_documents).
+function applicantHasCoe(PDO $pdo, array $applicant): bool {
+    if (trim((string)($applicant['coe_file'] ?? '')) !== '') return true;
+    $id = (int)($applicant['id'] ?? 0);
+    if ($id <= 0) return false;
+    $stmt = $pdo->prepare("SELECT 1 FROM applicant_documents WHERE applicant_id = ? AND document_type = 'coe' AND TRIM(file_path) != '' LIMIT 1");
+    $stmt->execute([$id]);
+    return (bool)$stmt->fetchColumn();
 }
 
 function compareOperator(string $operator, float $actual, float $value, ?float $value2 = null): bool {
@@ -204,7 +303,17 @@ function evaluateCriterion(PDO $pdo, array $criterion, array $applicant): array 
             case 'enrollment_status':
             case 'regular_student': {
                 $enrolled = !empty($applicant['enrolled']);
-                return ['status' => $enrolled ? 'pass' : 'fail', 'autoChecked' => true, 'actualValue' => $enrolled ? 1 : 0];
+                if (!$enrolled) {
+                    return ['status' => 'fail', 'autoChecked' => true, 'actualValue' => 0];
+                }
+                // Same rule as Evaluation's Enrollment column/tab: enrollment is confirmed by an
+                // uploaded Certificate of Enrollment, not by the enrolled flag (every new applicant
+                // has it by default).
+                // Confirmed in the Registrar's records counts as officially enrolled, even with no COE.
+                if (empty($applicant['enrollment_verified']) && !applicantHasCoe($pdo, $applicant)) {
+                    return ['status' => 'pending', 'autoChecked' => true, 'actualValue' => null, 'remarks' => 'No Certificate of Enrollment on file.'];
+                }
+                return ['status' => 'pass', 'autoChecked' => true, 'actualValue' => 1];
             }
             case 'year_level': {
                 $actual = trim((string)($applicant['year_level'] ?? ''));
@@ -299,8 +408,16 @@ function evaluateApplicantDocuments(PDO $pdo, array $applicant): array {
         }
     }
 
+    // Applicants who uploaded a separate ITR or Certificate of Indigency (before the two were
+    // combined) still count as having submitted the combined document.
+    if (empty($uploaded['itr_or_indigency'])) {
+        foreach (ITR_OR_INDIGENCY_TYPES as $alt) {
+            if (!empty($uploaded[$alt])) { $uploaded['itr_or_indigency'] = $uploaded[$alt]; break; }
+        }
+    }
+
     $out = [];
-    foreach (getScholarshipDocuments($pdo, $scholarshipId) as $d) {
+    foreach (getApplicationDocuments($pdo, $scholarshipId) as $d) {
         $filename = $uploaded[$d['document_type']] ?? '';
         $out[] = [
             'id' => (int)$d['id'],
